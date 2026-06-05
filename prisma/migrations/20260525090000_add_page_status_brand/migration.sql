@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Page" ADD COLUMN "brandName" TEXT;
+ALTER TABLE "Page" ADD COLUMN "status" TEXT NOT NULL DEFAULT 'draft';
+ALTER TABLE "Page" ADD COLUMN "exportedAt" DATETIME;

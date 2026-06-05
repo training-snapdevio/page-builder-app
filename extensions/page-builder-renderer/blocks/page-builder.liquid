@@ -1,0 +1,50 @@
+{% comment %}
+  Page Builder Renderer — App Block
+  Reads the page_builder.content JSON metafield, passes it to storefront.js
+  (React bundle) via a data attribute, and renders nothing if no content is saved.
+{% endcomment %}
+
+{% assign pb_content = page.metafields.page_builder.content %}
+{% assign pb_styles  = shop.metafields.page_builder.global_styles %}
+
+{% if pb_content != blank %}
+  {%- comment -%}
+    Fallback page-title hide for merchants who haven't enabled the
+    "Page Builder Chrome" app embed yet. The embed is the canonical hide
+    (loads sitewide in <head>, no flash). This per-page CSS is a safety net.
+    Add the class `pb-keep-title` to a heading to opt out.
+  {%- endcomment -%}
+  <style>
+    .main-page-title:not(.pb-keep-title),
+    .page-title:not(.pb-keep-title),
+    .page__title:not(.pb-keep-title),
+    .page__heading:not(.pb-keep-title),
+    .page-header__title:not(.pb-keep-title)
+    { display: none !important; }
+  </style>
+
+  {%- comment -%}
+    Emit Global Settings as CSS custom properties (--button-padding-x,
+    --primary-color, etc.) so storefront buttons/colors/typography match the
+    editor canvas. Sourced from the shop-level `global_styles` metafield.
+  {%- endcomment -%}
+  {% if pb_styles != blank %}
+    <style data-page-builder="settings">{{ pb_styles }}</style>
+  {% endif %}
+
+  <div
+    id="page-builder-root"
+    data-content="{{ pb_content | json | escape }}"
+    style="width:100%;"
+  ></div>
+{% endif %}
+
+{% schema %}
+{
+  "name": "t:blocks.page_builder.name",
+  "target": "section",
+  "javascript": "storefront.js",
+  "templates": ["page"],
+  "settings": []
+}
+{% endschema %}

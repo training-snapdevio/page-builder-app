@@ -1,0 +1,206 @@
+@import "@my-app/puck-editor/no-external.css";
+@import "tailwindcss";
+
+/* ── Editor loading screen ──────────────────────────────────────────────── */
+.pb-loader {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  background: radial-gradient(circle at 50% 38%, #ffffff 0%, #f4f4f7 100%);
+  /* Match the Shopify admin: use Polaris's font stack (Inter-led), not a
+     hardcoded one. */
+  font-family: var(
+    --p-font-family-sans,
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    sans-serif
+  );
+}
+
+.pb-loader__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 15px);
+  grid-template-rows: repeat(4, 15px);
+  gap: 6px;
+}
+
+.pb-loader__cell {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  background: #e4e4ec;
+  animation: pbCellPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pbCellPulse {
+  0%,
+  100% {
+    background: #e4e4ec;
+    transform: scale(0.82);
+  }
+  50% {
+    background: #5b4bff;
+    transform: scale(1);
+    box-shadow: 0 3px 10px rgba(91, 75, 255, 0.4);
+  }
+}
+
+.pb-loader__title {
+  font-size: var(--p-font-size-500, 20px);
+  font-weight: var(--p-font-weight-semibold, 650);
+  letter-spacing: -0.01em;
+  color: #1a1a1f;
+}
+
+.pb-loader__tip {
+  font-size: var(--p-font-size-325, 13px);
+  color: #8a8a94;
+  min-height: 18px;
+  max-width: 320px;
+  text-align: center;
+  animation: pbTipFade 0.4s ease;
+}
+
+@keyframes pbTipFade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pb-loader__cell,
+  .pb-loader__tip {
+    animation: none;
+  }
+}
+
+/* ── Header — hide Puck's native undo/redo (moved to right action bar) ───── */
+._PuckHeader-tools_63pti_75 {
+  display: none !important;
+}
+
+/* ── Header — capitalize page name ──────────────────────────────────────── */
+._PuckHeader-path_63pti_68 {
+  text-transform: capitalize !important;
+}
+
+/* ── Left Sidebar — Fixed width, no expansion ───────────────────────────── */
+._PuckLayout-inner_1dd16_40 {
+  --puck-user-left-side-bar-width: 260px !important;
+}
+
+/* Hide the left sidebar drag-resize handle */
+._Sidebar--left_o396p_13 + ._Sidebar-resizeHandle_o396p_37 {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* ── Left Sidebar — Padding & refined card look ─────────────────────────── */
+
+/* Section content area: breathing room around the component grid */
+._Sidebar--left_o396p_13 ._SidebarSection-content_5otpt_24 {
+  padding: 10px 12px 12px !important;
+}
+
+/* Section title: consistent horizontal padding */
+._Sidebar--left_o396p_13 ._SidebarSection-title_5otpt_12 {
+  padding: 10px 12px !important;
+}
+
+/* Drawer gap between rows */
+._Sidebar--left_o396p_13 ._Drawer_pl7z0_1 {
+  gap: 8px !important;
+}
+
+/* Component cards: softer radius + subtle shadow instead of flat border */
+._Sidebar--left_o396p_13 ._DrawerItem-draggable_pl7z0_22 {
+  border-radius: 8px !important;
+  padding: 20px 16px !important;
+  border-color: #e5e7eb !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+  transition: box-shadow 120ms ease, background-color 120ms ease !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+._Sidebar--left_o396p_13 ._DrawerItem-draggable_pl7z0_22:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* ── Right Sidebar — Hide Puck's "Page" title when GlobalLayoutPanel is open ── */
+/* SelectionTracker stamps data-pb-global-select on .Puck when header/footer   */
+/* panel is open. Hiding Puck's own title lets our header sit flush at the top. */
+[data-pb-global-select] ._Sidebar--right_o396p_25 ._SidebarSection-title_5otpt_12 {
+  display: none !important;
+}
+
+/* ── Right Sidebar — Fixed width, no expansion ──────────────────────────── */
+._Sidebar--right_o396p_25 + ._Sidebar-resizeHandle_o396p_37 {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* ── Right Sidebar — Normalize all inputs & selects to consistent 36px height ── */
+._Sidebar--right_o396p_25 ._Input-input_bsxfo_26 {
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  height: 36px !important;
+  box-sizing: border-box !important;
+}
+select._Sidebar--right_o396p_25 ._Input-input_bsxfo_26,
+._Sidebar--right_o396p_25 select._Input-input_bsxfo_26 {
+  height: 36px !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+}
+
+/* ── Thin Scrollbars — App-wide ─────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c7c7d6 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #c7c7d6;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Keep the root html scroll invisible; inner panels show thin scrollbars */
+html {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar {
+  display: none;
+}

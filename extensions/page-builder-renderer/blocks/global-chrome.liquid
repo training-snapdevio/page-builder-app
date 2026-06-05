@@ -1,0 +1,257 @@
+{% comment %}
+  Page Builder — Global Chrome (app embed)
+
+  Renders the custom global header/footer on EVERY storefront page.
+
+  Three metafields drive the behavior:
+    - hide_native_header  ("true"/"false") — drives immediate CSS hide
+    - hide_native_footer  ("true"/"false") — drives immediate CSS hide
+    - global_chrome        — the full bundle (style + script + header + footer)
+
+  The boolean flags let us output hide-CSS DIRECTLY from this liquid, so
+  hiding works even when the chrome bundle metafield is stale — no need to
+  wait for JS or re-save settings.
+
+  Merchants enable this block in: Theme Editor → App Embeds.
+{% endcomment %}
+
+{% assign pb_hide_header = shop.metafields.page_builder.hide_native_header.value %}
+{% assign pb_hide_footer = shop.metafields.page_builder.hide_native_footer.value %}
+{% assign pb_chrome      = shop.metafields.page_builder.global_chrome.value %}
+{% assign pb_styles      = shop.metafields.page_builder.global_styles %}
+
+{%- comment -%}
+  Sitewide brand cascade — Page Builder Global Settings (colors, fonts, sizes)
+  apply to EVERY storefront page (home, products, collections, blogs, etc.),
+  not just the pages built with Page Builder.
+
+  Two parts:
+    1. <style data-page-builder="settings"> — :root { --primary-color ...; }
+       Sourced from the `global_styles` shop metafield. The app writes this
+       every time the merchant saves Global Settings.
+    2. <style data-page-builder="brand-cascade"> — body/heading/link rules that
+       reference those CSS variables so the theme picks up brand fonts/colors
+       sitewide. Scoped to `:where()` so theme-specific selectors still win
+       on explicit overrides, but plain body/h1/etc. inherit our brand.
+{%- endcomment -%}
+{% if pb_styles != blank %}
+  <style data-page-builder="settings">{{ pb_styles }}</style>
+  <style data-page-builder="brand-cascade">
+    :where(body) {
+      font-family: var(--font-family);
+      font-size:   var(--base-font-size);
+      line-height: var(--line-height);
+      letter-spacing: var(--letter-spacing);
+      color:       var(--text-color);
+      background-color: var(--background-color);
+    }
+    :where(h1, h2, h3, h4, h5, h6) {
+      font-family: var(--heading-font);
+      font-weight: var(--heading-weight);
+      line-height: var(--heading-line-height);
+    }
+    :where(h1) { font-size: var(--h1-size); }
+    :where(h2) { font-size: var(--h2-size); }
+    :where(h3) { font-size: var(--h3-size); }
+    :where(h4) { font-size: var(--h4-size); }
+    :where(h5) { font-size: var(--h5-size); }
+    :where(h6) { font-size: var(--h6-size); }
+    :where(a:not([class*="btn"]):not([class*="button"])) {
+      color: var(--link-color);
+      text-decoration: var(--link-decoration);
+    }
+    :where(img) {
+      border-radius: var(--image-border-radius);
+    }
+  </style>
+{% endif %}
+
+{%- comment -%}
+  Page-title hide: Shopify themes auto-render `{{ page.title }}` above the
+  page body via their page.liquid template. We hide it sitewide via this
+  embed so we don't have to inline the CSS into every builder page (was
+  ~250 bytes per page; once globally is enough).
+  Add the class `pb-keep-title` to a page's heading if you want to keep it.
+{%- endcomment -%}
+<style data-page-builder="embed-title-hide">
+  .main-page-title:not(.pb-keep-title),
+  .page__title:not(.pb-keep-title),
+  .page-title:not(.pb-keep-title),
+  .page__heading:not(.pb-keep-title),
+  .page-header__title:not(.pb-keep-title),
+  .page-header h1:not(.pb-keep-title),
+  .shopify-section--page > h1:not(.pb-keep-title),
+  .shopify-section--page .page__title:not(.pb-keep-title),
+  .shopify-section--main-page h1:not(.pb-keep-title),
+  .template-page > h1:first-of-type:not(.pb-keep-title),
+  main.page-width > h1:first-child:not(.pb-keep-title)
+  { display: none !important; }
+</style>
+
+{% if pb_hide_header == 'true' or pb_hide_footer == 'true' %}
+  <style data-page-builder="embed-hide">
+    {% if pb_hide_header == 'true' %}
+      header:not(.pb-global-header),
+      .header:not(.pb-global-header),
+      .site-header:not(.pb-global-header),
+      .header-wrapper:not(.pb-global-header),
+      .shopify-section-header:not(.pb-global-header),
+      .shopify-section-group-header-group:not(.pb-global-header),
+      [id^='shopify-section-header']:not(.pb-global-header),
+      [id^='shopify-section-sections--'][id*='--header']:not(.pb-global-header)
+      { display: none !important; }
+    {% endif %}
+    {% if pb_hide_footer == 'true' %}
+      footer:not(.pb-global-footer),
+      .footer:not(.pb-global-footer),
+      .site-footer:not(.pb-global-footer),
+      .footer-wrapper:not(.pb-global-footer),
+      .shopify-section-footer:not(.pb-global-footer),
+      .shopify-section-group-footer-group:not(.pb-global-footer),
+      [id^='shopify-section-footer']:not(.pb-global-footer),
+      [id^='shopify-section-sections--'][id*='--footer']:not(.pb-global-footer)
+      { display: none !important; }
+    {% endif %}
+  </style>
+{% endif %}
+
+{%- comment -%}
+  Responsive overrides for Page Builder block markup.
+
+  Pages are rendered with inline `style="…"` (so they're self-contained inside
+  Shopify's page.body), which means the only way to override them on small
+  viewports is via attribute selectors with `!important`.
+
+  The blocks all emit the same canonical strings — `grid-template-columns:
+  repeat(N,1fr)`, `1fr 1fr`, etc. — so substring matches are stable across
+  every renderer (puck-renderer.ts and builder.js stay in sync because both
+  emit identical markup).
+{%- endcomment -%}
+<style data-page-builder="embed-responsive">
+  /* ── Mobile (<= 768px) ────────────────────────────────────────────────── */
+  @media (max-width: 768px) {
+    /* Any 2+ column grid collapses to a single column */
+    [style*="grid-template-columns:repeat(2,"],
+    [style*="grid-template-columns:repeat(3,"],
+    [style*="grid-template-columns:repeat(4,"],
+    [style*="grid-template-columns:repeat(5,"],
+    [style*="grid-template-columns:repeat(6,"],
+    [style*="grid-template-columns:1fr 1fr"],
+    [style*="grid-template-columns:1fr 2fr"],
+    [style*="grid-template-columns:2fr 1fr"],
+    [style*="grid-template-columns: repeat(2"],
+    [style*="grid-template-columns: repeat(3"],
+    [style*="grid-template-columns: repeat(4"],
+    [style*="grid-template-columns: repeat(5"],
+    [style*="grid-template-columns: repeat(6"] {
+      grid-template-columns: 1fr !important;
+      gap: 16px !important;
+    }
+
+    /* ContactSection uses a 1fr 1fr grid with a 64px gap;
+       shrink the gap on mobile too */
+    [style*="gap:64px"], [style*="gap: 64px"] { gap: 24px !important; }
+
+    /* Fixed-width cards expand to full container width */
+    [style*="width:300px"], [style*="width: 300px"] { width: 100% !important; }
+
+    /* Section padding gets aggressive on mobile to claw back screen real estate */
+    [style*="padding:80px 0"], [style*="padding: 80px 0"] {
+      padding: 48px 0 !important;
+    }
+    [style*="padding:0 24px"], [style*="padding: 0 24px"] {
+      padding-left: 16px !important;
+      padding-right: 16px !important;
+    }
+
+    /* Heroes: pinch top/bottom padding only — keep flex / overlay etc. */
+    [style*="padding:80px"], [style*="padding: 80px"] {
+      padding: 48px 16px !important;
+    }
+
+    /* Headlines too big for narrow viewports — scale down 2rem-ish heads */
+    [style*="font-size:2rem"], [style*="font-size: 2rem"] {
+      font-size: 1.5rem !important;
+    }
+    [style*="font-size:2.5rem"], [style*="font-size: 2.5rem"] {
+      font-size: 1.75rem !important;
+    }
+    [style*="font-size:3.5rem"], [style*="font-size: 3.5rem"] {
+      font-size: 2rem !important;
+    }
+  }
+
+  /* ── Tablet (769–1024px) ──────────────────────────────────────────────── */
+  @media (max-width: 1024px) and (min-width: 769px) {
+    /* 4+ column grids → 2 columns on tablet */
+    [style*="grid-template-columns:repeat(4,"],
+    [style*="grid-template-columns:repeat(5,"],
+    [style*="grid-template-columns:repeat(6,"],
+    [style*="grid-template-columns: repeat(4"],
+    [style*="grid-template-columns: repeat(5"],
+    [style*="grid-template-columns: repeat(6"] {
+      grid-template-columns: repeat(2, 1fr) !important;
+    }
+  }
+
+  /* ── Universal img safety — never overflow container ─────────────────── */
+  .pb-accordion img,
+  [style*="display:grid"] img,
+  [style*="display: grid"] img,
+  section img {
+    max-width: 100%;
+  }
+
+  /* ── PhotoCollage falls back to a clean 2-col stack on mobile ─────────── */
+  @media (max-width: 768px) {
+    [style*="grid-template-rows:repeat(3,160px)"],
+    [style*="grid-template-rows:repeat(3,200px)"] {
+      grid-template-columns: repeat(2, 1fr) !important;
+      grid-template-rows: auto !important;
+    }
+    [style*="grid-template-rows:repeat(3,160px)"] > div,
+    [style*="grid-template-rows:repeat(3,200px)"] > div {
+      grid-column: auto !important;
+      grid-row: auto !important;
+      min-height: 160px !important;
+    }
+  }
+
+  /* ── Global header — wrap on narrow viewports, tighten nav ────────────── */
+  @media (max-width: 640px) {
+    .pb-global-header {
+      flex-wrap: wrap !important;
+      gap: 8px !important;
+      padding: 12px 16px !important;
+      min-height: 0 !important;
+    }
+    .pb-global-header nav {
+      flex-wrap: wrap !important;
+      gap: 4px !important;
+      width: 100% !important;
+      order: 3 !important;
+    }
+    .pb-global-header nav a {
+      padding: 4px 8px !important;
+      font-size: 13px !important;
+    }
+    .pb-global-header > a + div {
+      /* the flex spacer between brand and nav */
+      display: none !important;
+    }
+  }
+
+  /* ── Global footer — column-grid is already responsive via auto-fit ──── */
+</style>
+
+{% if pb_chrome != blank %}
+  {{ pb_chrome }}
+{% endif %}
+
+{% schema %}
+{
+  "name": "Page Builder Chrome",
+  "target": "body",
+  "settings": []
+}
+{% endschema %}

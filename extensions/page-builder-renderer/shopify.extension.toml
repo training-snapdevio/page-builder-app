@@ -1,0 +1,7 @@
+api_version = "2025-04"
+
+[[extensions]]
+uid = "3c8b90de-469a-1da1-ad6c-9184c11807e1d76aba2d"
+type = "theme"
+name = "Page Builder Renderer"
+handle = "page-builder-renderer"
