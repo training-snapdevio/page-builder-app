@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "@my-app/puck-editor": "*",
-    "@prisma/client": "^6.16.3",
+    "@prisma/client": "^6.16.2",
     "@react-router/dev": "^7.12.0",
     "@react-router/fs-routes": "^7.12.0",
     "@react-router/node": "^7.12.0",
@@ -34,9 +34,10 @@
     "@shopify/polaris": "^13.9.5",
     "@shopify/shopify-app-react-router": "^1.1.0",
     "@shopify/shopify-app-session-storage-prisma": "^9.0.0",
+    "deepmerge-ts": "^7.1.5",
+    "install": "^0.13.0",
     "isbot": "^5.1.31",
     "lucide-react": "^0.511.0",
-    "prisma": "^6.16.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router": "^7.12.0",
@@ -60,6 +61,7 @@
     "eslint-plugin-react-hooks": "^4.6.2",
     "graphql-config": "^5.1.1",
     "prettier": "^3.6.2",
+    "prisma": "^6.16.2",
     "tailwindcss": "^4.1.8",
     "typescript": "^5.9.3",
     "vite": "^6.3.6"

@@ -141,8 +141,6 @@
 }
 
 /* ── Right Sidebar — Hide Puck's "Page" title when GlobalLayoutPanel is open ── */
-/* SelectionTracker stamps data-pb-global-select on .Puck when header/footer   */
-/* panel is open. Hiding Puck's own title lets our header sit flush at the top. */
 [data-pb-global-select] ._Sidebar--right_o396p_25 ._SidebarSection-title_5otpt_12 {
   display: none !important;
 }
@@ -165,6 +163,36 @@ select._Sidebar--right_o396p_25 ._Input-input_bsxfo_26,
   height: 36px !important;
   padding: 8px 12px !important;
   font-size: 13px !important;
+}
+
+/* ── Properties panel overlays left sidebar when a block is selected ─────── */
+/*                                                                             */
+/* Strategy: place the right sidebar in the same CSS grid cell as the left    */
+/* sidebar ("left" area). Both elements share the cell; the right sidebar sits */
+/* on top via z-index. The "right" grid column is forced to 0 so the canvas   */
+/* never shifts when a block is selected.                                      */
+
+/* Right sidebar occupies the same grid cell as the left sidebar */
+._Sidebar--right_o396p_25 {
+  grid-area: left !important;
+  z-index: 10;
+  border-inline-start: none !important;
+  border-inline-end: 1px solid var(--puck-color-grey-09) !important;
+}
+
+/* Keep the right grid column collapsed so canvas width never changes */
+@media (min-width: 638px) {
+  ._PuckLayout--rightSideBarVisible_1dd16_132 ._PuckLayout-inner_1dd16_40 {
+    grid-template-columns: var(--puck-side-nav-width) var(--puck-left-side-bar-width) var(--puck-frame-width) 0 !important;
+  }
+  ._PuckLayout--leftSideBarVisible_1dd16_81._PuckLayout--rightSideBarVisible_1dd16_132 ._PuckLayout-inner_1dd16_40 {
+    grid-template-columns: var(--puck-side-nav-width) var(--puck-left-side-bar-width) var(--puck-frame-width) 0 !important;
+  }
+}
+
+/* Subtle shadow to reinforce the overlay panel feel */
+._PuckLayout--rightSideBarVisible_1dd16_132 ._Sidebar--right_o396p_25 {
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08) !important;
 }
 
 /* ── Thin Scrollbars — App-wide ─────────────────────────────────────────── */

@@ -11940,7 +11940,7 @@ const ImageComponent = {
                 {tab === "content" && (
                   <>
                     <StackedField label="Image">
-                      {imageUploadField.render({ value: props.imageUrl ?? "", onChange: (v) => set("imageUrl", v), field: { label: "Image" } })}
+                      <ImageField label="Image" value={props.imageUrl ?? ""} onChange={(v) => set("imageUrl", v)} />
                     </StackedField>
                     <StackedTextField label="Alt Text" value={props.altText ?? ""} onChange={(v) => set("altText", v)} placeholder="Describe the image..." />
                     <StackedTextField label="Caption" value={props.caption ?? ""} onChange={(v) => set("caption", v)} placeholder="Optional caption..." />
@@ -14196,7 +14196,7 @@ const BlockQuoteComponent = {
                     <StackedTextField label="Author Name" value={props.authorName ?? ""} onChange={(v) => set("authorName", v)} placeholder="Author name..." />
                     <StackedTextField label="Author Title" value={props.authorTitle ?? ""} onChange={(v) => set("authorTitle", v)} placeholder="CEO, Acme Inc." />
                     <StackedField label="Author Image">
-                      {imageUploadField.render({ value: props.authorImage ?? "", onChange: (v) => set("authorImage", v), field: { label: "Author Image" } })}
+                      <ImageField label="Author Image" value={props.authorImage ?? ""} onChange={(v) => set("authorImage", v)} />
                     </StackedField>
                     <ToggleField label="Show Quote Icon" value={props.showQuoteIcon !== false} onChange={(v) => set("showQuoteIcon", v)} />
                   </>
