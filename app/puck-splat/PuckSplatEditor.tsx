@@ -76,6 +76,7 @@ import { GlobalSettingsProvider, useGlobalSettings } from "@/puck-splat/context/
 import { IframeThemeInjector } from "@/puck-splat/components/IframeThemeInjector";
 import { SaveBlockModal } from "@/puck-splat/components/SaveBlockModal";
 import { EditGlobalBlockModal } from "@/puck-splat/components/EditGlobalBlockModal";
+import { PublishGuidelineModal } from "@/puck-splat/components/PublishGuidelineModal";
 import { ComponentsPanelWithTabs } from "@/puck-splat/components/ComponentsPanelWithTabs";
 import { GlobalLayoutPanel } from "@/puck-splat/components/GlobalLayoutPanel";
 import { useSavePage } from "@/puck-splat/hooks/useSavePage";
@@ -903,9 +904,11 @@ function SaveButton({
 
 function PublishButton({
   onPublish,
+  onPublishSuccess,
   pageTitle,
 }: {
   onPublish: (data: Data) => Promise<void>;
+  onPublishSuccess?: () => void;
   pageTitle: string;
 }) {
   const { appState } = usePuck();
@@ -946,6 +949,7 @@ function PublishButton({
       await onPublish(cleanData);
       markClean(snapshot);
       showToast("Page published successfully");
+      onPublishSuccess?.();
     } catch (err) {
       setPublishError(err instanceof Error ? err.message : "Publish failed");
       setTimeout(() => setPublishError(null), 5000);
@@ -977,6 +981,7 @@ function PolarisEditorHeader({
   pageTitle,
   slug,
   onPublish,
+  onPublishSuccess,
   inspectorEnabled,
   onToggleInspector,
   children,
@@ -984,6 +989,7 @@ function PolarisEditorHeader({
   pageTitle: string;
   slug: string;
   onPublish: (data: Data) => Promise<void>;
+  onPublishSuccess?: () => void;
   inspectorEnabled: boolean;
   onToggleInspector: () => void;
   children: React.ReactNode;
@@ -1047,6 +1053,7 @@ function PolarisEditorHeader({
         <div style={{ width: 1, height: 20, background: "var(--p-color-border)", flexShrink: 0 }} />
         <PublishButton
           onPublish={onPublish}
+          onPublishSuccess={onPublishSuccess}
           pageTitle={pageTitle}
         />
       </InlineStack>
@@ -1076,6 +1083,7 @@ export default function PuckSplatEditor({
   footerData?: unknown;
 }) {
   const [showLibrary, setShowLibrary] = useState(false);
+  const [showGuidelineModal, setShowGuidelineModal] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showSaveAsGlobalModal, setShowSaveAsGlobalModal] = useState(false);
   const [editingGlobalBlock, setEditingGlobalBlock] = useState<GlobalBlock | null>(null);
@@ -1386,12 +1394,14 @@ export default function PuckSplatEditor({
                 inspectorEnabled={inspectorEnabled}
                 onToggleInspector={() => setInspectorEnabled((prev) => !prev)}
                 onPublish={async (cleanData) => {
-                  await fetch(`/api/pages/${slug}`, {
+                  const res = await fetch(`/api/pages/${slug}`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ data: cleanData }),
                   });
+                  if (!res.ok) throw new Error("Publish failed");
                 }}
+                onPublishSuccess={() => setShowGuidelineModal(true)}
               >
                 {children}
               </PolarisEditorHeader>
@@ -1487,6 +1497,14 @@ export default function PuckSplatEditor({
                 />
                 {showSaveModal && <PuckContextModal onClose={() => setShowSaveModal(false)} />}
                 {showSaveAsGlobalModal && <SaveAsGlobalBlockModal onClose={() => setShowSaveAsGlobalModal(false)} />}
+                {showGuidelineModal && (
+                  <PublishGuidelineModal
+                    pageTitle={pageTitle}
+                    pageId={slug}
+                    pageSlug={slug}
+                    onClose={() => setShowGuidelineModal(false)}
+                  />
+                )}
                 {editingGlobalBlock && (
                   <EditGlobalBlockModal
                     block={editingGlobalBlock as never}

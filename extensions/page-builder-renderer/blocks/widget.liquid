@@ -1,0 +1,58 @@
+{% comment %}
+  Page Builder Widget Block
+  Fetches page builder content from the app proxy and renders it on the storefront.
+  Merchants enter a Block ID (page slug) in the block settings to display a published page.
+{% endcomment %}
+
+{% assign block_id    = block.settings.block_id | strip %}
+{% assign use_theme   = block.settings.use_theme_styles %}
+{% assign proxy_root  = routes.root_url | append: 'apps/pb-widget' %}
+
+{% if block_id != blank %}
+  <div
+    id="pb-widget-{{ block.id }}"
+    data-block-id="{{ block_id | escape }}"
+    data-proxy-url="{{ proxy_root }}"
+    data-theme-styles="{{ use_theme | default: false }}"
+    style="width:100%;min-height:60px;position:relative;"
+  >
+    {%- comment -%} Loading placeholder — removed by pb-widget-loader.js after inject {%- endcomment -%}
+    <div class="pb-widget-loading" style="display:flex;align-items:center;justify-content:center;padding:32px;color:#9ca3af;font-size:14px;font-family:sans-serif;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;animation:pb-spin 1s linear infinite">
+        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+      </svg>
+      Loading content…
+      <style>@keyframes pb-spin{to{transform:rotate(360deg)}}</style>
+    </div>
+  </div>
+{% else %}
+  {% if request.design_mode %}
+    <div style="padding:24px;border:2px dashed #e5e7eb;border-radius:8px;text-align:center;color:#6b7280;font-size:14px;font-family:sans-serif;">
+      <strong style="display:block;margin-bottom:6px;color:#374151;">Page Builder Widget</strong>
+      Enter a Block ID in the block settings to display your page builder content here.
+    </div>
+  {% endif %}
+{% endif %}
+
+{% schema %}
+{
+  "name": "Page Builder Widget",
+  "target": "section",
+  "javascript": "pb-widget-loader.js",
+  "settings": [
+    {
+      "type": "text",
+      "id": "block_id",
+      "label": "Block ID",
+      "info": "Enter the Block ID from your published page in the Page Builder app."
+    },
+    {
+      "type": "checkbox",
+      "id": "use_theme_styles",
+      "label": "Use theme styles",
+      "default": false,
+      "info": "When enabled, the widget inherits your theme's colors and fonts instead of the Page Builder app's design settings."
+    }
+  ]
+}
+{% endschema %}

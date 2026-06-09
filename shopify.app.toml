@@ -11,9 +11,14 @@ automatically_update_urls_on_dev = true
 [webhooks]
 api_version = "2026-07"
 
+[app_proxy]
+url = "/apps/pb-widget"
+subpath = "pb-widget"
+prefix = "apps"
+
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products,read_content,write_content,write_files"
+scopes = "write_products,read_content,write_content,write_files,read_script_tags,write_app_proxy"
 
 [auth]
 redirect_urls = [ "https://example.com/api/auth" ]

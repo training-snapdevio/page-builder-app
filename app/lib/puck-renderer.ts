@@ -444,21 +444,55 @@ function Space(p: Props): string {
 }
 
 function Image(p: Props): string {
-  const img = (p.image as Record<string, string> | null | undefined) ?? {};
-  if (!img.url) return "";
-  const borderRadius = `${p.borderRadius ?? 0}px`;
-  const width = (p.width as string) || "100%";
-  const height = `${p.height ?? 400}px`;
-  const objectFit = (p.objectFit as string) || "cover";
-  const shadow = p.shadow ? "box-shadow:0 8px 30px rgba(0,0,0,0.15);" : "";
-  const imgTag = `<img src="${esc(img.url)}" alt="${esc(img.alt || "")}" loading="lazy" style="width:${width};height:${height};object-fit:${objectFit};border-radius:${borderRadius};display:block;${shadow}">`;
-  const wrapped = p.linkUrl ? `<a href="${esc(p.linkUrl)}" target="_blank" rel="noopener noreferrer">${imgTag}</a>` : imgTag;
-  return `<div style="${s({ padding: `${p.padding ?? 0}px`, textAlign: (p.alignment || "center") as string })}">
-  <div style="display:inline-block;max-width:100%">
-    ${wrapped}
-    ${p.caption ? `<p style="font-size:13px;color:#374151;opacity:.65;margin-top:8px;text-align:${esc((p.alignment as string) || "center")};font-style:italic">${esc(p.caption)}</p>` : ""}
-  </div>
-</div>`;
+  const imageUrl = (p.imageUrl as string) || "";
+  if (!imageUrl) return "";
+
+  const altText     = esc((p.altText as string) || "");
+  const caption     = (p.caption as string) || "";
+  const linkUrl     = (p.linkUrl as string) || "";
+  const linkTarget  = esc((p.linkTarget as string) || "_self");
+  const width       = esc((p.width as string) || "100%");
+  const height      = esc((p.height as string) || "auto");
+  const objectFit   = esc((p.objectFit as string) || "cover");
+  const borderRadius = esc((p.borderRadius as string) || "0px");
+  const borderStyle = (p.borderStyle as string) || "none";
+  const borderWidth = p.borderWidth ?? 1;
+  const borderColor = esc((p.borderColor as string) || "#e5e7eb");
+  const opacity     = p.opacity != null ? (p.opacity as number) / 100 : 1;
+  const alignment   = esc((p.alignment as string) || "center");
+
+  const shadowColor = p.shadowColor as string;
+  const boxShadow   = shadowColor
+    ? `box-shadow:${p.shadowX ?? 0}px ${p.shadowY ?? 0}px ${p.shadowBlur ?? 0}px ${p.shadowSpread ?? 0}px ${esc(shadowColor)};`
+    : "";
+
+  const borderCss = borderStyle !== "none"
+    ? `border:${borderWidth}px ${esc(borderStyle)} ${borderColor};`
+    : "";
+
+  const advMargin  = (p.advMargin as any) ?? {};
+  const advPadding = (p.advPadding as any) ?? {};
+  const mt = advMargin.top ?? 0, mr = advMargin.right ?? 0, mb = advMargin.bottom ?? 0, ml = advMargin.left ?? 0;
+  const pt = advPadding.top ?? 0, pr = advPadding.right ?? 0, pb = advPadding.bottom ?? 0, pl = advPadding.left ?? 0;
+
+  const advBgStyle = (p.advBgType as string) === "color" && p.advBgColor
+    ? `background-color:${esc(p.advBgColor as string)};`
+    : "";
+
+  const imgStyle = `width:${width};height:${height};object-fit:${objectFit};border-radius:${borderRadius};display:block;opacity:${opacity};${borderCss}${boxShadow}`;
+  const imgTag = `<img src="${esc(imageUrl)}" alt="${altText}" loading="lazy" style="${imgStyle}">`;
+
+  const captionHtml = caption
+    ? `<p style="font-size:${p.captionFontSize ?? 13}px;color:${esc((p.captionColor as string) || "var(--text-color)")};margin-top:8px;text-align:${esc((p.captionAlign as string) || "center")};font-style:italic;background:${esc((p.captionBackground as string) || "transparent")}">${esc(caption)}</p>`
+    : "";
+
+  const wrapped = linkUrl
+    ? `<a href="${esc(linkUrl)}" target="${linkTarget}"${linkTarget === "_blank" ? ' rel="noopener noreferrer"' : ""} style="display:block">${imgTag}</a>`
+    : imgTag;
+
+  return `<div style="margin:${mt}px ${mr}px ${mb}px ${ml}px;padding:${pt}px ${pr}px ${pb}px ${pl}px;text-align:${alignment};${advBgStyle}">` +
+    `<div style="display:inline-block;max-width:100%;position:relative;overflow:hidden">${wrapped}${captionHtml}</div>` +
+    `</div>`;
 }
 
 
@@ -1314,6 +1348,434 @@ function renderSectionBlock(p: Props, zones: Zones): string {
   return `<section style="position:relative;overflow:hidden;${bg}padding:${pt}px ${pr}px ${pb}px ${pl}px;box-sizing:border-box"><div style="${maxW}width:100%;box-sizing:border-box"><div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${rowGap} ${colGap}">${cells}</div></div></section>`;
 }
 
+// ─── New block renderers ──────────────────────────────────────────────────────
+
+function advSpacing(p: Props): string {
+  const m = p.advMargin as any ?? {};
+  const pad = p.advPadding as any ?? {};
+  const mt = m.top ?? 0, mr = m.right ?? 0, mb = m.bottom ?? 0, ml = m.left ?? 0;
+  const pt = pad.top ?? 0, pr = pad.right ?? 0, pb = pad.bottom ?? 0, pl = pad.left ?? 0;
+  return `margin:${mt}px ${mr}px ${mb}px ${ml}px;padding:${pt}px ${pr}px ${pb}px ${pl}px;`;
+}
+
+function advBgStyle(p: Props): string {
+  if ((p.advBgType as string) === "color" && p.advBgColor)
+    return `background-color:${esc(p.advBgColor as string)};`;
+  return "";
+}
+
+function flexJustify(align: string): string {
+  if (align === "center") return "center";
+  if (align === "right") return "flex-end";
+  return "flex-start";
+}
+
+function renderDivider(p: Props): string {
+  const spacing = advSpacing(p);
+  const color = esc((p.lineColor as string) || "#e5e7eb");
+  const thickness = p.thickness ?? 1;
+  const style = esc((p.lineStyle as string) || "solid");
+  const width = esc((p.lineWidth as string) || "100%");
+  const gap = parseInt((p.gap as string) || "16") || 16;
+  const align = (p.alignment as string) || "center";
+  const justify = flexJustify(align);
+
+  let inner = "";
+  if (p.showElement) {
+    const elType = (p.elementType as string) || "icon";
+    const elSpacing = esc((p.elementSpacing as string) || "12px");
+    const elContent = elType === "text"
+      ? `<span style="font-size:${p.elementFontSize ?? 14}px;color:${esc((p.elementTextColor as string) || color)};white-space:nowrap">${esc((p.elementText as string) || "OR")}</span>`
+      : `<span style="font-size:${p.iconSize ?? 20}px;color:${esc((p.iconColor as string) || color)};line-height:1">${esc((p.elementIcon as string) || "✦")}</span>`;
+    const elPos = (p.elementPosition as string) || "center";
+    const lineEl = `<div style="flex:1;border-top:${thickness}px ${style} ${color}"></div>`;
+    const elDiv = `<div style="flex-shrink:0;padding:0 ${elSpacing}">${elContent}</div>`;
+    if (elPos === "left") inner = `<div style="display:flex;align-items:center;width:${width}">${elDiv}${lineEl}</div>`;
+    else if (elPos === "right") inner = `<div style="display:flex;align-items:center;width:${width}">${lineEl}${elDiv}</div>`;
+    else inner = `<div style="display:flex;align-items:center;width:${width}">${lineEl}${elDiv}${lineEl}</div>`;
+  } else {
+    inner = `<div style="width:${width};border-top:${thickness}px ${style} ${color}"></div>`;
+  }
+  return `<div style="${spacing}padding-top:${gap}px;padding-bottom:${gap}px;display:flex;justify-content:${justify};${advBgStyle(p)}">${inner}</div>`;
+}
+
+function renderVideo(p: Props): string {
+  const spacing = advSpacing(p);
+  const videoUrl = (p.videoUrl as string) || "";
+  const sourceType = (p.sourceType as string) || "youtube";
+  const thumbnailUrl = (p.thumbnailUrl as string) || "";
+  const aspectRatio = (p.aspectRatio as string) || "16:9";
+  const width = esc((p.width as string) || "100%");
+  const borderRadius = esc((p.borderRadius as string) || "0px");
+  const shadowColor = p.shadowColor as string;
+  const boxShadow = shadowColor ? `box-shadow:${p.shadowX ?? 0}px ${p.shadowY ?? 0}px ${p.shadowBlur ?? 0}px ${esc(shadowColor)};` : "";
+  const ratioMap: Record<string, string> = { "16:9": "56.25%", "4:3": "75%", "1:1": "100%" };
+  const paddingBottom = aspectRatio === "custom" ? "0" : (ratioMap[aspectRatio] ?? "56.25%");
+  const containerH = aspectRatio === "custom" ? esc((p.customHeight as string) || "450px") : "0";
+
+  if (!videoUrl && !thumbnailUrl) {
+    return `<div style="${spacing}padding:24px;border:2px dashed #e5e7eb;border-radius:8px;color:#9ca3af;font-size:14px;text-align:center">No video URL set.</div>`;
+  }
+
+  let embedUrl = "";
+  if (sourceType === "youtube" && videoUrl && !videoUrl.startsWith("data:")) {
+    const match = videoUrl.match(/(?:v=|youtu\.be\/)([^&?/]+)/);
+    const id = match?.[1] ?? "";
+    const params = new URLSearchParams();
+    if (p.autoplay) params.set("autoplay", "1");
+    if (p.loop) { params.set("loop", "1"); params.set("playlist", id); }
+    if (p.mute) params.set("mute", "1");
+    if ((p.controls as string) === "hide") params.set("controls", "0");
+    if (p.startTime) params.set("start", String(p.startTime));
+    embedUrl = `https://www.youtube.com/embed/${id}?${params.toString()}`;
+  } else if (sourceType === "vimeo" && videoUrl && !videoUrl.startsWith("data:")) {
+    const match = videoUrl.match(/vimeo\.com\/(\d+)/);
+    const id = match?.[1] ?? "";
+    const params = new URLSearchParams();
+    if (p.autoplay) params.set("autoplay", "1");
+    if (p.loop) params.set("loop", "1");
+    if (p.mute) params.set("muted", "1");
+    embedUrl = `https://player.vimeo.com/video/${id}?${params.toString()}`;
+  }
+
+  const containerStyle = `position:relative;width:${width};padding-bottom:${paddingBottom};height:${containerH !== "0" ? containerH : paddingBottom !== "0" ? undefined : containerH};overflow:hidden;border-radius:${borderRadius};${boxShadow}background:#000;`;
+
+  let inner = "";
+  if (thumbnailUrl && !videoUrl.startsWith("data:")) {
+    inner = `<img src="${esc(thumbnailUrl)}" alt="Video thumbnail" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`;
+  } else if ((sourceType === "self" || sourceType === "upload") && videoUrl && !videoUrl.startsWith("data:")) {
+    const controls = (p.controls as string) !== "hide" ? " controls" : "";
+    const autoplay = p.autoplay ? " autoplay" : "";
+    const loop = p.loop ? " loop" : "";
+    const muted = p.mute ? " muted" : "";
+    inner = `<video src="${esc(videoUrl)}"${controls}${autoplay}${loop}${muted} playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>`;
+  } else if (embedUrl) {
+    inner = `<iframe src="${esc(embedUrl)}" style="position:absolute;inset:0;width:100%;height:100%;border:none" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+  }
+
+  return `<div style="${spacing}">${inner ? `<div style="${containerStyle}">${inner}</div>` : ""}</div>`;
+}
+
+const SOCIAL_SVGS: Record<string, string> = {
+  facebook:  `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.235 2.686.235v2.97h-1.514c-1.491 0-1.956.93-1.956 1.884v2.25h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>`,
+  instagram: `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>`,
+  twitter:   `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`,
+  youtube:   `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
+  tiktok:    `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>`,
+  linkedin:  `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>`,
+  pinterest: `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 01.083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.632-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0z"/></svg>`,
+  snapchat:  `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M12.065.003c.157-.003.313-.003.47 0 1.65.029 5.503.597 7.37 4.688.562 1.244.618 3.104.483 4.603l.006.004c.173.087.44.145.783.145.42 0 .896-.085 1.29-.274.17-.082.358-.12.539-.12.358 0 .72.156.953.43.284.33.329.73.114 1.083-.297.49-.946.8-1.583 1.02-.158.054-.328.107-.5.157-.405.12-.825.245-.954.484-.069.13-.068.294.007.527.334 1.04 1.165 2.703 2.986 3.735.188.106.265.335.183.534-.097.231-.366.48-.836.697-1.044.485-2.403.637-3.658.42-.143-.026-.278-.053-.407-.079-.27-.053-.513-.1-.745-.117-.34-.022-.64.037-.861.245-.125.12-.207.27-.272.453-.177.508-.293 1.17-.39 1.63-.016.079-.04.137-.069.18-.108.155-.335.248-.63.248-.186 0-.43-.042-.65-.156-.275-.14-.563-.217-.852-.217-.11 0-.22.01-.327.03-.48.084-.853.242-1.156.375-.499.214-.84.354-1.398.354-.535 0-.864-.133-1.35-.344-.303-.133-.676-.292-1.158-.376a2.45 2.45 0 00-.327-.03c-.29 0-.577.077-.852.218-.22.113-.464.155-.65.155-.295 0-.522-.093-.63-.248-.03-.043-.054-.101-.07-.18-.096-.46-.213-1.121-.389-1.63-.065-.182-.147-.332-.272-.452-.221-.208-.52-.267-.86-.245-.233.017-.476.064-.746.117-.128.026-.264.053-.406.079-1.256.217-2.614.065-3.658-.42-.47-.217-.74-.466-.836-.697-.082-.2-.005-.428.183-.534 1.821-1.032 2.652-2.695 2.986-3.735.074-.233.076-.396.007-.527-.129-.239-.549-.364-.954-.484-.172-.05-.342-.103-.5-.157-.637-.22-1.286-.53-1.583-1.02-.215-.353-.17-.754.114-1.083.233-.274.595-.43.953-.43.181 0 .369.038.539.12.393.189.868.274 1.288.274.344 0 .612-.058.785-.145l.006-.004c-.135-1.499-.08-3.359.483-4.604C6.558.597 10.41.029 12.065.003z"/></svg>`,
+};
+
+const SOCIAL_BRAND: Record<string, string> = {
+  facebook: "#1877F2", instagram: "#E1306C", twitter: "#000000", youtube: "#FF0000",
+  tiktok: "#000000", linkedin: "#0A66C2", pinterest: "#E60023", snapchat: "#FFFC00",
+};
+
+function renderSocialIcons(p: Props): string {
+  const spacing = advSpacing(p);
+  const enabled = (p.enabled as string[]) ?? ["facebook", "instagram", "twitter", "youtube"];
+  const urls = (p.urls as Record<string, string>) ?? {};
+  const newTab = p.newTab !== false;
+  const iconStyle = (p.iconStyle as string) || "filled";
+  const iconSize = parseFloat((p.iconSize as string) || "24") || 24;
+  const iconColor = (p.iconColor as string) || "";
+  const iconBgColor = (p.iconBgColor as string) || "";
+  const bgShape = (p.bgShape as string) || "circle";
+  const bgSize = esc((p.bgSize as string) || "40px");
+  const borderStyle = (p.borderStyle as string) || "none";
+  const borderWidth = p.borderWidth ?? 1;
+  const borderColor = (p.borderColor as string) || "";
+  const borderRadius = esc((p.borderRadius as string) || "50%");
+  const iconSpacing = esc((p.iconSpacing as string) || "12px");
+  const alignment = (p.alignment as string) || "left";
+  const shapeRadius = bgShape === "circle" ? "50%" : bgShape === "rounded" ? "10px" : bgShape === "square" ? "0px" : undefined;
+
+  const icons = enabled.map(key => {
+    const svg = SOCIAL_SVGS[key] ?? "";
+    const brand = SOCIAL_BRAND[key] ?? "#333";
+    const isBranded = iconStyle === "branded";
+    const color = isBranded ? (bgShape !== "none" ? "#fff" : brand) : (iconColor || "currentColor");
+    const bg = bgShape !== "none" ? (isBranded ? brand : (iconBgColor || "#e5e7eb")) : "";
+    const border = borderStyle === "solid" ? `border:${borderWidth}px solid ${borderColor || color};` : "";
+    const innerStyle = bgShape !== "none"
+      ? `display:inline-flex;align-items:center;justify-content:center;width:${bgSize};height:${bgSize};background:${bg};border-radius:${shapeRadius};${border}color:${color};flex-shrink:0;font-size:${iconSize}px;`
+      : `display:inline-flex;align-items:center;justify-content:center;color:${color};font-size:${iconSize}px;`;
+    const inner = `<span style="${innerStyle}">${svg}</span>`;
+    const url = urls[key];
+    return url
+      ? `<a href="${esc(url)}" target="${newTab ? "_blank" : "_self"}" rel="noopener noreferrer" title="${esc(key)}" style="text-decoration:none;color:inherit">${inner}</a>`
+      : `<span style="${innerStyle}opacity:0.4" title="${esc(key)} (no URL)">${svg}</span>`;
+  }).join("");
+
+  return `<div style="${spacing}${advBgStyle(p)}"><div style="display:flex;gap:${iconSpacing};flex-wrap:wrap;justify-content:${flexJustify(alignment)}">${icons}</div></div>`;
+}
+
+const SHARE_PLATFORMS_R = [
+  { key: "facebook",  label: "Facebook",  brand: "#1877F2", icon: "f" },
+  { key: "twitter",   label: "Twitter",   brand: "#000000", icon: "𝕏" },
+  { key: "whatsapp",  label: "WhatsApp",  brand: "#25D366", icon: "W" },
+  { key: "pinterest", label: "Pinterest", brand: "#E60023", icon: "P" },
+  { key: "email",     label: "Email",     brand: "#6b7280", icon: "✉" },
+  { key: "copy",      label: "Copy Link", brand: "#374151", icon: "🔗" },
+];
+
+function renderShareButtons(p: Props): string {
+  const spacing = advSpacing(p);
+  const enabled = (p.enabled as string[]) ?? ["facebook", "twitter", "whatsapp", "email", "copy"];
+  const labels = (p.labels as Record<string, string>) ?? {};
+  const showLabel = p.showLabel !== false;
+  const btnStyle = (p.btnStyle as string) || "icon-text";
+  const btnSize = (p.btnSize as string) || "medium";
+  const borderRadius = esc((p.borderRadius as string) || "6px");
+  const spacing2 = esc((p.spacing as string) || "8px");
+  const iconColor = (p.iconColor as string) || "";
+  const textColor = (p.textColor as string) || "";
+  const bgColor = (p.bgColor as string) || "";
+  const useBrandColors = !!p.useBrandColors;
+  const fontSize = esc((p.fontSize as string) || "0.875rem");
+  const fontWeight = p.fontWeight || "600";
+  const alignment = (p.alignment as string) || "left";
+  const sizeMap: Record<string, string> = { small: "8px 12px", medium: "10px 16px", large: "12px 20px" };
+  const pad = sizeMap[btnSize] ?? sizeMap.medium;
+
+  const platforms = SHARE_PLATFORMS_R.filter(pl => enabled.includes(pl.key));
+  const shareUrlMap: Record<string, string> = {
+    facebook:  "https://www.facebook.com/sharer/sharer.php?u=",
+    twitter:   "https://twitter.com/intent/tweet?url=",
+    whatsapp:  "https://wa.me/?text=",
+    pinterest: "https://pinterest.com/pin/create/button/?url=",
+    email:     "mailto:?body=",
+  };
+
+  const btns = platforms.map(pl => {
+    const resolvedBg = useBrandColors ? pl.brand : (bgColor || "#f3f4f6");
+    const resolvedText = useBrandColors ? "#fff" : (textColor || "var(--text-color)");
+    const resolvedIcon = useBrandColors ? "#fff" : (iconColor || "var(--text-color)");
+    const btnLabel = labels[pl.key] ?? pl.label;
+    const iconHtml = btnStyle !== "text-only" ? `<span style="color:${resolvedIcon};font-weight:700">${pl.icon}</span>` : "";
+    const labelHtml = btnStyle !== "icon-only" && showLabel ? `<span>${btnLabel}</span>` : "";
+    const btnContent = `${iconHtml}${iconHtml && labelHtml ? " " : ""}${labelHtml}`;
+    if (pl.key === "copy") {
+      return `<button onclick="(function(b){var t=b.textContent;navigator.clipboard&&navigator.clipboard.writeText(window.location.href).then(function(){b.textContent='Copied!';setTimeout(function(){b.textContent=t},2000)})})(this)" style="display:inline-flex;align-items:center;gap:6px;padding:${pad};font-size:${fontSize};font-weight:${fontWeight};color:${resolvedText};background:${resolvedBg};border:none;border-radius:${borderRadius};cursor:pointer">${btnContent}</button>`;
+    }
+    const shareBase = shareUrlMap[pl.key] ?? "#";
+    return `<a href="${shareBase}%7BURL%7D" onclick="event.preventDefault();window.open('${shareBase}'+encodeURIComponent(window.location.href),'_blank','noopener,noreferrer')" style="display:inline-flex;align-items:center;gap:6px;padding:${pad};font-size:${fontSize};font-weight:${fontWeight};color:${resolvedText};background:${resolvedBg};border-radius:${borderRadius};text-decoration:none;cursor:pointer">${btnContent}</a>`;
+  }).join("");
+
+  return `<div style="${spacing}${advBgStyle(p)}"><div style="display:flex;gap:${spacing2};flex-wrap:wrap;justify-content:${flexJustify(alignment)}">${btns}</div></div>`;
+}
+
+function renderStarRating(p: Props): string {
+  const spacing = advSpacing(p);
+  const maxStars = (p.maxStars as number) ?? 5;
+  const val = Math.min((p.ratingValue as number) ?? 4, maxStars);
+  const starSize = esc((p.starSize as string) || "24px");
+  const filledColor = esc((p.filledColor as string) || "#f59e0b");
+  const emptyColor = esc((p.emptyColor as string) || "#d1d5db");
+  const starGap = esc((p.starGap as string) || "4px");
+  const showNumber = p.showNumber !== false;
+  const numPos = (p.numberPosition as string) || "after";
+  const reviewCount = (p.reviewCount as string) || "";
+  const numFontSize = esc((p.numFontSize as string) || "1rem");
+  const numFontWeight = p.numFontWeight || "700";
+  const numColor = esc((p.numColor as string) || "var(--text-color)");
+  const alignment = (p.alignment as string) || "left";
+
+  const stars = Array.from({ length: maxStars }, (_, i) => {
+    const filled = i < Math.floor(val);
+    const partial = !filled && i < val;
+    const pct = partial ? Math.round((val - Math.floor(val)) * 100) : 0;
+    const gradId = `sg${i}`;
+    if (partial) {
+      return `<svg width="${starSize}" height="${starSize}" viewBox="0 0 24 24" style="flex-shrink:0"><defs><linearGradient id="${gradId}"><stop offset="${pct}%" stop-color="${filledColor}"/><stop offset="${pct}%" stop-color="${emptyColor}"/></linearGradient></defs><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="url(#${gradId})"/></svg>`;
+    }
+    return `<svg width="${starSize}" height="${starSize}" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="${filled ? filledColor : emptyColor}"/></svg>`;
+  }).join("");
+
+  const numEl = showNumber ? `<span style="font-size:${numFontSize};font-weight:${numFontWeight};color:${numColor};white-space:nowrap">${val.toFixed(1)}${reviewCount ? " " + esc(reviewCount) : ""}</span>` : "";
+  const inner = numPos === "before" ? `${numEl}${stars}` : `${stars}${numEl}`;
+
+  return `<div style="${spacing}text-align:${alignment};${advBgStyle(p)}"><div style="display:inline-flex;align-items:center;gap:${starGap};flex-wrap:wrap;justify-content:${flexJustify(alignment)}">${inner}</div></div>`;
+}
+
+function renderProgressBar(p: Props): string {
+  const spacing = advSpacing(p);
+  const title = esc((p.title as string) || "");
+  const pct = Math.min(100, Math.max(0, (p.percentage as number) ?? 75));
+  const barHeight = p.barHeight ?? 12;
+  const barColor = esc((p.barColor as string) || "#0158ad");
+  const barBg = esc((p.barBg as string) || "#e5e7eb");
+  const barRadius = p.barRadius ?? 6;
+  const displayPct = p.displayPercentage !== false;
+  const titleFontSize = esc((p.titleFontSize as string) || "0.9rem");
+  const titleFontWeight = p.titleFontWeight || "600";
+  const titleColor = esc((p.titleColor as string) || "var(--text-color)");
+  const titlePos = (p.titlePosition as string) || "above";
+  const labelFontSize = esc((p.labelFontSize as string) || "0.8rem");
+  const labelColor = esc((p.labelColor as string) || "var(--text-color)");
+  const labelPos = (p.labelPosition as string) || "outside-right";
+
+  let titleRow = "";
+  if (title && titlePos === "above") {
+    const labelRight = displayPct && labelPos === "outside-right" ? `<span style="font-size:${labelFontSize};color:${labelColor};font-weight:600">${pct}%</span>` : "";
+    titleRow = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:${titleFontSize};font-weight:${titleFontWeight};color:${titleColor}">${title}</span>${labelRight}</div>`;
+  }
+
+  let insideTitle = title && titlePos === "inside" ? `<span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:${titleFontSize};font-weight:${titleFontWeight};color:${titleColor || "#fff"};white-space:nowrap">${title}</span>` : "";
+  let insideLabel = displayPct && labelPos === "inside" ? `<span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:${labelFontSize};color:${labelColor || "#fff"};font-weight:600;white-space:nowrap">${pct}%</span>` : "";
+
+  const fill = `<div style="height:100%;width:${pct}%;background:${barColor};border-radius:${barRadius}px;position:relative;transition:width 0.8s ease">${insideTitle}${insideLabel}</div>`;
+  const track = `<div style="position:relative;height:${barHeight}px;background:${barBg};border-radius:${barRadius}px;overflow:hidden">${fill}</div>`;
+
+  return `<div style="${spacing}${advBgStyle(p)}">${titleRow}${track}</div>`;
+}
+
+function renderAlert(p: Props): string {
+  const spacing = advSpacing(p);
+  const alertType = (p.alertType as string) || "info";
+  const typeMap: Record<string, { bg: string; text: string; border: string; icon: string }> = {
+    info:    { bg: "#eff6ff", text: "#1e40af", border: "#bfdbfe", icon: "ℹ️" },
+    success: { bg: "#f0fdf4", text: "#166534", border: "#bbf7d0", icon: "✅" },
+    warning: { bg: "#fffbeb", text: "#92400e", border: "#fde68a", icon: "⚠️" },
+    error:   { bg: "#fef2f2", text: "#991b1b", border: "#fecaca", icon: "❌" },
+    custom:  { bg: "#f9fafb", text: "#111827", border: "#e5e7eb", icon: "🔔" },
+  };
+  const t = typeMap[alertType] ?? typeMap.info;
+  const resolvedBg = esc((p.bgColor as string) || t.bg);
+  const resolvedText = esc((p.textColor as string) || t.text);
+  const resolvedBorder = esc((p.borderColor as string) || t.border);
+  const resolvedIcon = esc((p.customIcon as string) || t.icon);
+  const showIcon = p.showIcon !== false;
+  const alertTitle = esc((p.alertTitle as string) || "");
+  const message = esc((p.message as string) || "");
+  const borderStyle = (p.borderStyle as string) || "solid";
+  const borderWidth = p.borderWidth ?? 1;
+  const borderRadius = p.borderRadius ?? 8;
+  const titleFontSize = esc((p.titleFontSize as string) || "1rem");
+  const titleFontWeight = p.titleFontWeight || "700";
+  const msgFontSize = esc((p.msgFontSize as string) || "0.9rem");
+  const lineHeight = esc((p.lineHeight as string) || "1.5");
+  const iconColor = esc((p.iconColor as string) || resolvedText);
+
+  let borderCss = "";
+  if (borderStyle === "left-only") borderCss = `border-left:${borderWidth}px solid ${resolvedBorder};`;
+  else if (borderStyle !== "none") borderCss = `border:${borderWidth}px solid ${resolvedBorder};`;
+
+  const iconHtml = showIcon ? `<span style="font-size:1.25rem;color:${iconColor};flex-shrink:0;line-height:1.3">${resolvedIcon}</span>` : "";
+  const titleHtml = alertTitle ? `<div style="font-size:${titleFontSize};font-weight:${titleFontWeight};margin-bottom:4px">${alertTitle}</div>` : "";
+  const msgHtml = `<div style="font-size:${msgFontSize}">${message}</div>`;
+
+  return `<div style="${spacing}background:${resolvedBg};color:${resolvedText};border-radius:${borderRadius}px;line-height:${lineHeight};${borderCss}${advBgStyle(p)}"><div style="display:flex;align-items:flex-start;gap:12px">${iconHtml}<div style="flex:1">${titleHtml}${msgHtml}</div></div></div>`;
+}
+
+function renderBlockQuote(p: Props): string {
+  const spacing = advSpacing(p);
+  const quoteText = esc((p.quoteText as string) || "");
+  const authorName = esc((p.authorName as string) || "");
+  const authorTitle = esc((p.authorTitle as string) || "");
+  const authorImage = esc((p.authorImage as string) || "");
+  const showQuoteIcon = p.showQuoteIcon !== false;
+  const quoteFontSize = esc((p.quoteFontSize as string) || "1.25rem");
+  const quoteFontFamily = (p.quoteFontFamily as string) !== "inherit" ? esc(p.quoteFontFamily as string) : "";
+  const quoteFontStyle = esc((p.quoteFontStyle as string) || "italic");
+  const quoteTextColor = esc((p.quoteTextColor as string) || "var(--text-color)");
+  const quoteLineHeight = esc((p.quoteLineHeight as string) || "1.7");
+  const nameColor = esc((p.nameColor as string) || "var(--text-color)");
+  const nameFontSize = esc((p.nameFontSize as string) || "1rem");
+  const nameFontWeight = p.nameFontWeight || "700";
+  const titleColor = esc((p.titleColor as string) || "var(--text-color)");
+  const titleFontSize = esc((p.titleFontSize as string) || "0.875rem");
+  const imageSize = esc((p.imageSize as string) || "48px");
+  const imageBorderRadius = esc((p.imageBorderRadius as string) || "50%");
+  const iconColor = esc((p.iconColor as string) || "var(--primary-color)");
+  const iconSize = esc((p.iconSize as string) || "3rem");
+  const iconPosition = (p.iconPosition as string) || "top-left";
+  const borderType = (p.borderType as string) || "left";
+  const borderColor = esc((p.borderColor as string) || "var(--primary-color)");
+  const borderWidth = p.borderWidth ?? 4;
+  const bgColor = esc((p.bgColor as string) || "");
+  const alignment = (p.alignment as string) || "left";
+  const opacity = p.opacity != null ? (p.opacity as number) / 100 : 1;
+
+  const borderMap: Record<string, string> = {
+    none: "",
+    left: `border-left:${borderWidth}px solid ${borderColor};padding-left:20px;`,
+    top:  `border-top:${borderWidth}px solid ${borderColor};padding-top:20px;`,
+    box:  `border:${borderWidth}px solid ${borderColor};`,
+  };
+
+  const quoteIconSvg = `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="${iconColor}" style="opacity:0.15"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1zm12 0c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>`;
+
+  let iconHtml = "";
+  if (showQuoteIcon) {
+    if (iconPosition === "top-left") iconHtml = `<div style="margin-bottom:8px">${quoteIconSvg}</div>`;
+    else if (iconPosition === "top-right") iconHtml = `<div style="text-align:right;margin-bottom:8px">${quoteIconSvg}</div>`;
+    else iconHtml = `<div style="position:absolute;top:0;right:0;pointer-events:none">${quoteIconSvg}</div>`;
+  }
+
+  const quoteEl = `<p style="font-size:${quoteFontSize};${quoteFontFamily ? `font-family:${quoteFontFamily};` : ""}font-style:${quoteFontStyle};color:${quoteTextColor};line-height:${quoteLineHeight};margin:0 0 16px 0">&ldquo;${quoteText}&rdquo;</p>`;
+
+  let authorEl = "";
+  if (authorName || authorImage) {
+    const imgEl = authorImage ? `<img src="${authorImage}" alt="${authorName}" style="width:${imageSize};height:${imageSize};border-radius:${imageBorderRadius};object-fit:cover;flex-shrink:0">` : "";
+    const nameEl = authorName ? `<div style="font-size:${nameFontSize};font-weight:${nameFontWeight};color:${nameColor}">${authorName}</div>` : "";
+    const titleEl = authorTitle ? `<div style="font-size:${titleFontSize};color:${titleColor};opacity:0.7">${authorTitle}</div>` : "";
+    const aJustify = flexJustify(alignment);
+    authorEl = `<div style="display:flex;align-items:center;gap:12px;justify-content:${aJustify}">${imgEl}<div>${nameEl}${titleEl}</div></div>`;
+  }
+
+  const bqStyle = `margin:0;position:relative;background:${bgColor || "transparent"};${bgColor ? "padding:24px;border-radius:8px;" : ""}${borderMap[borderType] || ""}`;
+
+  return `<div style="${spacing}text-align:${alignment};opacity:${opacity};${advBgStyle(p)}"><blockquote style="${bqStyle}">${iconHtml}${quoteEl}${authorEl}</blockquote></div>`;
+}
+
+function renderIcons(p: Props): string {
+  const spacing = advSpacing(p);
+  const iconType = (p.iconType as string) || "emoji";
+  const icon = esc((p.icon as string) || "★");
+  const iconImage = esc((p.iconImage as string) || "");
+  const linkUrl = esc((p.linkUrl as string) || "");
+  const linkTarget = esc((p.linkTarget as string) || "_self");
+  const tooltip = esc((p.tooltip as string) || "");
+  const iconSize = esc((p.iconSize as string) || "48px");
+  const iconColor = esc((p.iconColor as string) || "var(--primary-color)");
+  const rotate = p.rotate as string;
+  const bgType = (p.bgType as string) || "none";
+  const bgColor = esc((p.bgColor as string) || "");
+  const bgGrad1 = esc((p.bgGrad1 as string) || "");
+  const bgGrad2 = esc((p.bgGrad2 as string) || "");
+  const bgShape = (p.bgShape as string) || "none";
+  const bgSize = esc((p.bgSize as string) || "80px");
+  const borderStyle = (p.borderStyle as string) || "none";
+  const borderWidth = p.borderWidth ?? 2;
+  const borderColor = esc((p.borderColor as string) || "");
+  const borderRadius = esc((p.borderRadius as string) || "0px");
+  const alignment = (p.alignment as string) || "left";
+  const opacity = p.opacity != null ? (p.opacity as number) / 100 : 1;
+
+  const bg = bgType === "color" ? bgColor : bgType === "gradient" && bgGrad1 && bgGrad2 ? `linear-gradient(135deg,${bgGrad1},${bgGrad2})` : "";
+  const shapeRadius = bgShape === "circle" ? "50%" : bgShape === "rounded" ? "12px" : bgShape === "square" ? "0px" : "";
+  const hasBg = !!bg || !!shapeRadius;
+  const rotateStyle = rotate && rotate !== "0" ? `transform:rotate(${rotate}deg);` : "";
+  const borderCss = borderStyle !== "none" ? `border:${borderWidth}px ${borderStyle} ${borderColor || "currentColor"};` : "";
+
+  let innerStyle = hasBg
+    ? `display:inline-flex;align-items:center;justify-content:center;width:${bgSize};height:${bgSize};${bg ? `background:${bg};` : ""}${shapeRadius ? `border-radius:${shapeRadius};` : ""}${borderCss}color:${iconColor};${rotateStyle}opacity:${opacity};font-size:${iconSize};`
+    : `display:inline-flex;align-items:center;justify-content:center;color:${iconColor};${rotateStyle}opacity:${opacity};font-size:${iconSize};${borderCss}${borderRadius !== "0px" ? `border-radius:${borderRadius};` : ""}`;
+
+  const isImage = iconType === "image" && iconImage;
+  const iconContent = isImage
+    ? `<img src="${iconImage}" alt="${tooltip || "icon"}" style="width:100%;height:100%;object-fit:contain;display:block">`
+    : icon;
+  const inner = `<span style="${innerStyle}"${tooltip ? ` title="${tooltip}"` : ""}>${iconContent}</span>`;
+  const wrapped = linkUrl
+    ? `<a href="${linkUrl}" target="${linkTarget}"${linkTarget === "_blank" ? ' rel="noopener noreferrer"' : ""} style="text-decoration:none;color:inherit;display:inline-block">${inner}</a>`
+    : inner;
+
+  return `<div style="${spacing}text-align:${alignment};${advBgStyle(p)}">${wrapped}</div>`;
+}
+
 // ─── Main render dispatcher ───────────────────────────────────────────────────
 
 function renderBlock(block: Block, zones: Zones): string {
@@ -1340,6 +1802,16 @@ function renderBlock(block: Block, zones: Zones): string {
       case "MarqueeBar":       return MarqueeBar(p);
       case "ContactSection":   return ContactSection(p);
       case "PhotoCollage":     return PhotoCollage(p);
+      // New blocks
+      case "Divider":          return renderDivider(p);
+      case "Video":            return renderVideo(p);
+      case "Icons":            return renderIcons(p);
+      case "BlockQuote":       return renderBlockQuote(p);
+      case "StarRating":       return renderStarRating(p);
+      case "ProgressBar":      return renderProgressBar(p);
+      case "Alert":            return renderAlert(p);
+      case "SocialIcons":      return renderSocialIcons(p);
+      case "ShareButtons":     return renderShareButtons(p);
       // Layout / container blocks
       case "LayoutBlock":        return renderLayoutBlock(p, zones);
       case "Section":            return renderSectionBlock(p, zones);
@@ -1747,4 +2219,31 @@ function settingsFooterProps(f: FooterSettings): Props {
     quickLinks: f.quickLinks as unknown as Props[keyof Props],
     copyrightText: f.copyrightText,
   };
+}
+
+/**
+ * Render only the block content (no header/footer chrome, no global CSS).
+ * Used by the App Proxy endpoint to serve just the page markup to the storefront widget.
+ */
+export function renderPageContentOnly(data: PuckData): string {
+  const zones = (data.zones ?? {}) as Zones;
+  const content = (data.content ?? []) as Block[];
+
+  const above = (zones["root:above-header"] ?? zones["above-header"] ?? []) as Block[];
+  const below = (zones["root:below-footer"] ?? zones["below-footer"] ?? []) as Block[];
+
+  return [
+    RESPONSIVE_CSS,
+    ...above.map((b) => renderBlock(b, zones)),
+    ...content.map((b) => renderBlock(b, zones)),
+    ...below.map((b) => renderBlock(b, zones)),
+  ].join("\n");
+}
+
+/**
+ * Generate the global style CSS (button + image rules) for the App Proxy response.
+ * Scoped client-side by pb-widget-loader.js to the widget container.
+ */
+export function renderGlobalStyleCss(settings: GlobalSettings): string {
+  return buildGlobalButtonCss(settings) + buildGlobalImageCss(settings);
 }
