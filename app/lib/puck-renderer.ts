@@ -523,13 +523,20 @@ function HeadingBlock(p: Props): string {
 }
 
 function Space(p: Props): string {
-  const size = `${p.size ?? 32}px`;
-  if (p.orientation === "horizontal") {
-    return `<span style="display:inline-block;width:${size};height:100%;flex-shrink:0"></span>`;
-  }
-  return `<div style="height:${size};display:flex;flex-direction:column;justify-content:center;overflow:hidden">
-  ${p.showDivider ? `<hr style="border:none;border-top:${p.dividerWidth ?? 1}px ${p.dividerStyle || "solid"} ${p.dividerColor || "#e5e7eb"};margin:0">` : ""}
-</div>`;
+  // Support new NumberUnitField props (heightDesktop/heightDesktopUnit) and legacy p.size
+  const hD = p.heightDesktop != null ? `${p.heightDesktop}${(p.heightDesktopUnit as string) || "px"}` : `${p.size ?? 32}px`;
+  const hT = p.heightTablet  ? `${p.heightTablet}${(p.heightTabletUnit  as string) || "px"}` : hD;
+  const hM = p.heightMobile  ? `${p.heightMobile}${(p.heightMobileUnit  as string) || "px"}` : hT;
+  const hideClasses = [
+    p.hideDesktop ? "puck-hide-desktop" : "",
+    p.hideTablet  ? "puck-hide-tablet"  : "",
+    p.hideMobile  ? "puck-hide-mobile"  : "",
+  ].filter(Boolean).join(" ");
+  const cls = hideClasses ? ` class="${hideClasses}"` : "";
+  const bgStyle = p.backgroundColor ? `background-color:${esc(p.backgroundColor as string)};` : "";
+  const uid = `sp-${Math.random().toString(36).slice(2, 8)}`;
+  const responsiveCss = `<style>.${uid}{height:${hD}}@media(max-width:1023px){.${uid}{height:${hT}}}@media(max-width:767px){.${uid}{height:${hM}}}</style>`;
+  return `${responsiveCss}<div${cls} class="${uid}" style="${bgStyle}width:100%;box-sizing:border-box"></div>`;
 }
 
 function Image(p: Props): string {
@@ -540,8 +547,11 @@ function Image(p: Props): string {
   const caption     = (p.caption as string) || "";
   const linkUrl     = (p.linkUrl as string) || "";
   const linkTarget  = esc((p.linkTarget as string) || "_self");
-  const width       = esc((p.width as string) || "100%");
-  const height      = esc((p.height as string) || "auto");
+  // Support both new NumberUnitField props and legacy string props
+  const wUnit  = (p.imgWidthUnit  as string) || "%";
+  const hUnit  = (p.imgHeightUnit as string) || "px";
+  const width  = p.imgWidth  != null ? `${p.imgWidth}${wUnit}`  : esc((p.width  as string) || "100%");
+  const height = p.imgHeight != null ? (hUnit === "auto" || !(p.imgHeight as number) ? "auto" : `${p.imgHeight}${hUnit}`) : esc((p.height as string) || "auto");
   const objectFit   = esc((p.objectFit as string) || "cover");
   const borderRadius = esc((p.borderRadius as string) || "0px");
   const borderStyle = (p.borderStyle as string) || "none";
@@ -549,11 +559,6 @@ function Image(p: Props): string {
   const borderColor = esc((p.borderColor as string) || "#e5e7eb");
   const opacity     = p.opacity != null ? (p.opacity as number) / 100 : 1;
   const alignment   = esc((p.alignment as string) || "center");
-
-  const shadowColor = p.shadowColor as string;
-  const boxShadow   = shadowColor
-    ? `box-shadow:${p.shadowX ?? 0}px ${p.shadowY ?? 0}px ${p.shadowBlur ?? 0}px ${p.shadowSpread ?? 0}px ${esc(shadowColor)};`
-    : "";
 
   const borderCss = borderStyle !== "none"
     ? `border:${borderWidth}px ${esc(borderStyle)} ${borderColor};`
@@ -568,7 +573,7 @@ function Image(p: Props): string {
     ? `background-color:${esc(p.advBgColor as string)};`
     : "";
 
-  const imgStyle = `width:${width};height:${height};object-fit:${objectFit};border-radius:${borderRadius};display:block;opacity:${opacity};${borderCss}${boxShadow}`;
+  const imgStyle = `width:${width};height:${height};object-fit:${objectFit};border-radius:${borderRadius};display:block;opacity:${opacity};${borderCss}`;
   const imgTag = `<img src="${esc(imageUrl)}" alt="${altText}" loading="lazy" style="${imgStyle}">`;
 
   const captionHtml = caption
@@ -1467,7 +1472,7 @@ function renderDivider(p: Props): string {
   const color = esc((p.lineColor as string) || "#e5e7eb");
   const thickness = p.thickness ?? 1;
   const style = esc((p.lineStyle as string) || "solid");
-  const width = esc((p.lineWidth as string) || "100%");
+  const width = p.lineWidthVal != null ? `${p.lineWidthVal}${(p.lineWidthUnit as string) || "%"}` : esc((p.lineWidth as string) || "100%");
   const gap = parseInt((p.gap as string) || "16") || 16;
   const align = (p.alignment as string) || "center";
   const justify = flexJustify(align);
@@ -1497,13 +1502,15 @@ function renderVideo(p: Props): string {
   const sourceType = (p.sourceType as string) || "youtube";
   const thumbnailUrl = (p.thumbnailUrl as string) || "";
   const aspectRatio = (p.aspectRatio as string) || "16:9";
-  const width = esc((p.width as string) || "100%");
+  const videoWidthVal = p.videoWidthVal ?? 100;
+  const videoWidthUnit = (p.videoWidthUnit as string) || "%";
+  const width = `${videoWidthVal}${videoWidthUnit}`;
   const borderRadius = esc((p.borderRadius as string) || "0px");
-  const shadowColor = p.shadowColor as string;
-  const boxShadow = shadowColor ? `box-shadow:${p.shadowX ?? 0}px ${p.shadowY ?? 0}px ${p.shadowBlur ?? 0}px ${esc(shadowColor)};` : "";
   const ratioMap: Record<string, string> = { "16:9": "56.25%", "4:3": "75%", "1:1": "100%" };
   const paddingBottom = aspectRatio === "custom" ? "0" : (ratioMap[aspectRatio] ?? "56.25%");
   const containerH = aspectRatio === "custom" ? esc((p.customHeight as string) || "450px") : "0";
+  const isNative = sourceType === "self" || sourceType === "upload";
+  const autoplay = p.autoplay as boolean;
 
   if (!videoUrl && !thumbnailUrl) {
     return `<div style="${spacing}padding:24px;border:2px dashed #e5e7eb;border-radius:8px;color:#9ca3af;font-size:14px;text-align:center">No video URL set.</div>`;
@@ -1514,38 +1521,53 @@ function renderVideo(p: Props): string {
     const match = videoUrl.match(/(?:v=|youtu\.be\/)([^&?/]+)/);
     const id = match?.[1] ?? "";
     const params = new URLSearchParams();
-    if (p.autoplay) params.set("autoplay", "1");
+    if (autoplay) params.set("autoplay", "1");
     if (p.loop) { params.set("loop", "1"); params.set("playlist", id); }
     if (p.mute) params.set("mute", "1");
     if ((p.controls as string) === "hide") params.set("controls", "0");
     if (p.startTime) params.set("start", String(p.startTime));
+    if (p.endTime) params.set("end", String(p.endTime));
     embedUrl = `https://www.youtube.com/embed/${id}?${params.toString()}`;
   } else if (sourceType === "vimeo" && videoUrl && !videoUrl.startsWith("data:")) {
     const match = videoUrl.match(/vimeo\.com\/(\d+)/);
     const id = match?.[1] ?? "";
     const params = new URLSearchParams();
-    if (p.autoplay) params.set("autoplay", "1");
+    if (autoplay) params.set("autoplay", "1");
     if (p.loop) params.set("loop", "1");
     if (p.mute) params.set("muted", "1");
+    if ((p.controls as string) === "hide") params.set("controls", "0");
     embedUrl = `https://player.vimeo.com/video/${id}?${params.toString()}`;
   }
 
-  const containerStyle = `position:relative;width:${width};padding-bottom:${paddingBottom};height:${containerH !== "0" ? containerH : paddingBottom !== "0" ? undefined : containerH};overflow:hidden;border-radius:${borderRadius};${boxShadow}background:#000;`;
+  const containerStyle = `position:relative;width:${width};padding-bottom:${paddingBottom};height:${containerH !== "0" ? containerH : "0"};overflow:hidden;border-radius:${borderRadius};background:#000;`;
+  const absStyle = `position:absolute;inset:0;width:100%;height:100%;`;
 
-  let inner = "";
-  if (thumbnailUrl && !videoUrl.startsWith("data:")) {
-    inner = `<img src="${esc(thumbnailUrl)}" alt="Video thumbnail" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`;
-  } else if ((sourceType === "self" || sourceType === "upload") && videoUrl && !videoUrl.startsWith("data:")) {
-    const controls = (p.controls as string) !== "hide" ? " controls" : "";
-    const autoplay = p.autoplay ? " autoplay" : "";
-    const loop = p.loop ? " loop" : "";
-    const muted = p.mute ? " muted" : "";
-    inner = `<video src="${esc(videoUrl)}"${controls}${autoplay}${loop}${muted} playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>`;
+  let videoInner = "";
+  if (isNative && videoUrl && !videoUrl.startsWith("data:")) {
+    const ctrlAttr = (p.controls as string) !== "hide" ? " controls" : "";
+    const autoAttr = autoplay ? " autoplay" : "";
+    const loopAttr = p.loop ? " loop" : "";
+    const mutedAttr = p.mute ? " muted" : "";
+    const inlineAttr = p.playInline !== false ? " playsinline" : "";
+    videoInner = `<video src="${esc(videoUrl)}"${ctrlAttr}${autoAttr}${loopAttr}${mutedAttr}${inlineAttr} style="${absStyle}object-fit:cover"></video>`;
   } else if (embedUrl) {
-    inner = `<iframe src="${esc(embedUrl)}" style="position:absolute;inset:0;width:100%;height:100%;border:none" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    videoInner = `<iframe src="${esc(embedUrl)}" style="${absStyle}border:none" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
   }
 
-  return `<div style="${spacing}">${inner ? `<div style="${containerStyle}">${inner}</div>` : ""}</div>`;
+  // Thumbnail: shown as static image when no videoUrl, or as a clickable overlay with JS when videoUrl exists
+  let thumbnailInner = "";
+  if (thumbnailUrl && !thumbnailUrl.startsWith("data:")) {
+    if (!videoUrl) {
+      // Static display — no video to play
+      thumbnailInner = `<img src="${esc(thumbnailUrl)}" alt="Video thumbnail" style="${absStyle}object-fit:cover">`;
+    } else if (!autoplay) {
+      // Clickable overlay — hides when play is clicked, JS-progressive-enhanced
+      thumbnailInner = `<div class="pb-vid-thumb" style="${absStyle}cursor:pointer;z-index:2;" onclick="this.style.display='none'"><img src="${esc(thumbnailUrl)}" alt="Video thumbnail" style="width:100%;height:100%;object-fit:cover"><div style="${absStyle}display:flex;align-items:center;justify-content:center;"><div style="width:64px;height:64px;background:rgba(0,0,0,0.5);border-radius:50%;display:flex;align-items:center;justify-content:center;"><svg width='26' height='26' viewBox='0 0 24 24' fill='white'><path d='M8 5v14l11-7z'/></svg></div></div></div>`;
+    }
+  }
+
+  const inner = videoInner || thumbnailInner;
+  return `<div style="${spacing}">${inner ? `<div style="${containerStyle}">${videoInner}${thumbnailInner}</div>` : ""}</div>`;
 }
 
 const SOCIAL_SVGS: Record<string, string> = {
@@ -1953,9 +1975,14 @@ img{max-width:100%;height:auto}
 .pb-collage>*{grid-column:auto!important;grid-row:auto!important}
 .pb-hero{padding:40px 20px!important}
 .pb-header-nav{display:none!important}
+.puck-hide-mobile{display:none!important}
 }
 @media(min-width:768px) and (max-width:1023px){
 .pb-grid-ncol{grid-template-columns:repeat(2,1fr)!important}
+.puck-hide-tablet{display:none!important}
+}
+@media(min-width:1024px){
+.puck-hide-desktop{display:none!important}
 }
 </style>`;
 

@@ -1399,7 +1399,14 @@ export default function PuckSplatEditor({
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ data: cleanData }),
                   });
-                  if (!res.ok) throw new Error("Publish failed");
+                  if (!res.ok) {
+                    let msg = "Publish failed";
+                    try {
+                      const body = await res.json();
+                      if (body?.error) msg = body.error;
+                    } catch { /* ignore parse errors */ }
+                    throw new Error(msg);
+                  }
                 }}
                 onPublishSuccess={() => setShowGuidelineModal(true)}
               >

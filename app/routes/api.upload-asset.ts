@@ -196,8 +196,7 @@ async function fileCreate(
 }
 
 async function pollImageUrl(admin: AdminClient, id: string): Promise<string> {
-  // Images are typically ready on the next round-trip — short retry loop.
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 30; i++) {
     const res = await admin.graphql(NODE_IMAGE, { variables: { id } });
     const json = (await res.json()) as {
       data?: {
@@ -213,7 +212,7 @@ async function pollImageUrl(admin: AdminClient, id: string): Promise<string> {
       throw new Error(node.fileErrors.map((e) => e.message).join(", "));
     }
     if (node?.image?.url) return node.image.url;
-    await sleep(500);
+    await sleep(1000);
   }
   throw new Error("Image upload did not become ready in time");
 }

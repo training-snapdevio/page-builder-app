@@ -426,35 +426,21 @@ function StackedDateField({
 
 function StackedNumberField({
   value,
-
   onChange,
-
   label,
-
   placeholder = "",
-
   icon,
-
   min,
-
   max,
-
-  step,
+  step = 1,
 }: {
   value: number;
-
   onChange: (val: number) => void;
-
   label: string;
-
   placeholder?: string;
-
   icon?: React.ReactNode;
-
   min?: number;
-
   max?: number;
-
   step?: number;
 }) {
   const [draftValue, setDraftValue] = useState(
@@ -465,63 +451,161 @@ function StackedNumberField({
     setDraftValue(value === undefined || value === null ? "" : String(value));
   }, [value]);
 
-  const defaultIcon = null;
+  const resolvedIcon = icon === undefined ? null : icon;
 
-  const resolvedIcon = icon === undefined ? defaultIcon : icon;
+  const commit = (raw: string) => {
+    if (raw === "" || raw === "-" || raw === "." || raw === "-.") {
+      setDraftValue(value === undefined || value === null ? "" : String(value));
+      return;
+    }
+    let parsed = Number(raw);
+    if (Number.isNaN(parsed)) { setDraftValue(String(value)); return; }
+    if (min !== undefined) parsed = Math.max(min, parsed);
+    if (max !== undefined) parsed = Math.min(max, parsed);
+    onChange(parsed);
+    setDraftValue(String(parsed));
+  };
+
+  const stepBy = (dir: 1 | -1) => {
+    let n = (Number(draftValue) || 0) + dir * (step ?? 1);
+    if (min !== undefined) n = Math.max(min, n);
+    if (max !== undefined) n = Math.min(max, n);
+    onChange(n);
+    setDraftValue(String(n));
+  };
+
+  const btnStyle: React.CSSProperties = {
+    width: 24, height: 28, display: "flex", alignItems: "center", justifyContent: "center",
+    border: "1px solid var(--p-color-border)", borderRadius: 4,
+    background: "var(--p-color-bg-surface)", cursor: "pointer",
+    fontSize: 15, lineHeight: 1, color: "var(--p-color-text)", padding: 0,
+    flexShrink: 0, userSelect: "none",
+  };
 
   return (
     <StackedField label={label} icon={resolvedIcon}>
-      <input
-        type="number"
-        value={draftValue}
-        placeholder={placeholder}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(e) => {
-          const nextValue = e.target.value;
-          setDraftValue(nextValue);
+      <div style={{ display: "flex", gap: 3, width: "100%", alignItems: "center" }}>
+        <button style={btnStyle} onClick={() => stepBy(-1)} type="button">−</button>
+        <input
+          type="number"
+          value={draftValue}
+          placeholder={placeholder}
+          min={min}
+          max={max}
+          step={step}
+          onChange={(e) => {
+            const v = e.target.value;
+            setDraftValue(v);
+            if (v === "" || v === "-" || v.endsWith(".") || v === "-.") return;
+            const n = Number(v);
+            if (!Number.isNaN(n)) onChange(n);
+          }}
+          onBlur={(e) => commit(e.target.value)}
+          style={{
+            flex: 1, minWidth: 0, padding: "5px 6px", fontSize: 12, textAlign: "center",
+            border: "1px solid var(--p-color-border)", borderRadius: 4,
+            outline: "none", boxSizing: "border-box",
+            background: "var(--p-color-bg-surface)", color: "var(--p-color-text)",
+            MozAppearance: "textfield",
+          }}
+        />
+        <button style={btnStyle} onClick={() => stepBy(1)} type="button">+</button>
+      </div>
+    </StackedField>
+  );
+}
 
-          if (nextValue === "" || nextValue === "-" || nextValue.endsWith(".") || nextValue === "-.") {
-            return;
-          }
+// ─── Helper: Number + Unit field (e.g. Width: 100 [px ▼]) ───────────────────
 
-          const parsedValue = Number(nextValue);
+function NumberUnitField({
+  label,
+  value,
+  unit,
+  onValueChange,
+  onUnitChange,
+  units,
+  min = 0,
+  max = 9999,
+  step = 1,
+}: {
+  label: string;
+  value: number;
+  unit: string;
+  onValueChange: (v: number) => void;
+  onUnitChange: (u: string) => void;
+  units: string[];
+  min?: number;
+  max?: number;
+  step?: number;
+}) {
+  const [draft, setDraft] = useState(value === null || value === undefined ? "" : String(value));
+  useEffect(() => {
+    setDraft(value === null || value === undefined ? "" : String(value));
+  }, [value]);
 
-          if (!Number.isNaN(parsedValue)) {
-            onChange(parsedValue);
-          }
-        }}
-        onBlur={() => {
-          if (draftValue === "" || draftValue === "-" || draftValue === "." || draftValue === "-.") {
-            setDraftValue(value === undefined || value === null ? "" : String(value));
-            return;
-          }
+  const commit = (raw: string) => {
+    if (raw === "" || raw === "-") { setDraft(String(value)); return; }
+    let n = Number(raw);
+    if (Number.isNaN(n)) { setDraft(String(value)); return; }
+    if (min !== undefined) n = Math.max(min, n);
+    if (max !== undefined) n = Math.min(max, n);
+    onValueChange(n);
+    setDraft(String(n));
+  };
 
-          let parsedValue = Number(draftValue);
+  const stepBy = (dir: 1 | -1) => {
+    let n = (Number(draft) || 0) + dir * (step ?? 1);
+    if (min !== undefined) n = Math.max(min, n);
+    if (max !== undefined) n = Math.min(max, n);
+    onValueChange(n);
+    setDraft(String(n));
+  };
 
-          if (!Number.isNaN(parsedValue)) {
-            if (min !== undefined) parsedValue = Math.max(min, parsedValue);
-            if (max !== undefined) parsedValue = Math.min(max, parsedValue);
-            onChange(parsedValue);
-            setDraftValue(String(parsedValue));
-          }
-        }}
-        style={{
-          width: "100%",
-          padding: "5px 8px",
-          fontSize: 12,
-          border: "1px solid var(--p-color-border)",
-          borderRadius: "var(--p-border-radius-100, 4px)",
-          outline: "none",
-          boxSizing: "border-box",
-          background: "var(--p-color-bg-surface)",
-          color: "var(--p-color-text)",
-          appearance: "auto",
-          MozAppearance: "auto",
-          WebkitAppearance: "auto",
-        }}
-      />
+  const btnStyle: React.CSSProperties = {
+    width: 22, height: 28, display: "flex", alignItems: "center", justifyContent: "center",
+    border: "1px solid var(--p-color-border)", borderRadius: 4, background: "var(--p-color-bg-surface)",
+    cursor: "pointer", fontSize: 14, lineHeight: 1, color: "var(--p-color-text)", padding: 0,
+    flexShrink: 0, userSelect: "none",
+  };
+
+  return (
+    <StackedField label={label}>
+      <div style={{ display: "flex", gap: 4, width: "100%", alignItems: "center" }}>
+        <button style={btnStyle} onClick={() => stepBy(-1)} type="button">−</button>
+        <input
+          type="number"
+          value={draft}
+          min={min}
+          max={max}
+          step={step}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            const n = Number(e.target.value);
+            if (!Number.isNaN(n) && e.target.value !== "" && e.target.value !== "-") onValueChange(n);
+          }}
+          onBlur={(e) => commit(e.target.value)}
+          style={{
+            flex: 1, minWidth: 0, padding: "5px 6px", fontSize: 12, textAlign: "center",
+            border: "1px solid var(--p-color-border)", borderRadius: 4,
+            background: "var(--p-color-bg-surface)", color: "var(--p-color-text)",
+            outline: "none", boxSizing: "border-box",
+            MozAppearance: "textfield",
+          }}
+        />
+        <button style={btnStyle} onClick={() => stepBy(1)} type="button">+</button>
+        <select
+          value={unit}
+          onChange={(e) => onUnitChange(e.target.value)}
+          style={{
+            height: 28, padding: "0 4px", fontSize: 11, fontWeight: 600,
+            border: "1px solid var(--p-color-border)", borderRadius: 4,
+            background: "var(--p-color-bg-surface)", color: "var(--p-color-text)",
+            outline: "none", cursor: "pointer", flexShrink: 0,
+          }}
+        >
+          {units.map((u) => <option key={u} value={u}>{u}</option>)}
+        </select>
+      </div>
     </StackedField>
   );
 }
@@ -1023,7 +1107,8 @@ function BlockTabBar({ blockKey, children }: {
         ))}
       </div>
       {/* Active tab content */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <style>{_tabSectionCss}</style>
+      <div className="pb-tab-content" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {children(tab)}
       </div>
     </div>
@@ -1031,9 +1116,18 @@ function BlockTabBar({ blockKey, children }: {
 }
 
 // Section header used inside tabs (lighter than SettingsSectionHeader)
+// When it's the first element in a tab the parent flex container makes it :first-child,
+// so we suppress the top border via a global CSS rule injected once.
+const _tabSectionCss = `
+  .pb-tab-content > .pb-tab-section:first-child {
+    border-top: none !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+`;
 function TabSection({ title }: { title: string }) {
   return (
-    <div style={{
+    <div className="pb-tab-section" style={{
       fontSize: 11,
       fontWeight: 700,
       textTransform: "uppercase",
@@ -2363,19 +2457,6 @@ const commonComponents: any = {
         ),
       },
 
-      showShadow: {
-        type: "custom",
-
-        label: "Show Shadow",
-
-        render: ({ value, onChange }) => (
-          <ToggleField
-            value={!!value}
-            onChange={onChange}
-            label="Show Shadow"
-          />
-        ),
-      },
 
       showNavigation: {
         type: "custom",
@@ -6348,30 +6429,6 @@ const commonComponents: any = {
                         min={10} max={64} step={1}
                       />
 
-                      <TabSection title="Text Shadow" />
-                      <ColorPickerField
-                        label="Shadow Color"
-                        value={props.textShadowColor ?? ""}
-                        onChange={(v) => set("textShadowColor", v)}
-                      />
-                      <StackedNumberField
-                        label="Horizontal (px)"
-                        value={props.textShadowX ?? 0}
-                        onChange={(v) => set("textShadowX", v)}
-                        min={-50} max={50} step={1}
-                      />
-                      <StackedNumberField
-                        label="Vertical (px)"
-                        value={props.textShadowY ?? 0}
-                        onChange={(v) => set("textShadowY", v)}
-                        min={-50} max={50} step={1}
-                      />
-                      <StackedNumberField
-                        label="Blur (px)"
-                        value={props.textShadowBlur ?? 0}
-                        onChange={(v) => set("textShadowBlur", v)}
-                        min={0} max={50} step={1}
-                      />
 
                       <TabSection title="Alignment" />
                       <AlignField
@@ -6538,36 +6595,6 @@ const commonComponents: any = {
                         onChange={(v) => set("advBorderRadius", v)}
                       />
 
-                      <TabSection title="Shadow" />
-                      <ColorPickerField
-                        label="Box Shadow Color"
-                        value={props.advShadowColor ?? ""}
-                        onChange={(v) => set("advShadowColor", v)}
-                      />
-                      <StackedNumberField
-                        label="X (px)"
-                        value={props.advShadowX ?? 0}
-                        onChange={(v) => set("advShadowX", v)}
-                        min={-100} max={100} step={1}
-                      />
-                      <StackedNumberField
-                        label="Y (px)"
-                        value={props.advShadowY ?? 0}
-                        onChange={(v) => set("advShadowY", v)}
-                        min={-100} max={100} step={1}
-                      />
-                      <StackedNumberField
-                        label="Blur (px)"
-                        value={props.advShadowBlur ?? 0}
-                        onChange={(v) => set("advShadowBlur", v)}
-                        min={0} max={100} step={1}
-                      />
-                      <StackedNumberField
-                        label="Spread (px)"
-                        value={props.advShadowSpread ?? 0}
-                        onChange={(v) => set("advShadowSpread", v)}
-                        min={-50} max={50} step={1}
-                      />
 
                       <TabSection title="Responsive" />
                       <ToggleField
@@ -6586,48 +6613,6 @@ const commonComponents: any = {
                         onChange={(v) => set("hideMobile", v)}
                       />
 
-                      <TabSection title="Custom" />
-                      <StackedTextField
-                        label="CSS ID"
-                        value={props.cssId ?? ""}
-                        onChange={(v) => set("cssId", v)}
-                        placeholder="my-heading"
-                      />
-                      <StackedTextField
-                        label="CSS Class"
-                        value={props.cssClass ?? ""}
-                        onChange={(v) => set("cssClass", v)}
-                        placeholder="custom-class"
-                      />
-                      <StackedField label="Custom CSS">
-                        <textarea
-                          value={props.customCss ?? ""}
-                          onChange={(e) => set("customCss", e.target.value)}
-                          rows={4}
-                          placeholder={"color: red;\nfont-size: 2rem;"}
-                          style={{
-                            width: "100%",
-                            padding: "6px 8px",
-                            fontSize: 11,
-                            fontFamily: "ui-monospace, monospace",
-                            border: "1px solid var(--p-color-border)",
-                            borderRadius: "var(--p-border-radius-100, 4px)",
-                            outline: "none",
-                            boxSizing: "border-box",
-                            background: "var(--p-color-bg-surface)",
-                            color: "var(--p-color-text)",
-                            resize: "vertical",
-                            lineHeight: 1.5,
-                          }}
-                        />
-                      </StackedField>
-                      <StackedNumberField
-                        label="Z-Index"
-                        value={props.zIndex ?? null}
-                        onChange={(v) => set("zIndex", v)}
-                        placeholder="e.g. 10"
-                        min={-100} max={9999} step={1}
-                      />
                       <StackedNumberField
                         label="Opacity (%)"
                         value={props.opacity ?? 100}
@@ -6666,10 +6651,6 @@ const commonComponents: any = {
       subtitleColor: "",
       subtitleSize: 18,
       // Style – text shadow
-      textShadowColor: "",
-      textShadowX: 0,
-      textShadowY: 0,
-      textShadowBlur: 0,
       // Style – alignment & divider
       alignment: "left",
       dividerType: "none",
@@ -6694,11 +6675,6 @@ const commonComponents: any = {
       advBorderColor: "",
       advBorderRadius: { top: 0, right: 0, bottom: 0, left: 0 },
       // Advanced – shadow
-      advShadowColor: "",
-      advShadowX: 0,
-      advShadowY: 0,
-      advShadowBlur: 0,
-      advShadowSpread: 0,
       // Advanced – responsive
       hideDesktop: false,
       hideTablet: false,
@@ -6731,10 +6707,6 @@ const commonComponents: any = {
       lineHeight,
       letterSpacing,
       hoverColor: _hoverColor,
-      textShadowColor,
-      textShadowX,
-      textShadowY,
-      textShadowBlur,
       dividerType,
       dividerColor,
       dividerLength,
@@ -6752,11 +6724,6 @@ const commonComponents: any = {
       advBorderWidth,
       advBorderColor,
       advBorderRadius,
-      advShadowColor,
-      advShadowX,
-      advShadowY,
-      advShadowBlur,
-      advShadowSpread,
       hideDesktop,
       hideTablet,
       hideMobile,
@@ -6799,15 +6766,6 @@ const commonComponents: any = {
         borderBottomLeftRadius:  advBorderRadius?.left   ?? 0,
       };
 
-      // Box shadow
-      const boxShadow = advShadowColor
-        ? `${advShadowX ?? 0}px ${advShadowY ?? 0}px ${advShadowBlur ?? 0}px ${advShadowSpread ?? 0}px ${advShadowColor}`
-        : undefined;
-
-      // Text shadow
-      const textShadow = textShadowColor
-        ? `${textShadowX ?? 0}px ${textShadowY ?? 0}px ${textShadowBlur ?? 0}px ${textShadowColor}`
-        : undefined;
 
       // Responsive hide classes
       const hideClasses = [
@@ -6836,7 +6794,6 @@ const commonComponents: any = {
         textAlign: alignment as any,
         zIndex: zIndex ?? undefined,
         opacity: opacity != null ? opacity / 100 : 1,
-        boxShadow,
         ...bgStyle,
         ...borderStyle,
         ...radiusStyle,
@@ -6854,7 +6811,6 @@ const commonComponents: any = {
             lineHeight: lineHeight ?? "var(--heading-line-height, 1.2)",
             letterSpacing: letterSpacing != null ? `${letterSpacing}px` : undefined,
             color: textColor || "var(--primary-color)",
-            textShadow,
             margin: 0,
           }}
         >
@@ -7147,31 +7103,12 @@ const commonComponents: any = {
                       )}
                       <FourSideField label="Border Radius (px)" value={props.advBorderRadius} onChange={(v) => set("advBorderRadius", v)} />
 
-                      <TabSection title="Shadow" />
-                      <ColorPickerField label="Box Shadow Color" value={props.advShadowColor ?? ""} onChange={(v) => set("advShadowColor", v)} />
-                      <StackedNumberField label="X (px)" value={props.advShadowX ?? 0} onChange={(v) => set("advShadowX", v)} min={-100} max={100} step={1} />
-                      <StackedNumberField label="Y (px)" value={props.advShadowY ?? 0} onChange={(v) => set("advShadowY", v)} min={-100} max={100} step={1} />
-                      <StackedNumberField label="Blur (px)" value={props.advShadowBlur ?? 0} onChange={(v) => set("advShadowBlur", v)} min={0} max={100} step={1} />
-                      <StackedNumberField label="Spread (px)" value={props.advShadowSpread ?? 0} onChange={(v) => set("advShadowSpread", v)} min={-50} max={50} step={1} />
 
                       <TabSection title="Responsive" />
                       <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                       <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                       <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
 
-                      <TabSection title="Custom" />
-                      <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-text" />
-                      <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                      <StackedField label="Custom CSS">
-                        <textarea
-                          value={props.customCss ?? ""}
-                          onChange={(e) => set("customCss", e.target.value)}
-                          rows={4}
-                          placeholder={"color: red;\nfont-size: 1rem;"}
-                          style={{ width: "100%", padding: "6px 8px", fontSize: 11, fontFamily: "ui-monospace, monospace", border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-100, 4px)", outline: "none", boxSizing: "border-box", background: "var(--p-color-bg-surface)", color: "var(--p-color-text)", resize: "vertical", lineHeight: 1.5 }}
-                        />
-                      </StackedField>
-                      <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} placeholder="e.g. 10" min={-100} max={9999} step={1} />
                       <StackedNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1} />
                     </>
                   )}
@@ -7210,11 +7147,6 @@ const commonComponents: any = {
       advBorderWidth: { top: 0, right: 0, bottom: 0, left: 0 },
       advBorderColor: "",
       advBorderRadius: { top: 0, right: 0, bottom: 0, left: 0 },
-      advShadowColor: "",
-      advShadowX: 0,
-      advShadowY: 0,
-      advShadowBlur: 0,
-      advShadowSpread: 0,
       hideDesktop: false,
       hideTablet: false,
       hideMobile: false,
@@ -7252,11 +7184,6 @@ const commonComponents: any = {
       advBorderWidth,
       advBorderColor,
       advBorderRadius,
-      advShadowColor,
-      advShadowX,
-      advShadowY,
-      advShadowBlur,
-      advShadowSpread,
       hideDesktop,
       hideTablet,
       hideMobile,
@@ -7277,10 +7204,6 @@ const commonComponents: any = {
         ? { borderStyle: advBorderStyle, borderTopWidth: advBorderWidth?.top ?? 0, borderRightWidth: advBorderWidth?.right ?? 0, borderBottomWidth: advBorderWidth?.bottom ?? 0, borderLeftWidth: advBorderWidth?.left ?? 0, borderColor: advBorderColor || "currentColor" }
         : {};
 
-      const boxShadow = advShadowColor
-        ? `${advShadowX ?? 0}px ${advShadowY ?? 0}px ${advShadowBlur ?? 0}px ${advShadowSpread ?? 0}px ${advShadowColor}`
-        : undefined;
-
       const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
 
       const cols = parseInt(String(columnCount ?? "1"), 10) || 1;
@@ -7299,7 +7222,6 @@ const commonComponents: any = {
             marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0,
             zIndex: zIndex ?? undefined,
             opacity: opacity != null ? opacity / 100 : 1,
-            boxShadow,
             borderTopLeftRadius: advBorderRadius?.top ?? 0,
             borderTopRightRadius: advBorderRadius?.right ?? 0,
             borderBottomRightRadius: advBorderRadius?.bottom ?? 0,
@@ -7823,13 +7745,6 @@ const commonComponents: any = {
         label: "Image Height (px)",
         render: ({ value, onChange }) => (
           <StackedNumberField label="Image Height (px)" value={value ?? 460} onChange={onChange} placeholder="e.g., 460" min={120} max={900} />
-        ),
-      },
-      imageShadow: {
-        type: "custom",
-        label: "Image Shadow",
-        render: ({ value, onChange }) => (
-          <ToggleField value={value === true} onChange={onChange} label="Image Shadow" />
         ),
       },
       // ── Layout ───────────────────────────────────────────────────────────
@@ -8816,7 +8731,6 @@ const commonComponents: any = {
       const cardStyleMap: Record<string, React.CSSProperties> = {
         bordered: { border: "1px solid #e5e7eb", boxShadow: "none" },
 
-        shadow: { border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" },
 
         flat: { border: "none", boxShadow: "none", backgroundColor: "#f8fafc" },
       };
@@ -11939,9 +11853,7 @@ const ImageComponent = {
                 {/* ── CONTENT TAB ── */}
                 {tab === "content" && (
                   <>
-                    <StackedField label="Image">
-                      <ImageField label="Image" value={props.imageUrl ?? ""} onChange={(v) => set("imageUrl", v)} />
-                    </StackedField>
+                    <ImageField label="Image" value={props.imageUrl ?? ""} onChange={(v) => set("imageUrl", v)} />
                     <StackedTextField label="Alt Text" value={props.altText ?? ""} onChange={(v) => set("altText", v)} placeholder="Describe the image..." />
                     <StackedTextField label="Caption" value={props.caption ?? ""} onChange={(v) => set("caption", v)} placeholder="Optional caption..." />
                     <StackedTextField label="Link URL" value={props.linkUrl ?? ""} onChange={(v) => set("linkUrl", v)} placeholder="https://..." />
@@ -11962,9 +11874,24 @@ const ImageComponent = {
                 {tab === "style" && (
                   <>
                     <TabSection title="Sizing" />
-                    <StackedTextField label="Width" value={props.width ?? "100%"} onChange={(v) => set("width", v)} placeholder="e.g. 600px or 100%" />
-                    <StackedTextField label="Height" value={props.height ?? "auto"} onChange={(v) => set("height", v)} placeholder="e.g. 400px or auto" />
-                    <StackedTextField label="Max Width" value={props.maxWidth ?? ""} onChange={(v) => set("maxWidth", v)} placeholder="e.g. 800px or 100%" />
+                    <NumberUnitField
+                      label="Width"
+                      value={props.imgWidth ?? 100}
+                      unit={props.imgWidthUnit ?? "%"}
+                      onValueChange={(v) => set("imgWidth", v)}
+                      onUnitChange={(u) => set("imgWidthUnit", u)}
+                      units={["%", "px", "vw"]}
+                      min={0} max={9999} step={1}
+                    />
+                    <NumberUnitField
+                      label="Height"
+                      value={props.imgHeight ?? 0}
+                      unit={props.imgHeightUnit ?? "px"}
+                      onValueChange={(v) => set("imgHeight", v)}
+                      onUnitChange={(u) => set("imgHeightUnit", u)}
+                      units={["px", "vh", "auto"]}
+                      min={0} max={9999} step={1}
+                    />
                     <InlineSelect
                       label="Object Fit"
                       value={props.objectFit ?? "cover"}
@@ -11973,6 +11900,7 @@ const ImageComponent = {
                         { value: "cover", label: "Cover" },
                         { value: "contain", label: "Contain" },
                         { value: "fill", label: "Fill" },
+                        { value: "scale-down", label: "Scale Down" },
                         { value: "none", label: "None" },
                       ]}
                     />
@@ -12015,11 +11943,6 @@ const ImageComponent = {
                     <StackedNumberField label="CSS Brightness (%)" value={props.cssBrightness ?? 100} onChange={(v) => set("cssBrightness", v)} min={0} max={200} step={5} />
                     <StackedNumberField label="CSS Contrast (%)" value={props.cssContrast ?? 100} onChange={(v) => set("cssContrast", v)} min={0} max={200} step={5} />
                     <StackedNumberField label="CSS Saturate (%)" value={props.cssSaturate ?? 100} onChange={(v) => set("cssSaturate", v)} min={0} max={300} step={5} />
-                    <ColorPickerField label="Box Shadow Color" value={props.shadowColor ?? ""} onChange={(v) => set("shadowColor", v)} />
-                    <StackedNumberField label="Shadow X (px)" value={props.shadowX ?? 0} onChange={(v) => set("shadowX", v)} min={-50} max={50} step={1} />
-                    <StackedNumberField label="Shadow Y (px)" value={props.shadowY ?? 0} onChange={(v) => set("shadowY", v)} min={-50} max={50} step={1} />
-                    <StackedNumberField label="Shadow Blur (px)" value={props.shadowBlur ?? 0} onChange={(v) => set("shadowBlur", v)} min={0} max={100} step={1} />
-                    <StackedNumberField label="Shadow Spread (px)" value={props.shadowSpread ?? 0} onChange={(v) => set("shadowSpread", v)} min={-50} max={50} step={1} />
 
                     <TabSection title="Caption Style" />
                     <InlineSelect
@@ -12085,19 +12008,6 @@ const ImageComponent = {
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
 
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-image" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedField label="Custom CSS">
-                      <textarea
-                        value={props.customCss ?? ""}
-                        onChange={(e) => set("customCss", e.target.value)}
-                        rows={4}
-                        placeholder={"filter: grayscale(1);"}
-                        style={{ width: "100%", padding: "6px 8px", fontSize: 11, fontFamily: "ui-monospace, monospace", border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-100, 4px)", outline: "none", boxSizing: "border-box", background: "var(--p-color-bg-surface)", color: "var(--p-color-text)", resize: "vertical", lineHeight: 1.5 }}
-                      />
-                    </StackedField>
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} placeholder="e.g. 10" min={-100} max={9999} step={1} />
                   </>
                 )}
               </>
@@ -12115,9 +12025,10 @@ const ImageComponent = {
     linkUrl: "",
     linkTarget: "_self",
     lazyLoad: true,
-    width: "100%",
-    height: "auto",
-    maxWidth: "",
+    imgWidth: 100,
+    imgWidthUnit: "%",
+    imgHeight: 0,
+    imgHeightUnit: "px",
     objectFit: "cover",
     borderStyle: "none",
     borderWidth: 1,
@@ -12129,11 +12040,6 @@ const ImageComponent = {
     cssBrightness: 100,
     cssContrast: 100,
     cssSaturate: 100,
-    shadowColor: "",
-    shadowX: 0,
-    shadowY: 0,
-    shadowBlur: 0,
-    shadowSpread: 0,
     captionPosition: "below",
     captionColor: "",
     captionFontSize: 13,
@@ -12160,9 +12066,10 @@ const ImageComponent = {
     linkUrl,
     linkTarget,
     lazyLoad,
-    width,
-    height,
-    maxWidth,
+    imgWidth,
+    imgWidthUnit,
+    imgHeight,
+    imgHeightUnit,
     objectFit,
     borderStyle,
     borderWidth,
@@ -12174,11 +12081,6 @@ const ImageComponent = {
     cssBrightness,
     cssContrast,
     cssSaturate,
-    shadowColor,
-    shadowX,
-    shadowY,
-    shadowBlur,
-    shadowSpread,
     captionPosition,
     captionColor,
     captionFontSize,
@@ -12196,7 +12098,7 @@ const ImageComponent = {
     cssClass,
     customCss,
     zIndex,
-  }) => {
+  }: any) => {
     const cssFilter = [
       cssBlur ? `blur(${cssBlur}px)` : "",
       cssBrightness !== 100 ? `brightness(${cssBrightness}%)` : "",
@@ -12204,30 +12106,33 @@ const ImageComponent = {
       cssSaturate !== 100 ? `saturate(${cssSaturate}%)` : "",
     ].filter(Boolean).join(" ");
 
-    const boxShadow = shadowColor
-      ? `${shadowX ?? 0}px ${shadowY ?? 0}px ${shadowBlur ?? 0}px ${shadowSpread ?? 0}px ${shadowColor}`
-      : undefined;
-
     const wrapBgStyle: React.CSSProperties = advBgType === "color" && advBgColor
       ? { backgroundColor: advBgColor }
       : {};
 
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
 
+    const imgId = cssId || `img-${Math.random().toString(36).slice(2, 7)}`;
     const hoverStyles = hoverEffect && hoverEffect !== "none" ? `
-      .puck-img-${cssId || "default"}:hover img {
-        ${hoverEffect === "zoom" ? "transform: scale(1.05);" : ""}
+      #${imgId} .pb-img-wrap { overflow: hidden; }
+      #${imgId} .pb-img-wrap img { transition: all 0.35s ease; }
+      #${imgId}:hover .pb-img-wrap img {
+        ${hoverEffect === "zoom" ? "transform: scale(1.08);" : ""}
         ${hoverEffect === "grayscale" ? "filter: grayscale(1);" : ""}
         ${hoverEffect === "blur" ? "filter: blur(4px);" : ""}
-        ${hoverEffect === "brightness" ? "filter: brightness(1.2);" : ""}
-        transition: all 0.3s ease;
+        ${hoverEffect === "brightness" ? "filter: brightness(1.3);" : ""}
       }
-      .puck-img-${cssId || "default"} img { transition: all 0.3s ease; }
     ` : "";
 
+    const wUnit = imgWidthUnit ?? "%";
+    const hUnit = imgHeightUnit ?? "px";
+    const widthVal = wUnit === "auto" ? "auto" : `${imgWidth ?? 100}${wUnit}`;
+    const heightVal = (hUnit === "auto" || !imgHeight) ? "auto" : `${imgHeight}${hUnit}`;
+
     if (!imageUrl) return (
-      <div style={{ padding: 16, textAlign: alignment as any, color: "#9ca3af", fontSize: 14, border: "2px dashed #e5e7eb", borderRadius, margin: "0 auto", width }}>
-        No image selected. Use the property panel to add an image.
+      <div style={{ padding: 16, textAlign: alignment as any, color: "#9ca3af", fontSize: 14, border: "2px dashed #e5e7eb", borderRadius: borderRadius || "0px", margin: "0 auto" }}>
+        <div>No image selected. Use the property panel to add an image.</div>
+        {altText && <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>Alt: {altText}</div>}
       </div>
     );
 
@@ -12237,16 +12142,15 @@ const ImageComponent = {
         alt={altText ?? ""}
         loading={lazyLoad !== false ? "lazy" : "eager"}
         style={{
-          width, height, maxWidth: maxWidth || undefined,
+          width: "100%",
+          height: heightVal,
           objectFit: objectFit as any,
-          borderRadius,
           display: "block",
           filter: cssFilter || undefined,
-          boxShadow,
           borderStyle: borderStyle !== "none" ? borderStyle : undefined,
-          borderWidth: borderStyle !== "none" ? borderWidth : undefined,
+          borderWidth: borderStyle !== "none" ? (borderWidth || 1) : undefined,
           borderColor: borderStyle !== "none" ? (borderColor || "#e5e7eb") : undefined,
-          opacity: opacity / 100,
+          opacity: (opacity ?? 100) / 100,
         }}
       />
     );
@@ -12266,23 +12170,23 @@ const ImageComponent = {
           </div>
         )
         : (
-          <p style={{
+          <div style={{
             fontSize: captionFontSize || 13,
-            color: captionColor || "var(--text-color)",
+            color: captionColor || "var(--text-color, #374151)",
             backgroundColor: captionBackground || "transparent",
-            marginTop: 8,
+            padding: "6px 0",
             textAlign: captionAlign as any,
             fontStyle: "italic",
           }}>
             {caption}
-          </p>
+          </div>
         )
     );
 
     return (
       <div
-        id={cssId || undefined}
-        className={[`puck-img-${cssId || "default"}`, hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
+        id={imgId}
+        className={[`puck-img-wrap-outer`, hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={{
           paddingTop: advPadding?.top ?? 0, paddingRight: advPadding?.right ?? 0,
           paddingBottom: advPadding?.bottom ?? 0, paddingLeft: advPadding?.left ?? 0,
@@ -12294,16 +12198,28 @@ const ImageComponent = {
         }}
       >
         {(hoverStyles || customCss) && (
-          <style>{hoverStyles}{customCss ? `#${cssId || "img-block"} { ${customCss} }` : ""}</style>
+          <style>{hoverStyles}{customCss ? `#${imgId} { ${customCss} }` : ""}</style>
         )}
-        <div style={{ display: "inline-block", maxWidth: "100%", position: "relative", overflow: "hidden" }}>
+        <div
+          className="pb-img-wrap"
+          style={{
+            display: "block",
+            width: widthVal,
+            maxWidth: "100%",
+            marginLeft: alignment === "center" || alignment === "right" ? "auto" : undefined,
+            marginRight: alignment === "center" || alignment === "left" ? "auto" : undefined,
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: borderRadius || "0px",
+          }}
+        >
           {linkUrl
             ? <a href={linkUrl} target={linkTarget ?? "_self"} rel={linkTarget === "_blank" ? "noopener noreferrer" : undefined} style={{ display: "block" }}>{imgEl}</a>
             : imgEl
           }
-          {captionPosition !== "overlay" && captionEl}
           {captionPosition === "overlay" && captionEl}
         </div>
+        {captionPosition !== "overlay" && captionEl}
       </div>
     );
   },
@@ -12340,9 +12256,33 @@ const SpaceComponent = {
                 {/* ── CONTENT TAB ── */}
                 {tab === "content" && (
                   <>
-                    <StackedTextField label="Height Desktop" value={props.heightDesktop ?? "32px"} onChange={(v) => set("heightDesktop", v)} placeholder="e.g. 32px or 2rem" />
-                    <StackedTextField label="Height Tablet" value={props.heightTablet ?? ""} onChange={(v) => set("heightTablet", v)} placeholder="e.g. 24px (optional)" />
-                    <StackedTextField label="Height Mobile" value={props.heightMobile ?? ""} onChange={(v) => set("heightMobile", v)} placeholder="e.g. 16px (optional)" />
+                    <NumberUnitField
+                      label="Height Desktop"
+                      value={props.heightDesktop ?? 32}
+                      unit={props.heightDesktopUnit ?? "px"}
+                      onValueChange={(v) => set("heightDesktop", v)}
+                      onUnitChange={(u) => set("heightDesktopUnit", u)}
+                      units={["px", "vh", "rem"]}
+                      min={0} max={9999} step={1}
+                    />
+                    <NumberUnitField
+                      label="Height Tablet"
+                      value={props.heightTablet ?? 0}
+                      unit={props.heightTabletUnit ?? "px"}
+                      onValueChange={(v) => set("heightTablet", v)}
+                      onUnitChange={(u) => set("heightTabletUnit", u)}
+                      units={["px", "vh", "rem"]}
+                      min={0} max={9999} step={1}
+                    />
+                    <NumberUnitField
+                      label="Height Mobile"
+                      value={props.heightMobile ?? 0}
+                      unit={props.heightMobileUnit ?? "px"}
+                      onValueChange={(v) => set("heightMobile", v)}
+                      onUnitChange={(u) => set("heightMobileUnit", u)}
+                      units={["px", "vh", "rem"]}
+                      min={0} max={9999} step={1}
+                    />
                   </>
                 )}
 
@@ -12361,10 +12301,6 @@ const SpaceComponent = {
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
 
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-spacer" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} placeholder="e.g. 10" min={-100} max={9999} step={1} />
                   </>
                 )}
               </>
@@ -12376,9 +12312,12 @@ const SpaceComponent = {
   },
 
   defaultProps: {
-    heightDesktop: "32px",
-    heightTablet: "",
-    heightMobile: "",
+    heightDesktop: 32,
+    heightDesktopUnit: "px",
+    heightTablet: 0,
+    heightTabletUnit: "px",
+    heightMobile: 0,
+    heightMobileUnit: "px",
     backgroundColor: "",
     hideDesktop: false,
     hideTablet: false,
@@ -12388,12 +12327,15 @@ const SpaceComponent = {
     zIndex: null,
   },
 
-  render: ({ heightDesktop, heightTablet, heightMobile, backgroundColor, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex }) => {
+  render: ({ heightDesktop, heightDesktopUnit, heightTablet, heightTabletUnit, heightMobile, heightMobileUnit, backgroundColor, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex }: any) => {
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
+    const hD = `${heightDesktop || 32}${heightDesktopUnit || "px"}`;
+    const hT = heightTablet ? `${heightTablet}${heightTabletUnit || "px"}` : hD;
+    const hM = heightMobile ? `${heightMobile}${heightMobileUnit || "px"}` : hT;
     const responsiveCss = `
-      .spacer-${cssId || "default"} { height: ${heightDesktop || "32px"}; }
-      @media (max-width: 1024px) { .spacer-${cssId || "default"} { height: ${heightTablet || heightDesktop || "32px"}; } }
-      @media (max-width: 640px) { .spacer-${cssId || "default"} { height: ${heightMobile || heightTablet || heightDesktop || "32px"}; } }
+      .spacer-${cssId || "default"} { height: ${hD}; }
+      @media (max-width: 1024px) { .spacer-${cssId || "default"} { height: ${hT}; } }
+      @media (max-width: 640px) { .spacer-${cssId || "default"} { height: ${hM}; } }
     `;
     return (
       <div
@@ -12536,19 +12478,10 @@ const ButtonComponent = {
                       </>
                     )}
                     <StackedTextField label="Border Radius" value={props.borderRadius ?? "var(--button-border-radius, 6px)"} onChange={(v) => set("borderRadius", v)} placeholder="e.g. 6px or 50%" />
-                    <ColorPickerField label="Box Shadow Color" value={props.shadowColor ?? ""} onChange={(v) => set("shadowColor", v)} />
-                    <StackedNumberField label="Shadow X (px)" value={props.shadowX ?? 0} onChange={(v) => set("shadowX", v)} min={-50} max={50} step={1} />
-                    <StackedNumberField label="Shadow Y (px)" value={props.shadowY ?? 4} onChange={(v) => set("shadowY", v)} min={-50} max={50} step={1} />
-                    <StackedNumberField label="Shadow Blur (px)" value={props.shadowBlur ?? 0} onChange={(v) => set("shadowBlur", v)} min={0} max={100} step={1} />
 
                     <TabSection title="Hover State" />
                     <ColorPickerField label="Text Hover Color" value={props.hoverTextColor ?? ""} onChange={(v) => set("hoverTextColor", v)} />
                     <ColorPickerField label="Background Hover" value={props.hoverBgColor ?? ""} onChange={(v) => set("hoverBgColor", v)} />
-                    <ColorPickerField label="Border Hover Color" value={props.hoverBorderColor ?? ""} onChange={(v) => set("hoverBorderColor", v)} />
-                    <ColorPickerField label="Box Shadow Hover Color" value={props.hoverShadowColor ?? ""} onChange={(v) => set("hoverShadowColor", v)} />
-                    <StackedNumberField label="Shadow Hover X (px)" value={props.hoverShadowX ?? 0} onChange={(v) => set("hoverShadowX", v)} min={-50} max={50} step={1} />
-                    <StackedNumberField label="Shadow Hover Y (px)" value={props.hoverShadowY ?? 6} onChange={(v) => set("hoverShadowY", v)} min={-50} max={50} step={1} />
-                    <StackedNumberField label="Shadow Hover Blur (px)" value={props.hoverShadowBlur ?? 0} onChange={(v) => set("hoverShadowBlur", v)} min={0} max={100} step={1} />
                     <InlineSelect
                       label="Hover Animation"
                       value={props.hoverAnimation ?? "none"}
@@ -12606,19 +12539,6 @@ const ButtonComponent = {
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
 
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-button" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedField label="Custom CSS">
-                      <textarea
-                        value={props.customCss ?? ""}
-                        onChange={(e) => set("customCss", e.target.value)}
-                        rows={4}
-                        placeholder={"letter-spacing: 0.1em;"}
-                        style={{ width: "100%", padding: "6px 8px", fontSize: 11, fontFamily: "ui-monospace, monospace", border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-100, 4px)", outline: "none", boxSizing: "border-box", background: "var(--p-color-bg-surface)", color: "var(--p-color-text)", resize: "vertical", lineHeight: 1.5 }}
-                      />
-                    </StackedField>
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} placeholder="e.g. 10" min={-100} max={9999} step={1} />
                     <StackedNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1} />
                   </>
                 )}
@@ -12649,17 +12569,9 @@ const ButtonComponent = {
     borderWidth: 2,
     borderColor: "",
     borderRadius: "var(--button-border-radius, 6px)",
-    shadowColor: "",
-    shadowX: 0,
-    shadowY: 0,
-    shadowBlur: 0,
     hoverTextColor: "",
     hoverBgColor: "",
     hoverBorderColor: "",
-    hoverShadowColor: "",
-    hoverShadowX: 0,
-    hoverShadowY: 6,
-    hoverShadowBlur: 15,
     hoverAnimation: "none",
     sizePreset: "medium",
     customPadding: { top: 12, right: 24, bottom: 12, left: 24 },
@@ -12695,17 +12607,9 @@ const ButtonComponent = {
     borderWidth,
     borderColor,
     borderRadius,
-    shadowColor,
-    shadowX,
-    shadowY,
-    shadowBlur,
     hoverTextColor,
     hoverBgColor,
     hoverBorderColor,
-    hoverShadowColor,
-    hoverShadowX,
-    hoverShadowY,
-    hoverShadowBlur,
     hoverAnimation,
     sizePreset,
     customPadding,
@@ -12729,14 +12633,12 @@ const ButtonComponent = {
     };
 
     const padding = sizeMap[sizePreset ?? "medium"] ?? sizeMap.medium;
-    const boxShadow = shadowColor ? `${shadowX ?? 0}px ${shadowY ?? 0}px ${shadowBlur ?? 0}px ${shadowColor}` : undefined;
 
     const hoverCss = `
       .puck-btn-${cssId || "default"}:hover {
         ${hoverTextColor ? `color: ${hoverTextColor} !important;` : ""}
         ${hoverBgColor ? `background: ${hoverBgColor} !important;` : ""}
         ${hoverBorderColor ? `border-color: ${hoverBorderColor} !important;` : ""}
-        ${hoverShadowColor ? `box-shadow: ${hoverShadowX ?? 0}px ${hoverShadowY ?? 6}px ${hoverShadowBlur ?? 15}px ${hoverShadowColor} !important;` : ""}
         ${hoverAnimation === "grow" ? "transform: scale(1.05);" : ""}
         ${hoverAnimation === "shrink" ? "transform: scale(0.96);" : ""}
         ${hoverAnimation === "pulse" ? "animation: puck-pulse 0.6s ease;" : ""}
@@ -12767,7 +12669,6 @@ const ButtonComponent = {
           background: bgColor || "var(--primary-color, #0158ad)",
           border: borderStyle !== "none" ? `${borderWidth ?? 2}px ${borderStyle} ${borderColor || "transparent"}` : "none",
           borderRadius: borderRadius || "6px",
-          boxShadow,
           cursor: "pointer",
           opacity: opacity != null ? opacity / 100 : 1,
           textDecoration: "none",
@@ -12837,9 +12738,21 @@ const DividerComponent = {
                         { value: "dashed", label: "Dashed" },
                         { value: "dotted", label: "Dotted" },
                         { value: "double", label: "Double" },
+                        { value: "gradient", label: "Gradient" },
+                        { value: "wave", label: "Wave" },
+                        { value: "zigzag", label: "Zigzag" },
+                        { value: "shadow", label: "Shadow" },
                       ]}
                     />
-                    <StackedTextField label="Width" value={props.lineWidth ?? "100%"} onChange={(v) => set("lineWidth", v)} placeholder="e.g. 100% or 600px" />
+                    <NumberUnitField
+                      label="Width"
+                      value={props.lineWidthVal ?? 100}
+                      unit={props.lineWidthUnit ?? "%"}
+                      onValueChange={(v) => set("lineWidthVal", v)}
+                      onUnitChange={(u) => set("lineWidthUnit", u)}
+                      units={["%", "px", "vw"]}
+                      min={0} max={9999} step={1}
+                    />
                     <AlignField
                       label="Alignment"
                       value={props.alignment ?? "center"}
@@ -12914,10 +12827,6 @@ const DividerComponent = {
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
 
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-divider" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} placeholder="e.g. 10" min={-100} max={9999} step={1} />
                   </>
                 )}
               </>
@@ -12930,7 +12839,8 @@ const DividerComponent = {
 
   defaultProps: {
     lineStyle: "solid",
-    lineWidth: "100%",
+    lineWidthVal: 100,
+    lineWidthUnit: "%",
     alignment: "center",
     showElement: false,
     elementType: "icon",
@@ -12957,7 +12867,8 @@ const DividerComponent = {
 
   render: ({
     lineStyle,
-    lineWidth,
+    lineWidthVal,
+    lineWidthUnit,
     alignment,
     showElement,
     elementType,
@@ -12983,9 +12894,36 @@ const DividerComponent = {
   }) => {
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
     const color = lineColor || "#e5e7eb";
-    const lineEl = (style: React.CSSProperties) => (
-      <div style={{ flex: 1, borderTop: `${thickness || 1}px ${lineStyle || "solid"} ${color}`, ...style }} />
-    );
+    const th = thickness || 1;
+    const lineEl = (style: React.CSSProperties) => {
+      if (lineStyle === "gradient") {
+        return <div style={{ flex: 1, height: th, background: `linear-gradient(90deg, transparent, ${color} 30%, ${color} 70%, transparent)`, alignSelf: "center", ...style }} />;
+      }
+      if (lineStyle === "shadow") {
+        return <div style={{ flex: 1, height: th * 4, background: `radial-gradient(ellipse at 50% 0%, ${color} 0%, transparent 70%)`, alignSelf: "center", ...style }} />;
+      }
+      if (lineStyle === "wave") {
+        const h = Math.max(th * 4, 8);
+        return (
+          <div style={{ flex: 1, height: h, overflow: "hidden", alignSelf: "center", ...style }}>
+            <svg width="100%" height={h} preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M0,4 C15,0 15,8 30,4 S45,0 60,4 S75,8 90,4 S105,0 120,4 S135,8 150,4 S165,0 180,4 S195,8 210,4 S225,0 240,4 S255,8 270,4 S285,0 300,4 S315,8 330,4 S345,0 360,4 S375,8 390,4 S405,0 420,4 S435,8 450,4 S465,0 480,4 S495,8 510,4 S525,0 540,4 S555,8 570,4 S585,0 600,4" fill="none" stroke={color} strokeWidth={th} vectorEffect="non-scaling-stroke" />
+            </svg>
+          </div>
+        );
+      }
+      if (lineStyle === "zigzag") {
+        const h = Math.max(th * 4, 8);
+        return (
+          <div style={{ flex: 1, height: h, overflow: "hidden", alignSelf: "center", ...style }}>
+            <svg width="100%" height={h} preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+              <polyline points="0,8 10,0 20,8 30,0 40,8 50,0 60,8 70,0 80,8 90,0 100,8 110,0 120,8 130,0 140,8 150,0 160,8 170,0 180,8 190,0 200,8 210,0 220,8 230,0 240,8 250,0 260,8 270,0 280,8 290,0 300,8 310,0 320,8 330,0 340,8 350,0 360,8 370,0 380,8 390,0 400,8 410,0 420,8 430,0 440,8 450,0 460,8 470,0 480,8 490,0 500,8 510,0 520,8 530,0 540,8 550,0 560,8 570,0 580,8 590,0 600,8" fill="none" stroke={color} strokeWidth={th} vectorEffect="non-scaling-stroke" />
+            </svg>
+          </div>
+        );
+      }
+      return <div style={{ flex: 1, borderTop: `${th}px ${lineStyle || "solid"} ${color}`, ...style }} />;
+    };
 
     const elementContent = showElement
       ? (
@@ -12998,16 +12936,17 @@ const DividerComponent = {
       )
       : null;
 
+    const lineWidthCss = `${lineWidthVal ?? 100}${lineWidthUnit ?? "%"}`;
     const innerAlign = elementPosition === "left" ? "flex-start" : elementPosition === "right" ? "flex-end" : "center";
     const lineWrap = showElement
       ? (
-        <div style={{ display: "flex", alignItems: "center", width: lineWidth || "100%" }}>
+        <div style={{ display: "flex", alignItems: "center", width: lineWidthCss }}>
           {elementPosition === "center" || elementPosition === "right" ? lineEl({}) : null}
           {elementContent}
           {elementPosition === "center" || elementPosition === "left" ? lineEl({}) : null}
         </div>
       )
-      : lineEl({ width: lineWidth || "100%" });
+      : lineEl({ width: lineWidthCss });
 
     return (
       <div
@@ -13195,7 +13134,15 @@ const VideoComponent = {
                         { value: "custom", label: "Custom Height" },
                       ]}
                     />
-                    <StackedTextField label="Width" value={props.width ?? "100%"} onChange={(v) => set("width", v)} placeholder="e.g. 100% or 800px" />
+                    <NumberUnitField
+                      label="Width"
+                      value={props.videoWidthVal ?? 100}
+                      unit={props.videoWidthUnit ?? "%"}
+                      onValueChange={(v) => set("videoWidthVal", v)}
+                      onUnitChange={(u) => set("videoWidthUnit", u)}
+                      units={["%", "px", "vw"]}
+                      min={0} max={9999} step={1}
+                    />
                     {props.aspectRatio === "custom" && (
                       <StackedTextField label="Custom Height" value={props.customHeight ?? "450px"} onChange={(v) => set("customHeight", v)} placeholder="e.g. 450px" />
                     )}
@@ -13221,10 +13168,6 @@ const VideoComponent = {
 
                     <TabSection title="Border" />
                     <StackedTextField label="Border Radius" value={props.borderRadius ?? "0px"} onChange={(v) => set("borderRadius", v)} placeholder="e.g. 8px" />
-                    <ColorPickerField label="Box Shadow Color" value={props.shadowColor ?? ""} onChange={(v) => set("shadowColor", v)} />
-                    <StackedNumberField label="Shadow X (px)" value={props.shadowX ?? 0} onChange={(v) => set("shadowX", v)} min={-50} max={50} step={1} />
-                    <StackedNumberField label="Shadow Y (px)" value={props.shadowY ?? 0} onChange={(v) => set("shadowY", v)} min={-50} max={50} step={1} />
-                    <StackedNumberField label="Shadow Blur (px)" value={props.shadowBlur ?? 0} onChange={(v) => set("shadowBlur", v)} min={0} max={100} step={1} />
                   </>
                 )}
 
@@ -13240,10 +13183,6 @@ const VideoComponent = {
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
 
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-video" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} placeholder="e.g. 10" min={-100} max={9999} step={1} />
                   </>
                 )}
               </>
@@ -13266,7 +13205,8 @@ const VideoComponent = {
     playInline: true,
     thumbnailUrl: "",
     aspectRatio: "16:9",
-    width: "100%",
+    videoWidthVal: 100,
+    videoWidthUnit: "%",
     customHeight: "450px",
     playBtnStyle: "default",
     playIconSize: 64,
@@ -13274,10 +13214,6 @@ const VideoComponent = {
     playBtnBg: "rgba(0,0,0,0.5)",
     playBtnRadius: "50%",
     borderRadius: "0px",
-    shadowColor: "",
-    shadowX: 0,
-    shadowY: 0,
-    shadowBlur: 0,
     advMargin: { top: 0, right: 0, bottom: 0, left: 0 },
     advPadding: { top: 0, right: 0, bottom: 0, left: 0 },
     hideDesktop: false,
@@ -13300,7 +13236,8 @@ const VideoComponent = {
     playInline,
     thumbnailUrl,
     aspectRatio,
-    width,
+    videoWidthVal,
+    videoWidthUnit,
     customHeight,
     playBtnStyle,
     playIconSize,
@@ -13308,10 +13245,6 @@ const VideoComponent = {
     playBtnBg,
     playBtnRadius,
     borderRadius,
-    shadowColor,
-    shadowX,
-    shadowY,
-    shadowBlur,
     advMargin,
     advPadding,
     hideDesktop,
@@ -13325,7 +13258,6 @@ const VideoComponent = {
 
     const ratioMap: Record<string, string> = { "16:9": "56.25%", "4:3": "75%", "1:1": "100%", "custom": "0" };
     const paddingBottom = ratioMap[aspectRatio ?? "16:9"] ?? "56.25%";
-    const boxShadow = shadowColor ? `${shadowX ?? 0}px ${shadowY ?? 0}px ${shadowBlur ?? 0}px ${shadowColor}` : undefined;
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
 
     const buildEmbedUrl = () => {
@@ -13355,15 +13287,17 @@ const VideoComponent = {
       return videoUrl;
     };
 
-    const showThumbnail = (thumbnailUrl && !playing && !autoplay) || (!videoUrl && thumbnailUrl);
+    const isNative = sourceType === "self" || sourceType === "upload";
+    // Show thumbnail overlay when: thumbnail exists, not yet playing, and not autoplaying
+    const showThumbnailOverlay = !!thumbnailUrl && !playing && !autoplay;
+
     const containerStyle: React.CSSProperties = {
       position: "relative",
-      width: width || "100%",
+      width: `${videoWidthVal ?? 100}${videoWidthUnit ?? "%"}`,
       paddingBottom: aspectRatio === "custom" ? 0 : paddingBottom,
       height: aspectRatio === "custom" ? (customHeight || "450px") : 0,
       overflow: "hidden",
       borderRadius: borderRadius || "0px",
-      boxShadow,
       backgroundColor: "#000",
     };
 
@@ -13372,6 +13306,48 @@ const VideoComponent = {
         No video URL set. Use the property panel to add a video.
       </div>
     );
+
+    const videoEl = isNative ? (
+      <video
+        key={videoUrl}
+        src={videoUrl}
+        autoPlay={autoplay}
+        loop={loop}
+        muted={mute}
+        controls={controls !== "hide"}
+        playsInline={playInline !== false}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+      />
+    ) : (
+      <iframe
+        src={buildEmbedUrl()}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      />
+    );
+
+    const thumbnailOverlay = showThumbnailOverlay ? (
+      <div
+        style={{ position: "absolute", inset: 0, cursor: "pointer", zIndex: 2 }}
+        onClick={() => setPlaying(true)}
+      >
+        <img src={thumbnailUrl} alt="Video thumbnail" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{
+            width: playIconSize || 64,
+            height: playIconSize || 64,
+            backgroundColor: playBtnBg || "rgba(0,0,0,0.5)",
+            borderRadius: playBtnStyle === "custom" ? (playBtnRadius || "50%") : "50%",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <svg width={(playIconSize || 64) * 0.4} height={(playIconSize || 64) * 0.4} viewBox="0 0 24 24" fill={playIconColor || "#fff"}>
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    ) : null;
 
     return (
       <div
@@ -13386,44 +13362,13 @@ const VideoComponent = {
         }}
       >
         <div style={containerStyle}>
-          {showThumbnail && !playing ? (
-            <div
-              style={{ position: "absolute", inset: 0, cursor: "pointer" }}
-              onClick={() => setPlaying(true)}
-            >
-              <img src={thumbnailUrl} alt="Video thumbnail" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              {/* Play button overlay */}
-              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{
-                  width: playIconSize || 64,
-                  height: playIconSize || 64,
-                  backgroundColor: playBtnBg || "rgba(0,0,0,0.5)",
-                  borderRadius: playBtnStyle === "custom" ? (playBtnRadius || "50%") : "50%",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <svg width={(playIconSize || 64) * 0.4} height={(playIconSize || 64) * 0.4} viewBox="0 0 24 24" fill={playIconColor || "#fff"}>
-                    <path d="M8 5v14l11-7z"/>
-                  </svg>
-                </div>
-              </div>
-            </div>
-          ) : (sourceType === "self" || sourceType === "upload") ? (
-            <video
-              src={videoUrl}
-              autoPlay={autoplay}
-              loop={loop}
-              muted={mute}
-              controls={controls !== "hide"}
-              playsInline={playInline !== false}
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          ) : (
-            <iframe
-              src={buildEmbedUrl()}
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+          {/* Always render the video/iframe underneath */}
+          {videoUrl && videoEl}
+          {/* Thumbnail overlay sits on top until user clicks play */}
+          {thumbnailOverlay}
+          {/* If no videoUrl, show thumbnail as static image */}
+          {!videoUrl && thumbnailUrl && (
+            <img src={thumbnailUrl} alt="Video thumbnail" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
           )}
         </div>
       </div>
@@ -13568,10 +13513,6 @@ const SocialIconsComponent = {
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-social" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} min={-100} max={9999} step={1} />
                   </>
                 )}
               </>
@@ -13720,10 +13661,6 @@ const ShareButtonsComponent = {
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-share" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} min={-100} max={9999} step={1} />
                   </>
                 )}
               </>
@@ -13852,10 +13789,6 @@ const StarRatingComponent = {
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-rating" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} min={-100} max={9999} step={1} />
                   </>
                 )}
               </>
@@ -13981,10 +13914,6 @@ const ProgressBarComponent = {
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-progress" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} min={-100} max={9999} step={1} />
                   </>
                 )}
               </>
@@ -14106,10 +14035,6 @@ const AlertComponent = {
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-alert" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} min={-100} max={9999} step={1} />
                   </>
                 )}
               </>
@@ -14243,19 +14168,10 @@ const BlockQuoteComponent = {
                     <InlineSelect label="Border Style" value={props.advBorderStyle ?? "none"} onChange={(v) => set("advBorderStyle", v)} options={[{ value: "none", label: "None" }, { value: "solid", label: "Solid" }, { value: "dashed", label: "Dashed" }]} />
                     {props.advBorderStyle !== "none" && (<><FourSideField label="Border Width (px)" value={props.advBorderWidth} onChange={(v) => set("advBorderWidth", v)} /><ColorPickerField label="Border Color" value={props.advBorderColor ?? ""} onChange={(v) => set("advBorderColor", v)} /></>)}
                     <FourSideField label="Border Radius (px)" value={props.advBorderRadius} onChange={(v) => set("advBorderRadius", v)} />
-                    <TabSection title="Shadow" />
-                    <ColorPickerField label="Box Shadow Color" value={props.advShadowColor ?? ""} onChange={(v) => set("advShadowColor", v)} />
-                    <StackedNumberField label="X (px)" value={props.advShadowX ?? 0} onChange={(v) => set("advShadowX", v)} min={-100} max={100} step={1} />
-                    <StackedNumberField label="Y (px)" value={props.advShadowY ?? 0} onChange={(v) => set("advShadowY", v)} min={-100} max={100} step={1} />
-                    <StackedNumberField label="Blur (px)" value={props.advShadowBlur ?? 0} onChange={(v) => set("advShadowBlur", v)} min={0} max={100} step={1} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-quote" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} min={-100} max={9999} step={1} />
                     <StackedNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1} />
                   </>
                 )}
@@ -14276,10 +14192,9 @@ const BlockQuoteComponent = {
     alignment: "left",
     advBgType: "none", advBgColorWrap: "", advMargin: { top: 0, right: 0, bottom: 0, left: 0 }, advPadding: { top: 24, right: 24, bottom: 24, left: 24 },
     advBorderStyle: "none", advBorderWidth: { top: 0, right: 0, bottom: 0, left: 0 }, advBorderColor: "", advBorderRadius: { top: 0, right: 0, bottom: 0, left: 0 },
-    advShadowColor: "", advShadowX: 0, advShadowY: 0, advShadowBlur: 0,
     hideDesktop: false, hideTablet: false, hideMobile: false, cssId: "", cssClass: "", zIndex: null, opacity: 100,
   },
-  render: ({ quoteText, authorName, authorTitle, authorImage, showQuoteIcon, quoteFontFamily, quoteFontSize, quoteFontStyle, quoteTextColor, quoteLineHeight, nameColor, nameFontSize, nameFontWeight, titleColor, titleFontSize, imageSize, imageBorderRadius, iconColor, iconSize, iconPosition, borderType, borderColor, borderWidth, bgColor, alignment, advBgType, advBgColorWrap, advMargin, advPadding, advBorderStyle, advBorderWidth, advBorderColor, advBorderRadius, advShadowColor, advShadowX, advShadowY, advShadowBlur, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex, opacity }) => {
+  render: ({ quoteText, authorName, authorTitle, authorImage, showQuoteIcon, quoteFontFamily, quoteFontSize, quoteFontStyle, quoteTextColor, quoteLineHeight, nameColor, nameFontSize, nameFontWeight, titleColor, titleFontSize, imageSize, imageBorderRadius, iconColor, iconSize, iconPosition, borderType, borderColor, borderWidth, bgColor, alignment, advBgType, advBgColorWrap, advMargin, advPadding, advBorderStyle, advBorderWidth, advBorderColor, advBorderRadius, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex, opacity }) => {
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
     const borderMap: Record<string, React.CSSProperties> = {
       none: {},
@@ -14287,7 +14202,6 @@ const BlockQuoteComponent = {
       top: { borderTop: `${borderWidth || 4}px solid ${borderColor || "var(--primary-color)"}`, paddingTop: 20 },
       box: { border: `${borderWidth || 2}px solid ${borderColor || "var(--primary-color)"}` },
     };
-    const boxShadow = advShadowColor ? `${advShadowX ?? 0}px ${advShadowY ?? 0}px ${advShadowBlur ?? 0}px ${advShadowColor}` : undefined;
     const wrapBg = advBgType === "color" && advBgColorWrap ? { backgroundColor: advBgColorWrap } : {};
     const quoteIconSvg = (
       <svg width={iconSize || "3rem"} height={iconSize || "3rem"} viewBox="0 0 24 24" fill={iconColor || "var(--primary-color)"} style={{ opacity: 0.15 }}>
@@ -14295,7 +14209,7 @@ const BlockQuoteComponent = {
       </svg>
     );
     return (
-      <div id={cssId || undefined} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ textAlign: alignment as any, paddingTop: advPadding?.top ?? 24, paddingRight: advPadding?.right ?? 24, paddingBottom: advPadding?.bottom ?? 24, paddingLeft: advPadding?.left ?? 24, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, opacity: opacity != null ? opacity / 100 : 1, boxShadow, borderTopLeftRadius: advBorderRadius?.top ?? 0, borderTopRightRadius: advBorderRadius?.right ?? 0, borderBottomRightRadius: advBorderRadius?.bottom ?? 0, borderBottomLeftRadius: advBorderRadius?.left ?? 0, ...(advBorderStyle && advBorderStyle !== "none" ? { borderStyle: advBorderStyle, borderTopWidth: advBorderWidth?.top ?? 0, borderRightWidth: advBorderWidth?.right ?? 0, borderBottomWidth: advBorderWidth?.bottom ?? 0, borderLeftWidth: advBorderWidth?.left ?? 0, borderColor: advBorderColor || "currentColor" } : {}), ...wrapBg }}>
+      <div id={cssId || undefined} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ textAlign: alignment as any, paddingTop: advPadding?.top ?? 24, paddingRight: advPadding?.right ?? 24, paddingBottom: advPadding?.bottom ?? 24, paddingLeft: advPadding?.left ?? 24, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, opacity: opacity != null ? opacity / 100 : 1, borderTopLeftRadius: advBorderRadius?.top ?? 0, borderTopRightRadius: advBorderRadius?.right ?? 0, borderBottomRightRadius: advBorderRadius?.bottom ?? 0, borderBottomLeftRadius: advBorderRadius?.left ?? 0, ...(advBorderStyle && advBorderStyle !== "none" ? { borderStyle: advBorderStyle, borderTopWidth: advBorderWidth?.top ?? 0, borderRightWidth: advBorderWidth?.right ?? 0, borderBottomWidth: advBorderWidth?.bottom ?? 0, borderLeftWidth: advBorderWidth?.left ?? 0, borderColor: advBorderColor || "currentColor" } : {}), ...wrapBg }}>
         <blockquote style={{ margin: 0, position: "relative", backgroundColor: bgColor || "transparent", padding: bgColor ? 24 : 0, borderRadius: bgColor ? 8 : 0, ...borderMap[borderType ?? "left"] }}>
           {showQuoteIcon && iconPosition === "background" && <div style={{ position: "absolute", top: 0, right: 0, pointerEvents: "none" }}>{quoteIconSvg}</div>}
           {showQuoteIcon && iconPosition === "top-left" && <div style={{ marginBottom: 8 }}>{quoteIconSvg}</div>}
@@ -14400,10 +14314,6 @@ const IconsComponent = {
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-icon" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} min={-100} max={9999} step={1} />
                     <StackedNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1} />
                   </>
                 )}
@@ -14479,12 +14389,24 @@ function SliderNumberField({
   step?: number;
   unit?: string;
 }) {
+  const stepBy = (dir: 1 | -1) => {
+    let n = (value ?? 0) + dir * step;
+    n = Math.max(min, Math.min(max, n));
+    onChange(n);
+  };
+  const btnS: React.CSSProperties = {
+    width: 22, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
+    border: "1px solid var(--p-color-border)", borderRadius: 4,
+    background: "var(--p-color-bg-surface)", cursor: "pointer",
+    fontSize: 14, lineHeight: 1, color: "var(--p-color-text)", padding: 0, flexShrink: 0,
+  };
   return (
     <FieldLabel label="">
       <div style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: "#000" }}>{label}</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <button style={btnS} onClick={() => stepBy(-1)} type="button">−</button>
             <input
               type="number"
               value={value ?? 0}
@@ -14496,9 +14418,10 @@ function SliderNumberField({
                 width: 52, padding: "2px 4px", fontSize: 12, fontWeight: 600,
                 border: "1px solid var(--p-color-border)", borderRadius: 4,
                 background: "var(--p-color-bg-surface)", color: "var(--p-color-text)",
-                textAlign: "right", outline: "none",
+                textAlign: "center", outline: "none", MozAppearance: "textfield",
               }}
             />
+            <button style={btnS} onClick={() => stepBy(1)} type="button">+</button>
             <span style={{ fontSize: 10, color: "var(--p-color-text-secondary)", fontWeight: 600, minWidth: 20 }}>{unit}</span>
           </div>
         </div>
@@ -14739,17 +14662,6 @@ const LayoutBlockComponent = {
                     )}
                     <FourSideField label="Border Radius (px)" value={props.borderRadius4 ?? { top: 0, right: 0, bottom: 0, left: 0 }} onChange={(v) => set("borderRadius4", v)} />
 
-                    <TabSection title="Box Shadow" />
-                    <InlineSelect label="Shadow" value={props.shadowType ?? "none"} onChange={(v) => set("shadowType", v)} options={[{ value: "none", label: "None" }, { value: "custom", label: "Custom" }]} />
-                    {props.shadowType === "custom" && (
-                      <>
-                        <ColorPickerField label="Color" value={props.shadowColor ?? "rgba(0,0,0,0.2)"} onChange={(v) => set("shadowColor", v)} />
-                        <SliderNumberField label="Horizontal" value={props.shadowX ?? 0} onChange={(v) => set("shadowX", v)} min={-100} max={100} step={1} unit="PX" />
-                        <SliderNumberField label="Vertical" value={props.shadowY ?? 4} onChange={(v) => set("shadowY", v)} min={-100} max={100} step={1} unit="PX" />
-                        <SliderNumberField label="Blur" value={props.shadowBlur ?? 10} onChange={(v) => set("shadowBlur", v)} min={0} max={100} step={1} unit="PX" />
-                        <SliderNumberField label="Spread" value={props.shadowSpread ?? 0} onChange={(v) => set("shadowSpread", v)} min={-50} max={50} step={1} unit="PX" />
-                      </>
-                    )}
 
                     <TabSection title="Shape Divider" />
                     <InlineSelect label="Top Divider" value={props.dividerTop ?? "none"} onChange={(v) => set("dividerTop", v)} options={[{ value: "none", label: "None" }, { value: "triangle", label: "Triangle" }, { value: "curve", label: "Curve" }, { value: "wave", label: "Wave" }]} />
@@ -14789,11 +14701,6 @@ const LayoutBlockComponent = {
                         <SliderNumberField label="Delay (ms)" value={props.animDelay ?? 0} onChange={(v) => set("animDelay", v)} min={0} max={3000} step={100} unit="ms" />
                       </>
                     )}
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-container" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedTextField label="Custom CSS" value={props.customCss ?? ""} onChange={(v) => set("customCss", v)} placeholder=".selector { property: value; }" />
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} min={-100} max={9999} step={1} />
                   </>
                 )}
               </>
@@ -14812,7 +14719,6 @@ const LayoutBlockComponent = {
     bgVideo: "", bgVideoLoop: true, bgVideoMute: true,
     borderStyle: "none", borderWidth4: { top: 1, right: 1, bottom: 1, left: 1 }, borderColor: "",
     borderRadius4: { top: 0, right: 0, bottom: 0, left: 0 },
-    shadowType: "none", shadowColor: "rgba(0,0,0,0.2)", shadowX: 0, shadowY: 4, shadowBlur: 10, shadowSpread: 0,
     dividerTop: "none", dividerTopColor: "#fff", dividerTopHeight: 50, dividerTopFlip: false,
     dividerBottom: "none", dividerBottomColor: "#fff", dividerBottomHeight: 50, dividerBottomFlip: false,
     advMargin: { top: 0, right: 0, bottom: 0, left: 0 }, advPadding: { top: 24, right: 24, bottom: 24, left: 24 },
@@ -14829,7 +14735,6 @@ const LayoutBlockComponent = {
     overlayType, overlayColor, overlayOpacity, overlayGrad1, overlayGrad2,
     bgVideo, bgVideoLoop, bgVideoMute,
     borderStyle, borderWidth4, borderColor, borderRadius4,
-    shadowType, shadowColor, shadowX, shadowY, shadowBlur, shadowSpread,
     dividerTop, dividerTopColor, dividerTopHeight, dividerTopFlip,
     dividerBottom, dividerBottomColor, dividerBottomHeight, dividerBottomFlip,
     advMargin, advPadding, hideDesktop, hideTablet, hideMobile,
@@ -14849,7 +14754,6 @@ const LayoutBlockComponent = {
 
     const br = borderRadius4 ?? { top: 0, right: 0, bottom: 0, left: 0 };
     const bw = borderWidth4 ?? { top: 1, right: 1, bottom: 1, left: 1 };
-    const boxShadow = shadowType === "custom" ? `${shadowX ?? 0}px ${shadowY ?? 4}px ${shadowBlur ?? 10}px ${shadowSpread ?? 0}px ${shadowColor || "rgba(0,0,0,0.2)"}` : undefined;
 
     const outerStyle: React.CSSProperties = {
       position: "relative",
@@ -14871,7 +14775,6 @@ const LayoutBlockComponent = {
       borderTopRightRadius: br.right ?? 0,
       borderBottomRightRadius: br.bottom ?? 0,
       borderBottomLeftRadius: br.left ?? 0,
-      boxShadow,
       minHeight: (minHeightPx && minHeightPx > 0) ? minHeightPx : undefined,
       paddingTop: advPadding?.top ?? 24, paddingRight: advPadding?.right ?? 24,
       paddingBottom: advPadding?.bottom ?? 24, paddingLeft: advPadding?.left ?? 24,
@@ -15010,10 +14913,6 @@ const GridBlockComponent = {
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-grid" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} min={-100} max={9999} step={1} />
                   </>
                 )}
               </>
@@ -15213,17 +15112,6 @@ const SectionBlockComponent = {
                     )}
                     <FourSideField label="Border Radius (px)" value={props.borderRadius4 ?? { top: 0, right: 0, bottom: 0, left: 0 }} onChange={(v) => set("borderRadius4", v)} />
 
-                    <TabSection title="Box Shadow" />
-                    <InlineSelect label="Shadow" value={props.shadowType ?? "none"} onChange={(v) => set("shadowType", v)} options={[{ value: "none", label: "None" }, { value: "custom", label: "Custom" }]} />
-                    {props.shadowType === "custom" && (
-                      <>
-                        <ColorPickerField label="Color" value={props.shadowColor ?? "rgba(0,0,0,0.2)"} onChange={(v) => set("shadowColor", v)} />
-                        <SliderNumberField label="Horizontal" value={props.shadowX ?? 0} onChange={(v) => set("shadowX", v)} min={-100} max={100} step={1} unit="PX" />
-                        <SliderNumberField label="Vertical" value={props.shadowY ?? 4} onChange={(v) => set("shadowY", v)} min={-100} max={100} step={1} unit="PX" />
-                        <SliderNumberField label="Blur" value={props.shadowBlur ?? 10} onChange={(v) => set("shadowBlur", v)} min={0} max={100} step={1} unit="PX" />
-                        <SliderNumberField label="Spread" value={props.shadowSpread ?? 0} onChange={(v) => set("shadowSpread", v)} min={-50} max={50} step={1} unit="PX" />
-                      </>
-                    )}
 
                     <TabSection title="Shape Divider" />
                     <InlineSelect label="Top" value={props.dividerTop ?? "none"} onChange={(v) => set("dividerTop", v)} options={[{ value: "none", label: "None" }, { value: "triangle", label: "Triangle" }, { value: "curve", label: "Curve" }, { value: "wave", label: "Wave" }]} />
@@ -15263,11 +15151,6 @@ const SectionBlockComponent = {
                         <SliderNumberField label="Delay (ms)" value={props.animDelay ?? 0} onChange={(v) => set("animDelay", v)} min={0} max={3000} step={100} unit="ms" />
                       </>
                     )}
-                    <TabSection title="Custom" />
-                    <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-section" />
-                    <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-                    <StackedTextField label="Custom CSS" value={props.customCss ?? ""} onChange={(v) => set("customCss", v)} placeholder=".selector { property: value; }" />
-                    <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} min={-100} max={9999} step={1} />
                   </>
                 )}
               </>
@@ -15294,7 +15177,6 @@ const SectionBlockComponent = {
     borderStyle: "none", borderWidth4: { top: 1, right: 1, bottom: 1, left: 1 }, borderColor: "",
     borderRadius4: { top: 0, right: 0, bottom: 0, left: 0 },
     // Shadow
-    shadowType: "none", shadowColor: "rgba(0,0,0,0.2)", shadowX: 0, shadowY: 4, shadowBlur: 10, shadowSpread: 0,
     // Dividers
     dividerTop: "none", dividerTopColor: "#fff", dividerTopHeight: 50, dividerTopFlip: false,
     dividerBottom: "none", dividerBottomColor: "#fff", dividerBottomHeight: 50, dividerBottomFlip: false,
@@ -15316,7 +15198,6 @@ const SectionBlockComponent = {
     overlayType, overlayColor, overlayOpacity, overlayGrad1, overlayGrad2,
     bgVideo, bgVideoLoop, bgVideoMute,
     borderStyle, borderWidth4, borderColor, borderRadius4,
-    shadowType, shadowColor, shadowX, shadowY, shadowBlur, shadowSpread,
     dividerTop, dividerTopColor, dividerTopHeight, dividerTopFlip,
     dividerBottom, dividerBottomColor, dividerBottomHeight, dividerBottomFlip,
     advMargin, advPadding, hideDesktop, hideTablet, hideMobile,
@@ -15333,9 +15214,6 @@ const SectionBlockComponent = {
     const cols = columns || 2;
     const br = borderRadius4 ?? { top: 0, right: 0, bottom: 0, left: 0 };
     const bw = borderWidth4  ?? { top: 1, right: 1, bottom: 1, left: 1 };
-    const boxShadow = shadowType === "custom"
-      ? `${shadowX ?? 0}px ${shadowY ?? 4}px ${shadowBlur ?? 10}px ${shadowSpread ?? 0}px ${shadowColor || "rgba(0,0,0,0.2)"}`
-      : undefined;
 
     // ── outer section wrapper (background / border / shadow) ──
     const outerStyle: React.CSSProperties = {
@@ -15358,7 +15236,6 @@ const SectionBlockComponent = {
       borderTopRightRadius:    br.right  ?? 0,
       borderBottomRightRadius: br.bottom ?? 0,
       borderBottomLeftRadius:  br.left   ?? 0,
-      boxShadow,
       minHeight: (minHeightPx && minHeightPx > 0) ? minHeightPx : undefined,
       paddingTop:    advPadding?.top    ?? 60,
       paddingRight:  advPadding?.right  ?? 0,
@@ -15543,18 +15420,6 @@ function SectionStyleFields({ props, set }: { props: any; set: (k: string, v: an
           <StackedNumberField label="Radius (px)" value={props.borderRadius ?? 0} onChange={(v) => set("borderRadius", v)} min={0} max={100} step={1} />
         </>
       )}
-      <TabSection title="Shadow" />
-      <InlineSelect label="Shadow" value={props.shadowType ?? "none"} onChange={(v) => set("shadowType", v)}
-        options={[{ value: "none", label: "None" }, { value: "custom", label: "Custom" }]} />
-      {props.shadowType === "custom" && (
-        <>
-          <ColorPickerField label="Color" value={props.shadowColor ?? "rgba(0,0,0,0.2)"} onChange={(v) => set("shadowColor", v)} />
-          <SliderNumberField label="Horizontal" value={props.shadowX ?? 0} onChange={(v) => set("shadowX", v)} min={-100} max={100} step={1} unit="PX" />
-          <SliderNumberField label="Vertical" value={props.shadowY ?? 4} onChange={(v) => set("shadowY", v)} min={-100} max={100} step={1} unit="PX" />
-          <SliderNumberField label="Blur" value={props.shadowBlur ?? 10} onChange={(v) => set("shadowBlur", v)} min={0} max={100} step={1} unit="PX" />
-          <SliderNumberField label="Spread" value={props.shadowSpread ?? 0} onChange={(v) => set("shadowSpread", v)} min={-50} max={50} step={1} unit="PX" />
-        </>
-      )}
     </>
   );
 }
@@ -15593,10 +15458,6 @@ function SectionAdvancedFields({ props, set }: { props: any; set: (k: string, v:
           <SliderNumberField label="Delay (ms)" value={props.animDelay ?? 0} onChange={(v) => set("animDelay", v)} min={0} max={3000} step={100} unit="ms" />
         </>
       )}
-      <TabSection title="Custom" />
-      <StackedTextField label="CSS ID" value={props.cssId ?? ""} onChange={(v) => set("cssId", v)} placeholder="my-section" />
-      <StackedTextField label="CSS Class" value={props.cssClass ?? ""} onChange={(v) => set("cssClass", v)} placeholder="custom-class" />
-      <StackedNumberField label="Z-Index" value={props.zIndex ?? null} onChange={(v) => set("zIndex", v)} min={-100} max={9999} step={1} />
     </>
   );
 }
@@ -15706,7 +15567,6 @@ function baseSectionProps(overrides: Record<string, unknown> = {}) {
     overlayType: "none", overlayColor: "#000000", overlayOpacity: 50,
     bgVideo: "", bgVideoLoop: true, bgVideoMute: true,
     borderStyle: "none", borderWidth: 1, borderColor: "", borderRadius: 0,
-    shadowType: "none", shadowColor: "rgba(0,0,0,0.2)", shadowX: 0, shadowY: 4, shadowBlur: 10, shadowSpread: 0,
     advMargin: { top: 0, right: 0, bottom: 0, left: 0 },
     advPadding: { top: 60, right: 0, bottom: 60, left: 0 },
     hideDesktop: false, hideTablet: false, hideMobile: false,
