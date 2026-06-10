@@ -33,13 +33,33 @@
       "</div>";
   }
 
-  function mountBlock(container) {
+  function unmountBlock(container) {
+    container.removeAttribute(MOUNTED_ATTR);
+    // Remove previously injected style tag
+    var prev = container.querySelector("style[data-pb-style]");
+    if (prev) prev.remove();
+    // Remove previously injected content wrapper
+    var wrapper = container.querySelector(".pb-page-content");
+    if (wrapper) wrapper.remove();
+    // Restore loading spinner if it was removed
+    if (!container.querySelector(".pb-widget-loading")) {
+      var spinner = document.createElement("div");
+      spinner.className = "pb-widget-loading";
+      spinner.style.cssText = "display:flex;align-items:center;justify-content:center;padding:32px;color:#9ca3af;font-size:14px;font-family:sans-serif;";
+      spinner.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;animation:pb-spin 1s linear infinite"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>Loading content…<style>@keyframes pb-spin{to{transform:rotate(360deg)}}</style>';
+      container.insertBefore(spinner, container.firstChild);
+    }
+  }
+
+  function mountBlock(container, force) {
     var blockId     = container.getAttribute(MOUNT_ATTR);
     var proxyUrl    = container.getAttribute(PROXY_ATTR);
     var themeStyles = container.getAttribute(THEME_ATTR);
 
     if (!blockId || !proxyUrl) return;
-    if (container.getAttribute(MOUNTED_ATTR)) return;
+    if (!force && container.getAttribute(MOUNTED_ATTR)) return;
+
+    unmountBlock(container);
     container.setAttribute(MOUNTED_ATTR, "1");
 
     // theme_styles=1 → send NO app CSS, let theme cascade apply
@@ -71,10 +91,13 @@
         if (loader) loader.remove();
 
         if (cfg.type === "page" && cfg.html) {
-          // Inject scoped CSS design tokens (app settings), unless merchant
-          // chose "Use theme styles" — in that case styleCss is empty string.
+          // Inject scoped CSS. In app-design mode this is the design-token
+          // stylesheet; in "Use theme styles" mode it is a reset stylesheet
+          // that neutralizes baked-in inline styles so the theme cascades in.
+          // Either way it is scoped to this container via the :root rewrite.
           if (cfg.styleCss) {
             var styleEl = document.createElement("style");
+            styleEl.setAttribute("data-pb-style", "1");
             var scopeId = container.id || "pb-widget-" + blockId;
             styleEl.textContent = cfg.styleCss.replace(/:root\b/g, "#" + scopeId);
             container.appendChild(styleEl);
@@ -96,10 +119,10 @@
       });
   }
 
-  function scanAndMount() {
+  function scanAndMount(force) {
     var containers = document.querySelectorAll("[" + MOUNT_ATTR + "]");
     for (var i = 0; i < containers.length; i++) {
-      mountBlock(containers[i]);
+      mountBlock(containers[i], force);
     }
   }
 
@@ -107,11 +130,16 @@
     document.readyState === "complete" ||
     document.readyState === "interactive"
   ) {
-    scanAndMount();
+    scanAndMount(false);
   } else {
-    document.addEventListener("DOMContentLoaded", scanAndMount);
+    document.addEventListener("DOMContentLoaded", function () { scanAndMount(false); });
   }
 
-  // Re-scan when theme editor loads a section dynamically
-  document.addEventListener("shopify:section:load", scanAndMount);
+  // Re-scan when theme editor loads a new section instance
+  document.addEventListener("shopify:section:load", function () { scanAndMount(false); });
+
+  // Re-fetch with updated settings whenever the merchant changes any setting
+  // (including the "Use Shopify theme styles" toggle) in the theme editor.
+  document.addEventListener("shopify:section:select", function () { scanAndMount(true); });
+  document.addEventListener("shopify:block:select", function () { scanAndMount(true); });
 })();

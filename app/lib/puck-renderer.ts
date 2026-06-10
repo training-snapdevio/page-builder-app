@@ -21,6 +21,92 @@ import type {
   FooterSettings,
   NavLink,
 } from "./settings.defaults";
+import { DEFAULT_GLOBAL_SETTINGS } from "./settings.defaults";
+
+const SYSTEM_FONT_KEYWORDS = [
+  "system-ui", "sans-serif", "serif", "monospace", "inherit", "initial",
+  "-apple-system", "blinkmacsystemfont",
+];
+
+/**
+ * Build a Google Fonts @import for any non-system font in the given stacks.
+ * Pure + client-safe (no server deps) so both the storefront route and the
+ * in-app preview (browser-built) can call it. Returns "" if no web fonts.
+ */
+export function buildGoogleFontsImport(fontFamilies: string[]): string {
+  const names = new Set<string>();
+  for (const stack of fontFamilies) {
+    for (const part of stack.split(",")) {
+      const name = part.replace(/['"]/g, "").trim();
+      if (name && !SYSTEM_FONT_KEYWORDS.some((kw) => name.toLowerCase().includes(kw))) {
+        names.add(name);
+      }
+    }
+  }
+  if (names.size === 0) return "";
+  const query = [...names]
+    .map((n) => `family=${n.replace(/\s+/g, "+")}:wght@300;400;500;600;700;800`)
+    .join("&");
+  return `@import url('https://fonts.googleapis.com/css2?${query}&display=swap');\n`;
+}
+
+/**
+ * Emit the `:root { --token: value }` block that the block markup references
+ * via var(--primary-color) etc. This is the bridge that makes the storefront
+ * AND the in-app preview match the Puck editor canvas. Pure + client-safe.
+ * Variable names MUST stay in sync with _applyVarsToElement (puck-splat/utils).
+ */
+export function settingsToCSSString(s: GlobalSettings): string {
+  const d = DEFAULT_GLOBAL_SETTINGS;
+  const v = (val: string | undefined, fallback: string): string =>
+    val && val !== "undefined" && val.trim() !== "" ? val : fallback;
+
+  const buttonStyle = s.buttonStyle ?? d.buttonStyle;
+  const borderRadius = v(s.borderRadius, d.borderRadius);
+  const buttonBR =
+    buttonStyle === "pill" ? "9999px"
+    : buttonStyle === "square" ? "0px"
+    : borderRadius;
+
+  return `
+:root {
+  --primary-color: ${v(s.primaryColor, d.primaryColor)};
+  --secondary-color: ${v(s.secondaryColor, d.secondaryColor)};
+  --accent-color: ${v(s.accentColor, d.accentColor)};
+  --text-color: ${v(s.textColor, d.textColor)};
+  --background-color: ${v(s.backgroundColor, d.backgroundColor)};
+  --font-family: ${v(s.fontFamily, d.fontFamily)};
+  --heading-font: ${v(s.headingFont, d.headingFont)};
+  --base-font-size: ${v(s.baseFontSize, d.baseFontSize)};
+  --line-height: ${v(s.lineHeight, d.lineHeight)};
+  --letter-spacing: ${v(s.letterSpacing, d.letterSpacing)};
+  --h1-size: ${v(s.h1Size, d.h1Size)};
+  --h2-size: ${v(s.h2Size, d.h2Size)};
+  --h3-size: ${v(s.h3Size, d.h3Size)};
+  --h4-size: ${v(s.h4Size, d.h4Size)};
+  --h5-size: ${v(s.h5Size, d.h5Size)};
+  --h6-size: ${v(s.h6Size, d.h6Size)};
+  --heading-weight: ${v(s.headingWeight, d.headingWeight)};
+  --heading-line-height: ${v(s.headingLineHeight, d.headingLineHeight)};
+  --border-radius: ${borderRadius};
+  --button-border-radius: ${buttonBR};
+  --button-padding-x: ${v(s.buttonPaddingX, d.buttonPaddingX)};
+  --button-padding-y: ${v(s.buttonPaddingY, d.buttonPaddingY)};
+  --button-text-transform: ${s.buttonTextTransform ?? d.buttonTextTransform};
+  --button-font-weight: ${v(s.buttonFontWeight, d.buttonFontWeight)};
+  --button-border-width: ${v(s.buttonBorderWidth, d.buttonBorderWidth)};
+  --image-border-radius: ${v(s.imageBorderRadius, d.imageBorderRadius)};
+  --image-object-fit: ${s.imageObjectFit ?? d.imageObjectFit};
+  --container-width: ${v(s.containerWidth, d.containerWidth)};
+  --column-gap: ${v(s.columnGap, d.columnGap)};
+  --row-gap: ${v(s.rowGap, d.rowGap)};
+  --link-color: ${v(s.linkColor, d.linkColor)};
+  --link-decoration: ${s.linkDecoration ?? d.linkDecoration};
+  --card-shadow: ${v(s.cardShadow, d.cardShadow)};
+}
+${s.customCSS ? s.customCSS : ""}
+`.trim();
+}
 
 // ─── Internal types ───────────────────────────────────────────────────────────
 
@@ -224,7 +310,7 @@ function renderHeroSlide(p: Props, opts?: { sliderIndex?: number; isFirst?: bool
   const patternBg = patternBackground(patternType, patternColor);
 
   const badgeHtml = p.badge
-    ? `<span style="display:inline-block;background:#0158ad;color:#fff;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:600;margin-bottom:12px">${esc(p.badge)}</span>`
+    ? `<span style="display:inline-block;background:var(--accent-color, #0158ad);color:#fff;padding:4px 12px;border-radius:var(--button-border-radius, 4px);font-size:12px;font-weight:600;margin-bottom:12px">${esc(p.badge)}</span>`
     : "";
 
   const subtitleHtml = p.subtitle
@@ -232,7 +318,7 @@ function renderHeroSlide(p: Props, opts?: { sliderIndex?: number; isFirst?: bool
     : "";
 
   const titleHtml = p.title
-    ? `<h1 style="font-size:clamp(2rem,5vw,3.5rem);font-weight:700;margin:0 0 16px;line-height:1.2">${esc(p.title)}</h1>`
+    ? `<h1 style="font-size:var(--h1-size, clamp(2rem,5vw,3.5rem));font-weight:var(--heading-weight, 700);margin:0 0 16px;line-height:var(--heading-line-height, 1.2);font-family:var(--heading-font)">${esc(p.title)}</h1>`
     : "";
 
   const rating = Number(p.rating ?? 0);
@@ -268,12 +354,12 @@ function renderHeroSlide(p: Props, opts?: { sliderIndex?: number; isFirst?: bool
           const variant = b.variant || "primary";
           const style =
             variant === "primary"
-              ? "background:#0158ad;color:#fff;border:none"
+              ? "background:var(--primary-color, #0158ad);color:#fff;border:none"
               : variant === "secondary"
-                ? "background:#64748b;color:#fff;border:none"
+                ? "background:var(--secondary-color, #64748b);color:#fff;border:none"
                 : "background:transparent;color:currentColor;border:2px solid currentColor";
           const className = variant === "outline" ? "pb-btn pb-btn-outline" : "pb-btn";
-          return `<a href="${esc(b.link || "#")}" class="${className}" style="${style};padding:12px 28px;border-radius:6px;font-weight:600;text-decoration:none;display:inline-block">${esc(b.label)}</a>`;
+          return `<a href="${esc(b.link || "#")}" class="${className}" style="${style};padding:12px 28px;border-radius:var(--button-border-radius, 6px);font-weight:600;text-decoration:none;display:inline-block">${esc(b.label)}</a>`;
         })
         .join("")}</div>`
     : "";
@@ -405,14 +491,14 @@ function GradientHero(p: Props): string {
 
 function TextBlock(p: Props): string {
   return `<div style="${s({ padding: (p.padding || "48px 24px") as string, maxWidth: (p.maxWidth || "720px") as string, margin: "0 auto", textAlign: (p.textAlign || "left") as string })}">
-  ${p.title ? `<h2 style="font-size:clamp(1.5rem,3vw,2.25rem);font-weight:700;margin:0 0 16px">${esc(p.title)}</h2>` : ""}
-  ${p.body ? `<div style="line-height:1.7;opacity:.85">${esc(p.body)}</div>` : ""}
+  ${p.title ? `<h2 style="font-size:var(--h2-size, clamp(1.5rem,3vw,2.25rem));font-weight:var(--heading-weight, 700);line-height:var(--heading-line-height, 1.2);font-family:var(--heading-font);margin:0 0 16px">${esc(p.title)}</h2>` : ""}
+  ${p.body ? `<div style="font-size:var(--base-font-size, 1rem);line-height:var(--line-height, 1.7);font-family:var(--font-family);color:var(--text-color);opacity:.85">${esc(p.body)}</div>` : ""}
 </div>`;
 }
 
 function Text(p: Props): string {
   const fontSize = p.fontSize ? `${p.fontSize}px` : "16px";
-  const content = `<p style="${s({ textAlign: (p.alignment || "left") as string, fontSize, fontWeight: (p.fontWeight || "400") as string, color: (p.textColor || "#374151") as string, lineHeight: String(p.lineHeight || 1.6), margin: "0" })}">${esc(p.title)}</p>`;
+  const content = `<p style="${s({ textAlign: (p.alignment || "left") as string, fontSize, fontWeight: (p.fontWeight || "400") as string, color: (p.textColor || "var(--text-color, #374151)") as string, fontFamily: "var(--font-family)", lineHeight: String(p.lineHeight || 1.6), margin: "0" })}">${esc(p.title)}</p>`;
   return `<div style="${s({ padding: `${p.padding ?? 16}px`, backgroundColor: (p.backgroundColor || "transparent") as string })}">
   ${p.linkUrl ? `<a href="${esc(p.linkUrl)}" style="text-decoration:none;color:inherit">${content}</a>` : content}
 </div>`;
@@ -420,15 +506,18 @@ function Text(p: Props): string {
 
 function HeadingBlock(p: Props): string {
   const level = Math.min(Math.max(Number(p.level) || 1, 1), 6);
-  const sizes = ["2.5rem", "2rem", "1.75rem", "1.5rem", "1.25rem", "1rem"];
-  const fs = sizes[level - 1];
+  const sizeVars = [
+    "var(--h1-size, 2.5rem)", "var(--h2-size, 2rem)", "var(--h3-size, 1.75rem)",
+    "var(--h4-size, 1.5rem)", "var(--h5-size, 1.25rem)", "var(--h6-size, 1rem)",
+  ];
+  const fs = sizeVars[level - 1];
   const padding = `${p.padding ?? 32}px`;
   const align = (p.alignment || "left") as string;
-  const color = (p.textColor || "#1a1a1a") as string;
+  const color = (p.textColor || "var(--primary-color, #1a1a1a)") as string;
   const dividerMargin = align === "center" ? "margin-left:auto;margin-right:auto" : align === "right" ? "margin-left:auto" : "";
   return `<div style="${s({ padding, textAlign: align, backgroundColor: (p.backgroundColor || "transparent") as string })}">
-  <h${level} style="font-size:${fs};font-weight:700;color:${esc(color)};line-height:1.2;margin:0">${esc(p.title)}</h${level}>
-  ${p.subtitle ? `<p style="font-size:1rem;color:${esc(color)};margin-top:8px;opacity:.75">${esc(p.subtitle)}</p>` : ""}
+  <h${level} style="font-size:${fs};font-weight:var(--heading-weight, 700);color:${esc(color)};line-height:var(--heading-line-height, 1.2);font-family:var(--heading-font);margin:0">${esc(p.title)}</h${level}>
+  ${p.subtitle ? `<p style="font-size:var(--base-font-size, 1rem);color:var(--text-color);margin-top:8px;opacity:.75">${esc(p.subtitle)}</p>` : ""}
   ${p.showDivider ? `<div style="width:60px;height:3px;background:${esc(color)};border-radius:2px;margin-top:12px;${dividerMargin}"></div>` : ""}
 </div>`;
 }
@@ -513,8 +602,8 @@ function Accordian(p: Props, zones: Zones): string {
   const id = (p.id as string) || "";
   const details = renderBlocks(zoneContent(id, "details", zones), zones);
   const bg = (p.backgroundColor || "#fff") as string;
-  const textColor = (p.textColor || "#1a1a1a") as string;
-  const accent = (p.accentColor || "#0158ad") as string;
+  const textColor = (p.textColor || "var(--text-color, #1a1a1a)") as string;
+  const accent = (p.accentColor || "var(--primary-color, #0158ad)") as string;
   const pad = `${p.padding ?? 16}px`;
   const br = `${p.borderRadius ?? 8}px`;
   const border = p.accordionStyle === "shadow" || p.accordionStyle === "minimal" ? "none" : "1px solid #e5e7eb";
@@ -549,13 +638,13 @@ function Article(p: Props): string {
   const bg = (p.backgroundColor || "transparent") as string;
   return `<div style="padding:${pad};background:${esc(bg)}">
   <article style="max-width:${mw};margin:0 auto">
-    ${p.articleTitle ? `<h1 style="font-size:2.5rem;font-weight:700;color:#1a1a1a;line-height:1.2;margin:0 0 12px">${esc(p.articleTitle)}</h1>` : ""}
-    ${p.author || p.publishDate ? `<div style="display:flex;gap:12px;font-size:13px;color:#374151;opacity:.65;margin-bottom:24px;flex-wrap:wrap">
+    ${p.articleTitle ? `<h1 style="font-size:var(--h1-size, 2.5rem);font-weight:var(--heading-weight, 700);color:var(--primary-color, #1a1a1a);line-height:var(--heading-line-height, 1.2);font-family:var(--heading-font);margin:0 0 12px">${esc(p.articleTitle)}</h1>` : ""}
+    ${p.author || p.publishDate ? `<div style="display:flex;gap:12px;font-size:13px;color:var(--text-color, #374151);opacity:.65;margin-bottom:24px;flex-wrap:wrap">
       ${p.author ? `By <strong>${esc(p.author)}</strong>` : ""}
       ${p.author && p.publishDate ? " | " : ""}
       ${p.publishDate ? esc(p.publishDate) : ""}
     </div>` : ""}
-    <div style="font-size:1rem;line-height:1.75;color:#374151">${p.body ? String(p.body) : ""}</div>
+    <div style="font-size:var(--base-font-size, 1rem);line-height:var(--line-height, 1.75);font-family:var(--font-family);color:var(--text-color, #374151)">${p.body ? String(p.body) : ""}</div>
   </article>
 </div>`;
 }
@@ -565,8 +654,8 @@ function CardBlock(p: Props): string {
   const img = (p.image as Record<string, unknown>) ?? {};
   const isBg = img.mode === "bg";
   const url = (img.url as string) || "";
-  const accent = (p.accentColor || "#0158ad") as string;
-  const textColor = (p.textColor || "#1a1a1a") as string;
+  const accent = (p.accentColor || "var(--primary-color, #0158ad)") as string;
+  const textColor = (p.textColor || "var(--text-color, #1a1a1a)") as string;
   const bg = (p.backgroundColor || "#fff") as string;
   const br = `${p.borderRadius ?? 8}px`;
   const pad = `${p.padding ?? 16}px`;
@@ -581,7 +670,7 @@ function CardBlock(p: Props): string {
   <div style="padding:${pad};background:linear-gradient(to top,rgba(0,0,0,.7),transparent)">
     <h3 style="color:#fff;margin:0 0 8px;font-size:1.25rem;font-weight:700">${esc(p.title)}</h3>
     ${p.description ? `<p style="color:rgba(255,255,255,.9);margin:0;font-size:.9rem">${esc(p.description)}</p>` : ""}
-    ${p.ctaLabel && p.ctaLink ? `<a href="${esc(p.ctaLink)}" class="pb-btn" style="display:inline-block;margin-top:12px;padding:8px 20px;background:${esc(accent)};color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:.875rem">${esc(p.ctaLabel)}</a>` : ""}
+    ${p.ctaLabel && p.ctaLink ? `<a href="${esc(p.ctaLink)}" class="pb-btn" style="display:inline-block;margin-top:12px;padding:8px 20px;background:${esc(accent)};color:#fff;text-decoration:none;border-radius:var(--button-border-radius, 6px);font-weight:600;font-size:.875rem">${esc(p.ctaLabel)}</a>` : ""}
   </div>
 </div>`;
   }
@@ -589,18 +678,18 @@ function CardBlock(p: Props): string {
   return `<div style="padding:${pad};background:${esc(bg)};border:${border};border-radius:${br};width:${width};max-width:100%;box-shadow:${shadow};display:flex;flex-direction:column;text-align:${align};overflow:hidden;position:relative">
   ${p.badge ? `<div style="position:absolute;top:12px;right:12px;background:${esc(accent)};color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px">${esc(p.badge)}</div>` : ""}
   ${url ? `<img src="${esc(url)}" alt="" style="width:100%;height:${imgH};object-fit:cover;display:block;margin-bottom:12px">` : ""}
-  <h3 style="color:${esc(textColor)};margin:0 0 8px;font-size:1.125rem;font-weight:700">${esc(p.title)}</h3>
+  <h3 style="color:${esc(textColor)};margin:0 0 8px;font-size:1.125rem;font-weight:700;font-family:var(--heading-font)">${esc(p.title)}</h3>
   ${p.description ? `<p style="color:${esc(textColor)};opacity:.8;margin:0 0 12px;font-size:.875rem;line-height:1.5;flex:1">${esc(p.description)}</p>` : ""}
-  ${p.ctaLabel && p.ctaLink ? `<a href="${esc(p.ctaLink)}" class="pb-btn" style="display:inline-block;padding:8px 20px;background:${esc(accent)};color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:.875rem;align-self:flex-start">${esc(p.ctaLabel)}</a>` : ""}
+  ${p.ctaLabel && p.ctaLink ? `<a href="${esc(p.ctaLink)}" class="pb-btn" style="display:inline-block;padding:8px 20px;background:${esc(accent)};color:#fff;text-decoration:none;border-radius:var(--button-border-radius, 6px);font-weight:600;font-size:.875rem;align-self:flex-start">${esc(p.ctaLabel)}</a>` : ""}
 </div>`;
 }
 
 function Button(p: Props): string {
   const variantMap: Record<string, string> = {
-    primary: "background:#0158ad;color:#fff;border:none",
-    secondary: "background:#64748b;color:#fff;border:none",
-    accent: "background:#f59e0b;color:#fff;border:none",
-    outline: "background:transparent;color:#0158ad;border:2px solid #0158ad",
+    primary: "background:var(--primary-color, #0158ad);color:#fff;border:none",
+    secondary: "background:var(--secondary-color, #64748b);color:#fff;border:none",
+    accent: "background:var(--accent-color, #f59e0b);color:#fff;border:none",
+    outline: "background:transparent;color:var(--primary-color, #0158ad);border:2px solid var(--primary-color, #0158ad)",
     success: "background:#22c55e;color:#fff;border:none",
   };
   const sizeMap: Record<string, string> = {
@@ -611,7 +700,7 @@ function Button(p: Props): string {
   const vStyle = variantMap[(p.variant as string) || "primary"] || variantMap.primary;
   const sStyle = sizeMap[(p.size as string) || "medium"] || sizeMap.medium;
   return `<div style="padding:16px">
-  <button style="border-radius:6px;cursor:pointer;font-weight:600;${vStyle};${sStyle}">${esc(p.text || "Click Me")}</button>
+  <button class="pb-btn" style="border-radius:var(--button-border-radius, 6px);cursor:pointer;font-weight:600;font-family:var(--font-family);${vStyle};${sStyle}">${esc(p.text || "Click Me")}</button>
 </div>`;
 }
 
@@ -636,7 +725,7 @@ function AboutSection(p: Props): string {
   const columnGap = Number(p.columnGap) || 64;
   const showStats = p.showStats !== false;
   const stats = (p.stats as Array<{ value: string; label: string }>) ?? [];
-  const accent = (p.buttonColor || "#0158ad") as string;
+  const accent = (p.buttonColor || "var(--primary-color, #0158ad)") as string;
   const btnText = (p.buttonTextColor || "#ffffff") as string;
 
   const imgW = imageStyle === "circle" ? `${imageHeight}px` : "100%";
@@ -648,22 +737,22 @@ function AboutSection(p: Props): string {
 
   const statsEl = showStats && stats.length
     ? `<div style="display:grid;grid-template-columns:repeat(${Math.min(stats.length, 4)},1fr);gap:16px;margin-bottom:32px;padding:24px 0;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;width:100%">` +
-      stats.map((st) => `<div style="text-align:center"><div style="font-size:1.75rem;font-weight:700;color:${esc((p.statValueColor as string) || "#0158ad")};line-height:1.1">${esc(st.value)}</div><div style="font-size:.8rem;color:${esc((p.statLabelColor as string) || "#374151")};opacity:.7;margin-top:4px">${esc(st.label)}</div></div>`).join("") +
+      stats.map((st) => `<div style="text-align:center"><div style="font-size:1.75rem;font-weight:700;color:${esc((p.statValueColor as string) || "var(--primary-color, #0158ad)")};line-height:1.1">${esc(st.value)}</div><div style="font-size:.8rem;color:${esc((p.statLabelColor as string) || "var(--text-color, #374151)")};opacity:.7;margin-top:4px">${esc(st.label)}</div></div>`).join("") +
       `</div>`
     : "";
 
   const buttonsEl = p.primaryButtonLabel || p.secondaryButtonLabel
     ? `<div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:${justifyRow}">` +
-      (p.primaryButtonLabel ? `<a href="${esc((p.primaryButtonLink as string) || "#")}" class="pb-btn" style="display:inline-block;background:${esc(accent)};color:${esc(btnText)};padding:12px 28px;border-radius:8px;font-weight:600;text-decoration:none">${esc(p.primaryButtonLabel as string)}</a>` : "") +
-      (p.secondaryButtonLabel ? `<a href="${esc((p.secondaryButtonLink as string) || "#")}" class="pb-btn" style="display:inline-block;background:transparent;color:${esc(accent)};padding:12px 28px;border-radius:8px;font-weight:600;text-decoration:none;border:2px solid ${esc(accent)}">${esc(p.secondaryButtonLabel as string)}</a>` : "") +
+      (p.primaryButtonLabel ? `<a href="${esc((p.primaryButtonLink as string) || "#")}" class="pb-btn" style="display:inline-block;background:${esc(accent)};color:${esc(btnText)};padding:12px 28px;border-radius:var(--button-border-radius, 8px);font-weight:600;text-decoration:none">${esc(p.primaryButtonLabel as string)}</a>` : "") +
+      (p.secondaryButtonLabel ? `<a href="${esc((p.secondaryButtonLink as string) || "#")}" class="pb-btn" style="display:inline-block;background:transparent;color:${esc(accent)};padding:12px 28px;border-radius:var(--button-border-radius, 8px);font-weight:600;text-decoration:none;border:2px solid ${esc(accent)}">${esc(p.secondaryButtonLabel as string)}</a>` : "") +
       `</div>`
     : "";
 
   const contentEl = `<div style="display:flex;flex-direction:column;align-items:${itemsAlign};text-align:${textAlign};min-width:0">
-    ${p.badge ? `<span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:${esc((p.badgeColor as string) || "#0158ad")};margin-bottom:12px">${esc(p.badge as string)}</span>` : ""}
-    ${p.subtitle ? `<p style="font-size:16px;color:${esc((p.subtitleColor as string) || "#374151")};margin:0 0 8px">${esc(p.subtitle as string)}</p>` : ""}
-    ${p.title ? `<h2 style="font-size:2rem;font-weight:700;color:${esc((p.titleColor as string) || "#1a1a1a")};line-height:1.2;margin:0 0 16px">${esc(p.title as string)}</h2>` : ""}
-    ${p.description ? `<p style="font-size:1rem;line-height:1.7;color:${esc((p.descriptionColor as string) || "#374151")};margin:0 0 32px">${esc(p.description as string)}</p>` : ""}
+    ${p.badge ? `<span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:${esc((p.badgeColor as string) || "var(--primary-color, #0158ad)")};margin-bottom:12px">${esc(p.badge as string)}</span>` : ""}
+    ${p.subtitle ? `<p style="font-size:16px;color:${esc((p.subtitleColor as string) || "var(--secondary-color, #374151)")};margin:0 0 8px">${esc(p.subtitle as string)}</p>` : ""}
+    ${p.title ? `<h2 style="font-size:var(--h2-size, 2rem);font-weight:var(--heading-weight, 700);color:${esc((p.titleColor as string) || "var(--primary-color, #1a1a1a)")};line-height:var(--heading-line-height, 1.2);font-family:var(--heading-font);margin:0 0 16px">${esc(p.title as string)}</h2>` : ""}
+    ${p.description ? `<p style="font-size:var(--base-font-size, 1rem);line-height:var(--line-height, 1.7);color:${esc((p.descriptionColor as string) || "var(--text-color, #374151)")};margin:0 0 32px">${esc(p.description as string)}</p>` : ""}
     ${statsEl}
     ${buttonsEl}
   </div>`;
@@ -691,8 +780,8 @@ function GallerySection(p: Props): string {
   return `<section style="background:${esc(bg)};padding:${pad}">
   <div style="max-width:1200px;margin:0 auto;padding:0 24px">
     ${p.title || p.subtitle ? `<div style="text-align:center;margin-bottom:48px">
-      ${p.subtitle ? `<p style="font-size:14px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#0158ad;margin:0 0 8px">${esc(p.subtitle)}</p>` : ""}
-      ${p.title ? `<h2 style="font-size:2rem;font-weight:700;color:#1a1a1a;margin:0">${esc(p.title)}</h2>` : ""}
+      ${p.subtitle ? `<p style="font-size:14px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--primary-color, #0158ad);margin:0 0 8px">${esc(p.subtitle)}</p>` : ""}
+      ${p.title ? `<h2 style="font-size:var(--h2-size, 2rem);font-weight:var(--heading-weight, 700);color:var(--primary-color, #1a1a1a);font-family:var(--heading-font);line-height:var(--heading-line-height, 1.2);margin:0">${esc(p.title)}</h2>` : ""}
     </div>` : ""}
     <div class="pb-grid-ncol" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${gap}px">
       ${images.filter((img) => img.url).map((img) => `<div style="position:relative;overflow:hidden;border-radius:8px">
@@ -719,16 +808,16 @@ function ServiceSection(p: Props): string {
   return `<section style="background:${esc(bg)};padding:${pad}">
   <div style="max-width:1200px;margin:0 auto;padding:0 24px">
     ${p.title || p.subtitle ? `<div style="text-align:center;margin-bottom:48px">
-      ${p.subtitle ? `<p style="font-size:14px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#0158ad;margin:0 0 8px">${esc(p.subtitle)}</p>` : ""}
-      ${p.title ? `<h2 style="font-size:2rem;font-weight:700;color:#1a1a1a;margin:0">${esc(p.title)}</h2>` : ""}
+      ${p.subtitle ? `<p style="font-size:14px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--primary-color, #0158ad);margin:0 0 8px">${esc(p.subtitle)}</p>` : ""}
+      ${p.title ? `<h2 style="font-size:var(--h2-size, 2rem);font-weight:var(--heading-weight, 700);color:var(--primary-color, #1a1a1a);font-family:var(--heading-font);line-height:var(--heading-line-height, 1.2);margin:0">${esc(p.title)}</h2>` : ""}
     </div>` : ""}
     <div class="pb-grid-ncol" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:24px;text-align:${align}">
       ${services.map((sv) => `<div style="padding:24px;border-radius:8px;${cs}">
         ${sv.icon ? `<span style="font-size:2rem;display:block;margin-bottom:16px">${esc(sv.icon)}</span>` : ""}
         ${sv.image?.url ? `<img src="${esc(sv.image.url)}" alt="" style="width:100%;height:160px;object-fit:cover;border-radius:4px;margin-bottom:12px;display:block">` : ""}
-        <h3 style="font-size:1.125rem;font-weight:700;margin:0 0 8px;color:#1a1a1a">${esc(sv.title || "")}</h3>
-        <p style="color:#374151;opacity:.8;font-size:.9rem;line-height:1.6;margin:0 0 12px">${esc(sv.description || "")}</p>
-        ${sv.linkLabel && sv.link ? `<a href="${esc(sv.link)}" class="pb-btn" style="color:#0158ad;font-weight:600;text-decoration:none;font-size:.875rem">${esc(sv.linkLabel)} →</a>` : ""}
+        <h3 style="font-size:var(--h3-size, 1.125rem);font-weight:var(--heading-weight, 700);font-family:var(--heading-font);margin:0 0 8px;color:var(--primary-color, #1a1a1a)">${esc(sv.title || "")}</h3>
+        <p style="color:var(--text-color, #374151);opacity:.8;font-size:.9rem;line-height:var(--line-height, 1.6);margin:0 0 12px">${esc(sv.description || "")}</p>
+        ${sv.linkLabel && sv.link ? `<a href="${esc(sv.link)}" class="pb-btn" style="color:var(--primary-color, #0158ad);font-weight:600;text-decoration:none;font-size:.875rem">${esc(sv.linkLabel)} →</a>` : ""}
       </div>`).join("")}
     </div>
   </div>
@@ -740,7 +829,7 @@ function TestimonialSection(p: Props): string {
   const bg = (p.backgroundColor || "#fff") as string;
   const cols = Number(p.columns) || 2;
   const align = (p.contentAlign || "center") as string;
-  const accent = (p.accentColor || "#0158ad") as string;
+  const accent = (p.accentColor || "var(--primary-color, #0158ad)") as string;
   const cardBg = (p.cardBackgroundColor || "#f8fafc") as string;
   const items = (p.testimonials as Array<{ quote?: string; author?: string; role?: string; avatar?: string; rating?: number }>) ?? [];
   const avatarSize = p.avatarSize === "small" ? "40px" : p.avatarSize === "large" ? "80px" : "60px";
@@ -755,14 +844,14 @@ function TestimonialSection(p: Props): string {
   <div style="max-width:1200px;margin:0 auto;padding:0 24px">
     ${p.title || p.subtitle ? `<div style="text-align:center;margin-bottom:48px">
       ${p.subtitle ? `<p style="font-size:14px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:${esc(accent)};margin:0 0 8px">${esc(p.subtitle)}</p>` : ""}
-      ${p.title ? `<h2 style="font-size:2rem;font-weight:700;color:#1a1a1a;margin:0">${esc(p.title)}</h2>` : ""}
+      ${p.title ? `<h2 style="font-size:var(--h2-size, 2rem);font-weight:var(--heading-weight, 700);color:var(--primary-color, #1a1a1a);font-family:var(--heading-font);line-height:var(--heading-line-height, 1.2);margin:0">${esc(p.title)}</h2>` : ""}
     </div>` : ""}
     <div class="pb-grid-ncol" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:24px">
       ${items.map((t) => `<div style="padding:24px;background:${esc(cardBg)};border-radius:8px;text-align:${align};${cs}">
         ${p.showQuotes ? `<span style="font-size:2rem;color:${esc(accent)};display:block;margin-bottom:12px">✦</span>` : ""}
-        ${t.quote ? `<p style="font-style:italic;color:#374151;line-height:1.7;margin:0 0 16px">"${esc(t.quote)}"</p>` : ""}
+        ${t.quote ? `<p style="font-style:italic;color:var(--text-color, #374151);line-height:var(--line-height, 1.7);margin:0 0 16px">"${esc(t.quote)}"</p>` : ""}
         ${t.avatar ? `<img src="${esc(t.avatar)}" alt="" style="width:${avatarSize};height:${avatarSize};border-radius:50%;object-fit:cover;margin:0 auto 12px;display:block">` : ""}
-        ${t.author ? `<strong style="color:#1a1a1a;display:block">${esc(t.author)}</strong>` : ""}
+        ${t.author ? `<strong style="color:var(--text-color, #1a1a1a);display:block">${esc(t.author)}</strong>` : ""}
         ${t.role ? `<span style="font-size:12px;color:#6b7280">${esc(t.role)}</span>` : ""}
         ${t.rating ? `<div style="color:${esc(accent)};font-size:14px;margin-top:8px">${"★".repeat(t.rating)}</div>` : ""}
       </div>`).join("")}
@@ -793,7 +882,10 @@ function MarqueeBar(p: Props): string {
 function ContactSection(p: Props): string {
   const pad = `${p.padding ?? 80}px 0`;
   const bg = (p.backgroundColor || "#f8fafc") as string;
-  const accent = (p.accentColor || "#0158ad") as string;
+  const accent = (p.accentColor || "var(--primary-color, #0158ad)") as string;
+  // Translucent accent for tints/gradients. Hex-alpha suffix (`${accent}22`) only
+  // works on bare hex, not on a var(); use color-mix so it tracks the token too.
+  const accentTint = (pct: number) => `color-mix(in srgb, ${accent} ${pct}%, transparent)`;
   const br = `${p.borderRadius ?? 8}px`;
   const labelName = (p.labelName as string) || "Name";
   const labelEmail = (p.labelEmail as string) || "Email";
@@ -803,7 +895,7 @@ function ContactSection(p: Props): string {
   const cardStyle = (() => {
     switch (p.cardStyle) {
       case "glassmorphism": return `background:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.3)`;
-      case "gradient":      return `background:linear-gradient(135deg,${bg} 0%,${accent}22 100%)`;
+      case "gradient":      return `background:linear-gradient(135deg,${bg} 0%,${accentTint(13)} 100%)`;
       case "shadow":        return `background:#fff;box-shadow:0 10px 40px rgba(0,0,0,.1)`;
       case "minimal":       return `background:#fff;border:1px solid #e5e7eb`;
       default:              return `background:#fff;box-shadow:0 4px 6px rgba(0,0,0,.05)`;
@@ -820,9 +912,9 @@ function ContactSection(p: Props): string {
   ].filter(Boolean).join("");
 
   const infoCard = `<div style="${cardStyle};border-radius:${br};padding:32px">
-    <h3 style="font-size:1.25rem;font-weight:600;color:${esc(accent)};margin:0 0 24px">Contact Information</h3>
+    <h3 style="font-size:var(--h3-size, 1.25rem);font-weight:600;color:${esc(accent)};font-family:var(--heading-font);margin:0 0 24px">Contact Information</h3>
     <div style="display:flex;flex-direction:column;gap:20px">
-      ${p.responseTime ? `<div style="display:flex;align-items:center;gap:8px;padding:12px 16px;background:${esc(accent)}1a;border-radius:8px;margin-bottom:8px"><span style="font-size:16px">⏱️</span><span style="font-size:14px;font-weight:600;color:${esc(accent)}">${esc(p.responseTime as string)}</span></div>` : ""}
+      ${p.responseTime ? `<div style="display:flex;align-items:center;gap:8px;padding:12px 16px;background:${accentTint(10)};border-radius:8px;margin-bottom:8px"><span style="font-size:16px">⏱️</span><span style="font-size:14px;font-weight:600;color:${esc(accent)}">${esc(p.responseTime as string)}</span></div>` : ""}
       ${contactItems}
     </div>
   </div>`;
@@ -846,8 +938,8 @@ function ContactSection(p: Props): string {
   <div style="max-width:1200px;margin:0 auto;padding:0 24px">
     <div style="margin-bottom:48px">
       ${p.subtitle ? `<p style="font-size:14px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:${esc(accent)};margin:0 0 8px">${esc(p.subtitle as string)}</p>` : ""}
-      ${p.title ? `<h2 style="font-size:2rem;font-weight:700;color:${esc(accent)};margin:0 0 12px">${esc(p.title as string)}</h2>` : ""}
-      ${p.description ? `<p style="color:#374151;max-width:700px;margin:0;opacity:.85">${esc(p.description as string)}</p>` : ""}
+      ${p.title ? `<h2 style="font-size:var(--h2-size, 2rem);font-weight:var(--heading-weight, 700);color:${esc(accent)};font-family:var(--heading-font);line-height:var(--heading-line-height, 1.2);margin:0 0 12px">${esc(p.title as string)}</h2>` : ""}
+      ${p.description ? `<p style="color:var(--text-color, #374151);max-width:700px;margin:0;opacity:.85">${esc(p.description as string)}</p>` : ""}
     </div>
     <div class="pb-grid-2col" style="display:grid;grid-template-columns:1fr 1.5fr;gap:48px;align-items:start">
       ${infoCard}
@@ -917,11 +1009,11 @@ function GlobalHeader(p: Props): string {
     ? `<img src="${esc(logo)}" alt="${esc(siteTitle)}" style="height:${esc(
         height,
       )};max-height:48px;width:auto;display:block">`
-    : `<span style="font-weight:700;font-size:18px;color:${esc(text)}">${esc(siteTitle)}</span>`;
+    : `<span style="font-weight:var(--heading-weight, 700);font-size:var(--h3-size, 18px);font-family:var(--heading-font, var(--font-family));color:${esc(text)}">${esc(siteTitle)}</span>`;
 
   return `<header class="pb-global-header" style="background:${esc(bg)};color:${esc(text)};min-height:${esc(
     height,
-  )};display:flex;align-items:center;padding:0 24px;${showShadow ? "box-shadow:0 1px 6px rgba(0,0,0,.08);" : ""}">
+  )};font-family:var(--font-family);display:flex;align-items:center;padding:0 24px;${showShadow ? "box-shadow:0 1px 6px rgba(0,0,0,.08);" : ""}">
   <a href="/" style="text-decoration:none;color:inherit;display:inline-flex;align-items:center">${brand}</a>
   <div style="flex:1"></div>
   ${showNav ? `<nav style="display:flex;align-items:center;gap:4px">${renderNavLinks(nav, text)}</nav>` : ""}
@@ -929,7 +1021,7 @@ function GlobalHeader(p: Props): string {
     cta
       ? `<a href="${esc(ctaLink)}" class="pb-btn" style="margin-left:16px;display:inline-block;background:#ffffff;color:${esc(
           bg,
-        )};padding:8px 18px;border-radius:6px;font-weight:600;text-decoration:none">${esc(cta)}</a>`
+        )};padding:8px 18px;border-radius:var(--border-radius, 6px);font-weight:600;text-decoration:none">${esc(cta)}</a>`
       : ""
   }
 </header>`;
@@ -975,7 +1067,7 @@ function GlobalFooter(p: Props): string {
 
   return `<footer class="pb-global-footer" style="background:${esc(bg)};color:${esc(
     text,
-  )};padding:48px 24px 24px;">
+  )};font-family:var(--font-family);padding:48px 24px 24px;">
   <div style="max-width:1200px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:32px;align-items:start">
     <div>
       ${
@@ -983,7 +1075,7 @@ function GlobalFooter(p: Props): string {
           ? `<img src="${esc(logo)}" alt="${esc(
               companyName,
             )}" style="max-height:48px;width:auto;display:block;margin-bottom:12px">`
-          : `<div style="font-weight:700;font-size:18px;margin-bottom:8px">${esc(companyName)}</div>`
+          : `<div style="font-weight:var(--heading-weight, 700);font-size:var(--h3-size, 18px);font-family:var(--heading-font, var(--font-family));margin-bottom:8px">${esc(companyName)}</div>`
       }
       ${desc ? `<p style="opacity:.75;line-height:1.6;margin:0 0 12px;max-width:320px">${esc(desc)}</p>` : ""}
       ${socialIcons ? `<div>${socialIcons}</div>` : ""}

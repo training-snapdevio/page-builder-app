@@ -22,7 +22,7 @@ import { getAllGlobalBlocks } from "../lib/global-blocks.server";
 import { getSavedBlocks } from "../lib/saved-blocks.server";
 import { resolvePageBlocks } from "../lib/resolve-blocks";
 import { renderPageContentOnly, renderGlobalStyleCss } from "../lib/puck-renderer";
-import { settingsToCSSString } from "../lib/settings.server";
+import { settingsToCSSString, buildGoogleFontsImport } from "../lib/settings.server";
 import type { PuckData } from "../lib/page-schema";
 
 const CORS_HEADERS = {
@@ -30,6 +30,57 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Accept, Content-Type",
 };
+
+/**
+ * Reset stylesheet for "Use Shopify theme styles" mode.
+ *
+ * The rendered block HTML carries hardcoded inline styles (colors, font-family,
+ * padding, border-radius). Inline styles beat normal CSS, so the only way to let
+ * the host theme's styling win is to override those declarations with !important
+ * and reset them to `inherit` / `revert`, which makes the theme cascade apply.
+ *
+ * Every selector is anchored on `:root` so the loader can rewrite it to the
+ * widget container id — these rules stay scoped to the widget and never leak.
+ *
+ * Scope covered (per the merchant's request): colors, fonts, and spacing.
+ */
+function buildThemeResetCss(): string {
+  return [
+    // --- Typography: inherit the theme's font + text color everywhere ---
+    `:root, :root *{`,
+    `  font-family:inherit!important;`,
+    `  color:inherit!important;`,
+    `  letter-spacing:inherit!important;`,
+    `}`,
+    // Headings: let the theme define their own size/weight/line-height
+    `:root h1, :root h2, :root h3, :root h4, :root h5, :root h6{`,
+    `  font-size:revert!important;`,
+    `  font-weight:revert!important;`,
+    `  line-height:revert!important;`,
+    `}`,
+    // Body text size/line-height follows the theme
+    `:root, :root p, :root span, :root li, :root a{`,
+    `  font-size:revert!important;`,
+    `  line-height:inherit!important;`,
+    `}`,
+
+    // --- Colors: drop baked-in backgrounds/borders so the theme shows through.
+    // Buttons + links keep their interactive look from the theme, not the app. ---
+    `:root .pb-btn, :root button, :root a.pb-btn{`,
+    `  background:revert!important;`,
+    `  color:revert!important;`,
+    `  border-color:revert!important;`,
+    `  border-radius:revert!important;`,
+    `}`,
+
+    // --- Spacing: neutralize hardcoded padding/margin/radius on layout wrappers.
+    // We DON'T touch grid/flex containers' structural gaps — only visual spacing
+    // that the theme would otherwise own. Scoped to the content wrapper. ---
+    `:root .pb-page-content > *{`,
+    `  border-radius:revert!important;`,
+    `}`,
+  ].join("\n");
+}
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -105,17 +156,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Content markup is always the same — styling is what the toggle controls.
     const html = renderPageContentOnly(resolved);
 
-    // "theme_styles=1" → merchant flipped the toggle to inherit theme styling.
-    // In that mode we send NO app CSS, so the block markup picks up whatever
-    // CSS variables the surrounding theme defines.
     const useThemeStyles = url.searchParams.get("theme_styles") === "1";
 
-    // App styling = the :root custom-property block (settingsToCSSString) plus
-    // the button/image rules. Scoped client-side to the widget container so it
-    // never leaks into the rest of the theme.
+    // Toggle OFF (default): render exactly like the Puck editor canvas. The block
+    // markup references design tokens via var(--primary-color) etc., and we inject
+    // the same :root token block the editor injects (settingsToCSSString) so the
+    // storefront output is visually identical to what the merchant designed.
+    //
+    // Toggle ON: hand styling to the host Shopify theme. The block markup still
+    // carries token-based inline styles, so we inject a scoped RESET that strips
+    // those tokens (color/font/spacing) and lets the surrounding theme cascade in.
+    //
+    // The loader rewrites every `:root` selector to `#<container-id>`, so all
+    // rules stay scoped to this widget and never leak into the theme.
     const styleCss = useThemeStyles
-      ? ""
-      : settingsToCSSString(settings) + "\n" + renderGlobalStyleCss(settings);
+      ? buildThemeResetCss()
+      : buildGoogleFontsImport([settings.fontFamily ?? "", settings.headingFont ?? ""])
+        + settingsToCSSString(settings) + "\n" + renderGlobalStyleCss(settings);
 
     return jsonResponse({
       blockId,

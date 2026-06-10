@@ -22,7 +22,7 @@ import { DEFAULT_GLOBAL_SETTINGS, type GlobalSettings } from "../lib/settings.de
 import { getAllGlobalBlocks, type GlobalBlock } from "../lib/global-blocks.server";
 import { getSavedBlocks, type SavedBlock } from "../lib/saved-blocks.server";
 import { isValidPuckData } from "../lib/page-schema";
-import { renderPreviewBody } from "../lib/puck-renderer";
+import { renderPreviewBody, settingsToCSSString, buildGoogleFontsImport } from "../lib/puck-renderer";
 import { resolvePageBlocks } from "../lib/resolve-blocks";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -77,6 +77,16 @@ function buildPreviewDocument(
   const resolved = resolvePageBlocks(data, globalBlocksMap, savedBlocksMap);
   const body = renderPreviewBody(resolved, settings);
 
+  // Inject the same design tokens the storefront uses so this preview matches
+  // the Puck editor canvas. The block markup references var(--primary-color),
+  // var(--heading-font), etc.; without this :root block they fall back to
+  // hardcoded defaults and the preview ignores the merchant's settings.
+  const fontsImport = buildGoogleFontsImport([
+    settings.fontFamily ?? "",
+    settings.headingFont ?? "",
+  ]);
+  const tokenCss = settingsToCSSString(settings);
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -84,8 +94,10 @@ function buildPreviewDocument(
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Preview: ${escHtml(page.title)}</title>
   <style>
+    ${fontsImport}
+    ${tokenCss}
     *, *::before, *::after { box-sizing: border-box; }
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif); }
     img { max-width: 100%; height: auto; }
   </style>
 </head>
