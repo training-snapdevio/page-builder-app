@@ -920,6 +920,22 @@ function PublishButton({
   const handlePublish = async () => {
     setPublishError(null);
 
+    // Block validation: Image blocks must have an image set.
+    const allBlocks = [
+      ...(appState.data.content ?? []),
+      ...Object.values(appState.data.zones ?? {}).flat(),
+    ] as any[];
+    const emptyImages = allBlocks.filter(
+      (b) => b.type === "Image" && !b.props?.imageUrl
+    );
+    if (emptyImages.length > 0) {
+      setPublishError(
+        `${emptyImages.length === 1 ? "An Image block has" : `${emptyImages.length} Image blocks have`} no image set. Add an image before publishing.`,
+      );
+      setTimeout(() => setPublishError(null), 5000);
+      return;
+    }
+
     // Client-side preflight using the same renderer the server uses so the
     // user never sees the raw "pageUpdate body failed: Content is too big"
     // GraphQL error.

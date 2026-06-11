@@ -543,50 +543,83 @@ function Image(p: Props): string {
   const imageUrl = (p.imageUrl as string) || "";
   if (!imageUrl) return "";
 
-  const altText     = esc((p.altText as string) || "");
-  const caption     = (p.caption as string) || "";
-  const linkUrl     = (p.linkUrl as string) || "";
-  const linkTarget  = esc((p.linkTarget as string) || "_self");
-  // Support both new NumberUnitField props and legacy string props
-  const wUnit  = (p.imgWidthUnit  as string) || "%";
-  const hUnit  = (p.imgHeightUnit as string) || "px";
-  const width  = p.imgWidth  != null ? `${p.imgWidth}${wUnit}`  : esc((p.width  as string) || "100%");
-  const height = p.imgHeight != null ? (hUnit === "auto" || !(p.imgHeight as number) ? "auto" : `${p.imgHeight}${hUnit}`) : esc((p.height as string) || "auto");
-  const objectFit   = esc((p.objectFit as string) || "cover");
-  const borderRadius = esc((p.borderRadius as string) || "0px");
-  const borderStyle = (p.borderStyle as string) || "none";
-  const borderWidth = p.borderWidth ?? 1;
-  const borderColor = esc((p.borderColor as string) || "#e5e7eb");
-  const opacity     = p.opacity != null ? (p.opacity as number) / 100 : 1;
-  const alignment   = esc((p.alignment as string) || "center");
+  const altText      = esc((p.altText as string) || "");
+  const caption      = (p.caption as string) || "";
+  const linkUrl      = (p.linkUrl as string) || "";
+  const wUnit        = (p.imgWidthUnit as string) || "%";
+  const width        = p.imgWidth != null ? `${p.imgWidth}${wUnit}` : "100%";
+  const isCustomH    = (p.heightMode as string) === "custom";
+  const height       = isCustomH && p.imgHeight ? `${p.imgHeight}px` : "auto";
+  const objectFit    = esc((p.objectFit as string) || "cover");
+  const brPx         = `${Number(p.borderRadius) || 0}px`;
+  const borderStyle  = (p.borderStyle as string) || "none";
+  const borderWidth  = Number(p.borderWidth ?? 1);
+  const borderColor  = esc((p.borderColor as string) || "#e5e7eb");
+  const opacity      = p.opacity != null ? (p.opacity as number) / 100 : 1;
+  const alignment    = (p.alignment as string) || "left";
+  const hoverEffect  = (p.hoverEffect as string) || "none";
+  const entranceAnim = (p.entranceAnim as string) || "none";
 
   const borderCss = borderStyle !== "none"
     ? `border:${borderWidth}px ${esc(borderStyle)} ${borderColor};`
     : "";
 
-  const advMargin  = (p.advMargin as any) ?? {};
-  const advPadding = (p.advPadding as any) ?? {};
-  const mt = advMargin.top ?? 0, mr = advMargin.right ?? 0, mb = advMargin.bottom ?? 0, ml = advMargin.left ?? 0;
-  const pt = advPadding.top ?? 0, pr = advPadding.right ?? 0, pb = advPadding.bottom ?? 0, pl = advPadding.left ?? 0;
+  const advMarginP   = (p.advMargin as any) ?? {};
+  const advPaddingP  = (p.advPadding as any) ?? {};
+  const mt = advMarginP.top ?? 0, mr = advMarginP.right ?? 0, mb = advMarginP.bottom ?? 0, ml = advMarginP.left ?? 0;
+  const pt = advPaddingP.top ?? 0, pr = advPaddingP.right ?? 0, pbb = advPaddingP.bottom ?? 0, pl = advPaddingP.left ?? 0;
 
-  const advBgStyle = (p.advBgType as string) === "color" && p.advBgColor
+  const advBgCss = (p.advBgType as string) === "color" && p.advBgColor
     ? `background-color:${esc(p.advBgColor as string)};`
     : "";
 
-  const imgStyle = `width:${width};height:${height};object-fit:${objectFit};border-radius:${borderRadius};display:block;opacity:${opacity};${borderCss}`;
-  const imgTag = `<img src="${esc(imageUrl)}" alt="${altText}" loading="lazy" style="${imgStyle}">`;
+  const uid = `img-${Math.random().toString(36).slice(2, 8)}`;
+  let extraCss = "";
+  if (hoverEffect !== "none") {
+    const hf = hoverEffect === "zoom" ? "" :
+      hoverEffect === "grayscale" ? "filter:grayscale(1);" :
+      hoverEffect === "blur"      ? `filter:blur(${Number(p.cssBlur) || 4}px);` :
+                                    `filter:brightness(${Number(p.cssBrightness) || 130}%);`;
+    const ht = hoverEffect === "zoom" ? "transform:scale(1.08);" : "";
+    extraCss += `#${uid} img{transition:all 0.35s ease}#${uid}:hover img{${hf}${ht}}`;
+  }
+  if (entranceAnim !== "none") {
+    const an = entranceAnim === "fade-in" ? "pb-fadein" : entranceAnim === "slide-up" ? "pb-slideup" : "pb-zoomin";
+    extraCss += `@keyframes pb-fadein{from{opacity:0}to{opacity:1}}@keyframes pb-slideup{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}@keyframes pb-zoomin{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}#${uid}{animation:${an} 0.5s ease both}`;
+  }
+  const styleTag = extraCss ? `<style>${extraCss}</style>` : "";
 
-  const captionHtml = caption
-    ? `<p style="font-size:${p.captionFontSize ?? 13}px;color:${esc((p.captionColor as string) || "var(--text-color)")};margin-top:8px;text-align:${esc((p.captionAlign as string) || "center")};font-style:italic;background:${esc((p.captionBackground as string) || "transparent")}">${esc(caption)}</p>`
-    : "";
+  const imgStyle = `width:100%;height:${height};${isCustomH ? `object-fit:${objectFit};` : ""}display:block;opacity:${opacity};${borderCss}`;
+  const imgTag   = `<img src="${esc(imageUrl)}" alt="${altText}" loading="lazy" style="${imgStyle}">`;
 
-  const wrapped = linkUrl
-    ? `<a href="${esc(linkUrl)}" target="${linkTarget}"${linkTarget === "_blank" ? ' rel="noopener noreferrer"' : ""} style="display:block">${imgTag}</a>`
+  const safeLink = linkUrl && (linkUrl.startsWith("http://") || linkUrl.startsWith("https://")) ? linkUrl : "";
+  const wrapped = safeLink
+    ? `<a href="${esc(safeLink)}" target="_blank" rel="noopener noreferrer" style="display:block">${imgTag}</a>`
     : imgTag;
 
-  return `<div style="margin:${mt}px ${mr}px ${mb}px ${ml}px;padding:${pt}px ${pr}px ${pb}px ${pl}px;text-align:${alignment};${advBgStyle}">` +
-    `<div style="display:inline-block;max-width:100%;position:relative;overflow:hidden">${wrapped}${captionHtml}</div>` +
-    `</div>`;
+  let captionHtml = "";
+  if (caption) {
+    const capPos   = (p.captionPosition as string) || "below";
+    const capColor = esc((p.captionColor as string) || (capPos === "overlay" ? "#fff" : "var(--text-color)"));
+    const capFs    = `${Number(p.captionFontSize) || 13}px`;
+    const capAlign = esc((p.captionAlign as string) || "center");
+    if (capPos === "overlay") {
+      const capBg = esc((p.captionBackground as string) || "rgba(0,0,0,0.5)");
+      captionHtml = `<div style="position:absolute;bottom:0;left:0;right:0;background:${capBg};color:${capColor};font-size:${capFs};padding:8px 12px;text-align:${capAlign}">${esc(caption)}</div>`;
+    } else {
+      captionHtml = `<div style="font-size:${capFs};color:${capColor};padding:6px 0;text-align:${capAlign};font-style:italic">${esc(caption)}</div>`;
+    }
+  }
+
+  const capPos     = (p.captionPosition as string) || "below";
+  const ml_auto    = alignment === "center" || alignment === "right" ? "auto" : "0";
+  const mr_auto    = alignment === "center" || alignment === "left"  ? "auto" : "0";
+  const innerStyle = `display:block;width:${width};max-width:100%;margin-left:${ml_auto};margin-right:${mr_auto};position:relative;overflow:hidden;border-radius:${brPx}`;
+  const innerHtml  = capPos === "overlay"
+    ? `<div style="${innerStyle}">${wrapped}${captionHtml}</div>`
+    : `<div style="${innerStyle}">${wrapped}</div>${captionHtml}`;
+
+  return `${styleTag}<div id="${uid}" style="margin:${mt}px ${mr}px ${mb}px ${ml}px;padding:${pt}px ${pr}px ${pbb}px ${pl}px;${advBgCss}">${innerHtml}</div>`;
 }
 
 
@@ -1473,14 +1506,14 @@ function renderDivider(p: Props): string {
   const thickness = p.thickness ?? 1;
   const style = esc((p.lineStyle as string) || "solid");
   const width = p.lineWidthVal != null ? `${p.lineWidthVal}${(p.lineWidthUnit as string) || "%"}` : esc((p.lineWidth as string) || "100%");
-  const gap = parseInt((p.gap as string) || "16") || 16;
+  const gap = Number(p.gap ?? 16) || 16;
   const align = (p.alignment as string) || "center";
   const justify = flexJustify(align);
 
   let inner = "";
   if (p.showElement) {
     const elType = (p.elementType as string) || "icon";
-    const elSpacing = esc((p.elementSpacing as string) || "12px");
+    const elSpacing = `${Number(p.elementSpacing ?? 12)}px`;
     const elContent = elType === "text"
       ? `<span style="font-size:${p.elementFontSize ?? 14}px;color:${esc((p.elementTextColor as string) || color)};white-space:nowrap">${esc((p.elementText as string) || "OR")}</span>`
       : `<span style="font-size:${p.iconSize ?? 20}px;color:${esc((p.iconColor as string) || color)};line-height:1">${esc((p.elementIcon as string) || "✦")}</span>`;
@@ -1505,12 +1538,22 @@ function renderVideo(p: Props): string {
   const videoWidthVal = p.videoWidthVal ?? 100;
   const videoWidthUnit = (p.videoWidthUnit as string) || "%";
   const width = `${videoWidthVal}${videoWidthUnit}`;
-  const borderRadius = esc((p.borderRadius as string) || "0px");
+  const borderRadius = `${Number(p.borderRadius ?? 0)}px`;
   const ratioMap: Record<string, string> = { "16:9": "56.25%", "4:3": "75%", "1:1": "100%" };
   const paddingBottom = aspectRatio === "custom" ? "0" : (ratioMap[aspectRatio] ?? "56.25%");
-  const containerH = aspectRatio === "custom" ? esc((p.customHeight as string) || "450px") : "0";
+  const containerH = aspectRatio === "custom" ? `${Number(p.customHeightVal ?? 450)}${esc((p.customHeightUnit as string) || "px")}` : "0";
   const isNative = sourceType === "self" || sourceType === "upload";
   const autoplay = p.autoplay as boolean;
+  const startTime = p.startTime as number | null;
+  const endTime = p.endTime as number | null;
+
+  // Play button style
+  const playBtnStyle = (p.playBtnStyle as string) || "default";
+  const btnSize = Number(p.playIconSize ?? 64);
+  const btnBg = esc((p.playBtnBg as string) || "rgba(0,0,0,0.5)");
+  const btnRadius = playBtnStyle === "custom" ? `${Number(p.playBtnRadius ?? 50)}px` : "50%";
+  const btnColor = esc((p.playIconColor as string) || "#fff");
+  const iconSize = Math.round(btnSize * 0.4);
 
   if (!videoUrl && !thumbnailUrl) {
     return `<div style="${spacing}padding:24px;border:2px dashed #e5e7eb;border-radius:8px;color:#9ca3af;font-size:14px;text-align:center">No video URL set.</div>`;
@@ -1525,8 +1568,8 @@ function renderVideo(p: Props): string {
     if (p.loop) { params.set("loop", "1"); params.set("playlist", id); }
     if (p.mute) params.set("mute", "1");
     if ((p.controls as string) === "hide") params.set("controls", "0");
-    if (p.startTime) params.set("start", String(p.startTime));
-    if (p.endTime) params.set("end", String(p.endTime));
+    if (startTime != null && startTime > 0) params.set("start", String(startTime));
+    if (endTime != null && endTime > 0) params.set("end", String(endTime));
     embedUrl = `https://www.youtube.com/embed/${id}?${params.toString()}`;
   } else if (sourceType === "vimeo" && videoUrl && !videoUrl.startsWith("data:")) {
     const match = videoUrl.match(/vimeo\.com\/(\d+)/);
@@ -1536,6 +1579,7 @@ function renderVideo(p: Props): string {
     if (p.loop) params.set("loop", "1");
     if (p.mute) params.set("muted", "1");
     if ((p.controls as string) === "hide") params.set("controls", "0");
+    if (startTime != null && startTime > 0) params.set("t", String(startTime));
     embedUrl = `https://player.vimeo.com/video/${id}?${params.toString()}`;
   }
 
@@ -1554,15 +1598,15 @@ function renderVideo(p: Props): string {
     videoInner = `<iframe src="${esc(embedUrl)}" style="${absStyle}border:none" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
   }
 
-  // Thumbnail: shown as static image when no videoUrl, or as a clickable overlay with JS when videoUrl exists
+  const playBtnHtml = `<div style="${absStyle}display:flex;align-items:center;justify-content:center;pointer-events:none;"><div style="width:${btnSize}px;height:${btnSize}px;background:${btnBg};border-radius:${btnRadius};display:flex;align-items:center;justify-content:center;"><svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="${btnColor}"><path d="M8 5v14l11-7z"/></svg></div></div>`;
+
+  // Thumbnail: static when no videoUrl, clickable overlay when videoUrl exists
   let thumbnailInner = "";
   if (thumbnailUrl && !thumbnailUrl.startsWith("data:")) {
     if (!videoUrl) {
-      // Static display — no video to play
       thumbnailInner = `<img src="${esc(thumbnailUrl)}" alt="Video thumbnail" style="${absStyle}object-fit:cover">`;
     } else if (!autoplay) {
-      // Clickable overlay — hides when play is clicked, JS-progressive-enhanced
-      thumbnailInner = `<div class="pb-vid-thumb" style="${absStyle}cursor:pointer;z-index:2;" onclick="this.style.display='none'"><img src="${esc(thumbnailUrl)}" alt="Video thumbnail" style="width:100%;height:100%;object-fit:cover"><div style="${absStyle}display:flex;align-items:center;justify-content:center;"><div style="width:64px;height:64px;background:rgba(0,0,0,0.5);border-radius:50%;display:flex;align-items:center;justify-content:center;"><svg width='26' height='26' viewBox='0 0 24 24' fill='white'><path d='M8 5v14l11-7z'/></svg></div></div></div>`;
+      thumbnailInner = `<div class="pb-vid-thumb" style="${absStyle}cursor:pointer;z-index:2;" onclick="this.style.display='none'"><img src="${esc(thumbnailUrl)}" alt="Video thumbnail" style="width:100%;height:100%;object-fit:cover">${playBtnHtml}</div>`;
     }
   }
 
@@ -1682,21 +1726,20 @@ function renderShareButtons(p: Props): string {
 
 function renderStarRating(p: Props): string {
   const spacing = advSpacing(p);
-  const maxStars = (p.maxStars as number) ?? 5;
-  const val = Math.min((p.ratingValue as number) ?? 4, maxStars);
+  const val = Math.min((p.ratingValue as number) ?? 4, 5);
   const starSize = esc((p.starSize as string) || "24px");
   const filledColor = esc((p.filledColor as string) || "#f59e0b");
   const emptyColor = esc((p.emptyColor as string) || "#d1d5db");
   const starGap = esc((p.starGap as string) || "4px");
   const showNumber = p.showNumber !== false;
   const numPos = (p.numberPosition as string) || "after";
-  const reviewCount = (p.reviewCount as string) || "";
+  const reviewCount = Number(p.reviewCount ?? 0);
   const numFontSize = esc((p.numFontSize as string) || "1rem");
   const numFontWeight = p.numFontWeight || "700";
   const numColor = esc((p.numColor as string) || "var(--text-color)");
   const alignment = (p.alignment as string) || "left";
 
-  const stars = Array.from({ length: maxStars }, (_, i) => {
+  const stars = Array.from({ length: 5 }, (_, i) => {
     const filled = i < Math.floor(val);
     const partial = !filled && i < val;
     const pct = partial ? Math.round((val - Math.floor(val)) * 100) : 0;
@@ -1707,7 +1750,7 @@ function renderStarRating(p: Props): string {
     return `<svg width="${starSize}" height="${starSize}" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="${filled ? filledColor : emptyColor}"/></svg>`;
   }).join("");
 
-  const numEl = showNumber ? `<span style="font-size:${numFontSize};font-weight:${numFontWeight};color:${numColor};white-space:nowrap">${val.toFixed(1)}${reviewCount ? " " + esc(reviewCount) : ""}</span>` : "";
+  const numEl = showNumber ? `<span style="font-size:${numFontSize};font-weight:${numFontWeight};color:${numColor};white-space:nowrap">${val.toFixed(1)}${reviewCount ? ` (${reviewCount} reviews)` : ""}</span>` : "";
   const inner = numPos === "before" ? `${numEl}${stars}` : `${stars}${numEl}`;
 
   return `<div style="${spacing}text-align:${alignment};${advBgStyle(p)}"><div style="display:inline-flex;align-items:center;gap:${starGap};flex-wrap:wrap;justify-content:${flexJustify(alignment)}">${inner}</div></div>`;
@@ -1759,28 +1802,41 @@ function renderAlert(p: Props): string {
   const resolvedBg = esc((p.bgColor as string) || t.bg);
   const resolvedText = esc((p.textColor as string) || t.text);
   const resolvedBorder = esc((p.borderColor as string) || t.border);
-  const resolvedIcon = esc((p.customIcon as string) || t.icon);
+  const rawIcon = (p.customIcon as string) || "";
+  const isImgIcon = rawIcon && (rawIcon.startsWith("http") || rawIcon.startsWith("/") || rawIcon.startsWith("data:"));
+  const resolvedIcon = isImgIcon ? "" : esc(rawIcon || t.icon);
   const showIcon = p.showIcon !== false;
   const alertTitle = esc((p.alertTitle as string) || "");
   const message = esc((p.message as string) || "");
   const borderStyle = (p.borderStyle as string) || "solid";
-  const borderWidth = p.borderWidth ?? 1;
-  const borderRadius = p.borderRadius ?? 8;
-  const titleFontSize = esc((p.titleFontSize as string) || "1rem");
+  const borderWidth = Number(p.borderWidth ?? 1);
+  const borderRadius = Number(p.borderRadius ?? 8);
+  const titleFontSize = `${Number(p.titleFontSize) || 16}px`;
   const titleFontWeight = p.titleFontWeight || "700";
-  const msgFontSize = esc((p.msgFontSize as string) || "0.9rem");
-  const lineHeight = esc((p.lineHeight as string) || "1.5");
+  const msgFontSize = `${Number(p.msgFontSize) || 14}px`;
+  const lineHeight = Number(p.lineHeight) ? Number(p.lineHeight) / 10 : 1.5;
   const iconColor = esc((p.iconColor as string) || resolvedText);
 
   let borderCss = "";
   if (borderStyle === "left-only") borderCss = `border-left:${borderWidth}px solid ${resolvedBorder};`;
   else if (borderStyle !== "none") borderCss = `border:${borderWidth}px solid ${resolvedBorder};`;
 
-  const iconHtml = showIcon ? `<span style="font-size:1.25rem;color:${iconColor};flex-shrink:0;line-height:1.3">${resolvedIcon}</span>` : "";
+  const dismissible = p.dismissible === true || p.dismissible === "true";
+  const uid = `alert-${Math.random().toString(36).slice(2, 9)}`;
+
+  let iconHtml = "";
+  if (showIcon) {
+    iconHtml = isImgIcon
+      ? `<img src="${esc(rawIcon)}" alt="icon" style="width:1.5rem;height:1.5rem;object-fit:contain;flex-shrink:0" />`
+      : `<span style="font-size:1.25rem;color:${iconColor};flex-shrink:0;line-height:1.3">${resolvedIcon}</span>`;
+  }
   const titleHtml = alertTitle ? `<div style="font-size:${titleFontSize};font-weight:${titleFontWeight};margin-bottom:4px">${alertTitle}</div>` : "";
   const msgHtml = `<div style="font-size:${msgFontSize}">${message}</div>`;
+  const dismissBtn = dismissible
+    ? `<button onclick="document.getElementById('${uid}').style.display='none'" style="background:none;border:none;cursor:pointer;color:${resolvedText};font-size:1.2rem;line-height:1;padding:0;opacity:0.6;flex-shrink:0">×</button>`
+    : "";
 
-  return `<div style="${spacing}background:${resolvedBg};color:${resolvedText};border-radius:${borderRadius}px;line-height:${lineHeight};${borderCss}${advBgStyle(p)}"><div style="display:flex;align-items:flex-start;gap:12px">${iconHtml}<div style="flex:1">${titleHtml}${msgHtml}</div></div></div>`;
+  return `<div id="${uid}" style="${spacing}background:${resolvedBg};color:${resolvedText};border-radius:${borderRadius}px;line-height:${lineHeight};${borderCss}${advBgStyle(p)}"><div style="display:flex;align-items:flex-start;gap:12px">${iconHtml}<div style="flex:1">${titleHtml}${msgHtml}</div>${dismissBtn}</div></div>`;
 }
 
 function renderBlockQuote(p: Props): string {
@@ -1810,7 +1866,20 @@ function renderBlockQuote(p: Props): string {
   const borderWidth = p.borderWidth ?? 4;
   const bgColor = esc((p.bgColor as string) || "");
   const alignment = (p.alignment as string) || "left";
-  const opacity = p.opacity != null ? (p.opacity as number) / 100 : 1;
+
+  // Advanced wrapper styles
+  const advBgType = (p.advBgType as string) || "none";
+  const advBgColorWrap = esc((p.advBgColorWrap as string) || "");
+  const advBorderStyle = (p.advBorderStyle as string) || "none";
+  const advBorderColor = esc((p.advBorderColor as string) || "currentColor");
+  const advBorderWidth = p.advBorderWidth as { top?: number; right?: number; bottom?: number; left?: number } | undefined;
+  const advBorderRadius = p.advBorderRadius as { top?: number; right?: number; bottom?: number; left?: number } | undefined;
+
+  const wrapExtraStyle = [
+    advBgType === "color" && advBgColorWrap ? `background-color:${advBgColorWrap};` : "",
+    advBorderStyle !== "none" ? `border-style:${advBorderStyle};border-color:${advBorderColor};border-top-width:${advBorderWidth?.top ?? 0}px;border-right-width:${advBorderWidth?.right ?? 0}px;border-bottom-width:${advBorderWidth?.bottom ?? 0}px;border-left-width:${advBorderWidth?.left ?? 0}px;` : "",
+    `border-top-left-radius:${advBorderRadius?.top ?? 0}px;border-top-right-radius:${advBorderRadius?.right ?? 0}px;border-bottom-right-radius:${advBorderRadius?.bottom ?? 0}px;border-bottom-left-radius:${advBorderRadius?.left ?? 0}px;`,
+  ].join("");
 
   const borderMap: Record<string, string> = {
     none: "",
@@ -1825,7 +1894,6 @@ function renderBlockQuote(p: Props): string {
   if (showQuoteIcon) {
     if (iconPosition === "top-left") iconHtml = `<div style="margin-bottom:8px">${quoteIconSvg}</div>`;
     else if (iconPosition === "top-right") iconHtml = `<div style="text-align:right;margin-bottom:8px">${quoteIconSvg}</div>`;
-    else iconHtml = `<div style="position:absolute;top:0;right:0;pointer-events:none">${quoteIconSvg}</div>`;
   }
 
   const quoteEl = `<p style="font-size:${quoteFontSize};${quoteFontFamily ? `font-family:${quoteFontFamily};` : ""}font-style:${quoteFontStyle};color:${quoteTextColor};line-height:${quoteLineHeight};margin:0 0 16px 0">&ldquo;${quoteText}&rdquo;</p>`;
@@ -1841,7 +1909,7 @@ function renderBlockQuote(p: Props): string {
 
   const bqStyle = `margin:0;position:relative;background:${bgColor || "transparent"};${bgColor ? "padding:24px;border-radius:8px;" : ""}${borderMap[borderType] || ""}`;
 
-  return `<div style="${spacing}text-align:${alignment};opacity:${opacity};${advBgStyle(p)}"><blockquote style="${bqStyle}">${iconHtml}${quoteEl}${authorEl}</blockquote></div>`;
+  return `<div style="${spacing}text-align:${alignment};${wrapExtraStyle}"><blockquote style="${bqStyle}">${iconHtml}${quoteEl}${authorEl}</blockquote></div>`;
 }
 
 function renderIcons(p: Props): string {

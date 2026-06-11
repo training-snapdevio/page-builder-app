@@ -58,6 +58,10 @@ export default defineConfig({
     assetsInlineLimit: 0,
   },
   optimizeDeps: {
-    include: ["@shopify/app-bridge-react"],
+    include: ["@shopify/app-bridge-react", "@shopify/polaris"],
+  },
+  resolve: {
+    // Ensure Vite resolves to a single React instance in monorepos/workspaces
+    dedupe: ["react", "react-dom"],
   },
 }) satisfies UserConfig;
