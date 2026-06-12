@@ -1831,8 +1831,7 @@ const imageUploadField = {
                 flexShrink: useCompactPreview ? 0 : undefined,
               }}
               onMouseEnter={(e) =>
-                (e.currentTarget.style.borderColor =
-                  "var(--p-color-border-emphasis, #005bd3)")
+                (e.currentTarget.style.borderColor = "#1a1a1a")
               }
               onMouseLeave={(e) =>
                 (e.currentTarget.style.borderColor = value
@@ -1899,11 +1898,11 @@ const imageUploadField = {
               {/* Uploading overlay */}
               {uploadStatus === "uploading" && (
                 <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.82)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: "var(--p-border-radius-200, 8px)" }}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p-color-border-emphasis,#005bd3)" strokeWidth="2.5" strokeLinecap="round" style={{ animation: "pb-spin 0.8s linear infinite" }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2.5" strokeLinecap="round" style={{ animation: "pb-spin 0.8s linear infinite" }}>
                     <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
                   </svg>
                   <style>{`@keyframes pb-spin{to{transform:rotate(360deg)}}`}</style>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--p-color-border-emphasis,#005bd3)" }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#1a1a1a" }}>
                     {lastAction === "replace" ? "Replacing…" : "Uploading…"}
                   </span>
                 </div>
@@ -11960,6 +11959,14 @@ const ImageComponent = {
         const imgWidthUnit = props.imgWidthUnit ?? "%";
         const isLessThan100 = imgWidthUnit !== "%" || imgWidthVal < 100;
         const bgType = props.advBgType ?? "none";
+        const [showImgError, setShowImgError] = useState(false);
+
+        useEffect(() => {
+          if (props.imageUrl) { setShowImgError(false); return; }
+          const handler = () => { setShowImgError(true); setTimeout(() => setShowImgError(false), 5000); };
+          window.addEventListener("pb:image-validation-failed", handler);
+          return () => window.removeEventListener("pb:image-validation-failed", handler);
+        }, [props.imageUrl]);
 
         return (
           <BlockTabBar blockKey="Image">
@@ -11969,7 +11976,7 @@ const ImageComponent = {
                 {tab === "content" && (
                   <>
                     <ImageField label="Image" value={props.imageUrl ?? ""} onChange={(v) => set("imageUrl", v)} />
-                    {!(props.imageUrl ?? "") && (
+                    {showImgError && (
                       <div style={{ color: "#d72c0d", fontSize: 11, marginTop: -4, marginBottom: 6, paddingLeft: 2 }}>
                         Image is required before publishing.
                       </div>
@@ -12534,15 +12541,6 @@ const ButtonComponent = {
                   <>
                     <StackedTextField label="Label" value={props.label ?? "Click Me"} onChange={(v) => set("label", v)} placeholder="Button label..." />
                     <StackedTextField label="Link URL" value={props.linkUrl ?? ""} onChange={(v) => set("linkUrl", v)} placeholder="https://..." />
-                    <InlineSelect
-                      label="Link Target"
-                      value={props.linkTarget ?? "_self"}
-                      onChange={(v) => set("linkTarget", v)}
-                      options={[
-                        { value: "_self", label: "Same Tab" },
-                        { value: "_blank", label: "New Tab" },
-                      ]}
-                    />
                     <StackedTextField label="Icon (emoji or SVG)" value={props.icon ?? ""} onChange={(v) => set("icon", v)} placeholder="e.g. 🚀 or leave blank" />
                     <InlineSelect
                       label="Icon Position"
@@ -12703,7 +12701,7 @@ const ButtonComponent = {
   defaultProps: {
     label: "Click Me",
     linkUrl: "",
-    linkTarget: "_self",
+    linkTarget: "_blank",
     icon: "",
     iconPosition: "before",
     fullWidth: false,
@@ -12838,7 +12836,7 @@ const ButtonComponent = {
       >
         <style>{hoverCss}{customCss ? `#${cssId || "btn-block"} { ${customCss} }` : ""}</style>
         {linkUrl
-          ? <a href={linkUrl} target={linkTarget ?? "_self"} rel={linkTarget === "_blank" ? "noopener noreferrer" : undefined} style={{ textDecoration: "none", display: fullWidth ? "block" : "inline-block" }}>{btnEl}</a>
+          ? <a href={linkUrl} target={linkTarget ?? "_blank"} rel="noopener noreferrer" style={{ textDecoration: "none", display: fullWidth ? "block" : "inline-block" }}>{btnEl}</a>
           : btnEl
         }
       </div>

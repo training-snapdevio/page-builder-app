@@ -723,23 +723,94 @@ function CardBlock(p: Props): string {
 }
 
 function Button(p: Props): string {
-  const variantMap: Record<string, string> = {
-    primary: "background:var(--primary-color, #0158ad);color:#fff;border:none",
-    secondary: "background:var(--secondary-color, #64748b);color:#fff;border:none",
-    accent: "background:var(--accent-color, #f59e0b);color:#fff;border:none",
-    outline: "background:transparent;color:var(--primary-color, #0158ad);border:2px solid var(--primary-color, #0158ad)",
-    success: "background:#22c55e;color:#fff;border:none",
-  };
+  const label        = esc((p.label as string) || (p.text as string) || "Click Me");
+  const linkUrl      = esc((p.linkUrl as string) || "");
+  const icon         = esc((p.icon as string) || "");
+  const iconPos      = (p.iconPosition as string) || "before";
+  const fullWidth    = !!p.fullWidth;
+  const alignment    = (p.alignment as string) || "left";
+  const fontFamily   = (p.fontFamily as string) || "var(--font-family)";
+  const fontSize     = p.fontSize ? `${p.fontSize}px` : "";
+  const fontWeight   = (p.fontWeight as string) || "600";
+  const textTransform = (p.textTransform as string) || "none";
+  const letterSpacing = p.letterSpacing != null ? `${p.letterSpacing}px` : "";
+  const textColor    = esc((p.textColor as string) || "#ffffff");
+  const bgColor      = esc((p.bgColor as string) || "var(--primary-color, #0158ad)");
+  const borderStyle  = (p.borderStyle as string) || "none";
+  const borderWidth  = Number(p.borderWidth ?? 2);
+  const borderColor  = esc((p.borderColor as string) || "transparent");
+  const borderRadius = esc((p.borderRadius as string) || "var(--button-border-radius, 6px)");
+  const hoverTextColor = esc((p.hoverTextColor as string) || "");
+  const hoverBgColor   = esc((p.hoverBgColor as string) || "");
+  const hoverBorderColor = esc((p.hoverBorderColor as string) || "");
+  const hoverAnimation = (p.hoverAnimation as string) || "none";
+  const sizePreset   = (p.sizePreset as string) || "medium";
+  const customPad    = (p.customPadding as any) ?? {};
+  const opacity      = p.opacity != null ? (p.opacity as number) / 100 : 1;
+  const advMargin    = (p.advMargin as any) ?? {};
+  const advBgType    = (p.advBgType as string) || "none";
+  const advBgColor   = esc((p.advBgColor as string) || "");
+  const cssId        = esc((p.cssId as string) || "");
+  const cssClass     = esc((p.cssClass as string) || "");
+  const customCss    = (p.customCss as string) || "";
+  const zIndex       = p.zIndex != null ? String(p.zIndex) : "";
+
   const sizeMap: Record<string, string> = {
-    small: "font-size:.8rem;padding:6px 14px",
-    medium: "padding:10px 20px",
-    large: "font-size:1.125rem;padding:14px 28px",
+    small:  "padding:8px 16px",
+    medium: "padding:12px 24px",
+    large:  "padding:16px 32px",
+    custom: `padding:${customPad.top ?? 12}px ${customPad.right ?? 24}px ${customPad.bottom ?? 12}px ${customPad.left ?? 24}px`,
   };
-  const vStyle = variantMap[(p.variant as string) || "primary"] || variantMap.primary;
-  const sStyle = sizeMap[(p.size as string) || "medium"] || sizeMap.medium;
-  return `<div style="padding:16px">
-  <button class="pb-btn" style="border-radius:var(--button-border-radius, 6px);cursor:pointer;font-weight:600;font-family:var(--font-family);${vStyle};${sStyle}">${esc(p.text || "Click Me")}</button>
-</div>`;
+  const padStyle = sizeMap[sizePreset] ?? sizeMap.medium;
+  const borderCss = borderStyle !== "none" ? `border:${borderWidth}px ${borderStyle} ${borderColor};` : "border:none;";
+  const uid = cssId || `btn-${Math.random().toString(36).slice(2, 8)}`;
+
+  const hoverCss = (hoverTextColor || hoverBgColor || hoverBorderColor || hoverAnimation !== "none") ? `
+.pb-btn-${uid}{transition:all 0.2s ease}
+.pb-btn-${uid}:hover{${hoverTextColor ? `color:${hoverTextColor}!important;` : ""}${hoverBgColor ? `background:${hoverBgColor}!important;` : ""}${hoverBorderColor ? `border-color:${hoverBorderColor}!important;` : ""}${hoverAnimation === "grow" ? "transform:scale(1.05);" : hoverAnimation === "shrink" ? "transform:scale(0.96);" : hoverAnimation === "pulse" ? "animation:pb-pulse 0.6s ease;" : ""}}
+@keyframes pb-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}` : "";
+
+  const btnStyle = [
+    `display:${fullWidth ? "flex" : "inline-flex"}`,
+    fullWidth ? "width:100%" : "",
+    "align-items:center",
+    "justify-content:center",
+    icon ? "gap:8px" : "",
+    padStyle,
+    `font-family:${fontFamily}`,
+    fontSize ? `font-size:${fontSize}` : "",
+    `font-weight:${fontWeight}`,
+    `text-transform:${textTransform}`,
+    letterSpacing ? `letter-spacing:${letterSpacing}` : "",
+    `color:${textColor}`,
+    `background:${bgColor}`,
+    borderCss,
+    `border-radius:${borderRadius}`,
+    "cursor:pointer",
+    `opacity:${opacity}`,
+    "text-decoration:none",
+  ].filter(Boolean).join(";");
+
+  const iconBefore = icon && iconPos === "before" ? `<span>${icon}</span>` : "";
+  const iconAfter  = icon && iconPos === "after"  ? `<span>${icon}</span>` : "";
+  const inner = `${iconBefore}${label}${iconAfter}`;
+
+  const btnEl = `<button class="pb-btn pb-btn-${uid}" style="${btnStyle}">${inner}</button>`;
+  const linked = linkUrl
+    ? `<a href="${linkUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;${fullWidth ? "display:block" : "display:inline-block"}">${btnEl}</a>`
+    : btnEl;
+
+  const mt = advMargin.top ?? 0, mr = advMargin.right ?? 0, mb = advMargin.bottom ?? 0, ml = advMargin.left ?? 0;
+  const wrapBg = advBgType === "color" && advBgColor ? `background-color:${advBgColor};` : "";
+  const wrapStyle = [
+    `text-align:${alignment}`,
+    `margin:${mt}px ${mr}px ${mb}px ${ml}px`,
+    zIndex ? `z-index:${zIndex}` : "",
+    wrapBg,
+  ].filter(Boolean).join(";");
+
+  const styleTag = (hoverCss || customCss) ? `<style>${hoverCss}${customCss ? `#${uid}{${customCss}}` : ""}</style>` : "";
+  return `${styleTag}<div${cssId ? ` id="${cssId}"` : ""}${cssClass ? ` class="${cssClass}"` : ""} style="${wrapStyle}">${linked}</div>`;
 }
 
 function AboutSection(p: Props): string {
@@ -1960,65 +2031,78 @@ function renderIcons(p: Props): string {
 
 // ─── Main render dispatcher ───────────────────────────────────────────────────
 
+function applyHideClasses(html: string, p: Props): string {
+  if (!html) return html;
+  const classes = [
+    p.hideDesktop ? "puck-hide-desktop" : "",
+    p.hideTablet  ? "puck-hide-tablet"  : "",
+    p.hideMobile  ? "puck-hide-mobile"  : "",
+  ].filter(Boolean).join(" ");
+  if (!classes) return html;
+  return `<div class="${classes}">${html}</div>`;
+}
+
 function renderBlock(block: Block, zones: Zones): string {
   const p = block.props ?? {};
   try {
+    let html = "";
     switch (block.type) {
-      case "Hero":              return Hero(p);
-      case "GradientHero":     return GradientHero(p);
-      case "TextBlock":        return TextBlock(p);
-      case "Text":             return Text(p);
-      case "HeadingBlock":     return HeadingBlock(p);
-      case "Space":            return Space(p);
-      case "Image":            return Image(p);
-      case "GridBlock":        return renderGridBlock(p, zones);
-      case "DoubleColumn":     return DoubleColumn(p, zones);
-      case "Accordian":        return Accordian(p, zones);
-      case "Article":          return Article(p);
-      case "CardBlock":        return CardBlock(p);
-      case "Button":           return Button(p);
-      case "AboutSection":     return AboutSection(p);
-      case "GallerySection":   return GallerySection(p);
-      case "ServiceSection":   return ServiceSection(p);
-      case "TestimonialSection": return TestimonialSection(p);
-      case "MarqueeBar":       return MarqueeBar(p);
-      case "ContactSection":   return ContactSection(p);
-      case "PhotoCollage":     return PhotoCollage(p);
+      case "Hero":              html = Hero(p); break;
+      case "GradientHero":     html = GradientHero(p); break;
+      case "TextBlock":        html = TextBlock(p); break;
+      case "Text":             html = Text(p); break;
+      case "HeadingBlock":     html = HeadingBlock(p); break;
+      case "Space":            html = Space(p); break;
+      case "Image":            html = Image(p); break;
+      case "GridBlock":        html = renderGridBlock(p, zones); break;
+      case "DoubleColumn":     html = DoubleColumn(p, zones); break;
+      case "Accordian":        html = Accordian(p, zones); break;
+      case "Article":          html = Article(p); break;
+      case "CardBlock":        html = CardBlock(p); break;
+      case "Button":           html = Button(p); break;
+      case "AboutSection":     html = AboutSection(p); break;
+      case "GallerySection":   html = GallerySection(p); break;
+      case "ServiceSection":   html = ServiceSection(p); break;
+      case "TestimonialSection": html = TestimonialSection(p); break;
+      case "MarqueeBar":       html = MarqueeBar(p); break;
+      case "ContactSection":   html = ContactSection(p); break;
+      case "PhotoCollage":     html = PhotoCollage(p); break;
       // New blocks
-      case "Divider":          return renderDivider(p);
-      case "Video":            return renderVideo(p);
-      case "Icons":            return renderIcons(p);
-      case "BlockQuote":       return renderBlockQuote(p);
-      case "StarRating":       return renderStarRating(p);
-      case "ProgressBar":      return renderProgressBar(p);
-      case "Alert":            return renderAlert(p);
-      case "SocialIcons":      return renderSocialIcons(p);
-      case "ShareButtons":     return renderShareButtons(p);
+      case "Divider":          html = renderDivider(p); break;
+      case "Video":            html = renderVideo(p); break;
+      case "Icons":            html = renderIcons(p); break;
+      case "BlockQuote":       html = renderBlockQuote(p); break;
+      case "StarRating":       html = renderStarRating(p); break;
+      case "ProgressBar":      html = renderProgressBar(p); break;
+      case "Alert":            html = renderAlert(p); break;
+      case "SocialIcons":      html = renderSocialIcons(p); break;
+      case "ShareButtons":     html = renderShareButtons(p); break;
       // Layout / container blocks
-      case "LayoutBlock":        return renderLayoutBlock(p, zones);
-      case "Section":            return renderSectionBlock(p, zones);
+      case "LayoutBlock":        html = renderLayoutBlock(p, zones); break;
+      case "Section":            html = renderSectionBlock(p, zones); break;
       // Section templates
-      case "Section_Hero":          return renderSectionHero(p, zones);
-      case "Section_About":         return renderSectionAbout(p, zones);
-      case "Section_Gallery":       return renderSectionGallery(p, zones);
-      case "Section_Testimonial":   return renderSectionTestimonial(p, zones);
-      case "Section_Carousel":      return renderSectionCarousel(p, zones);
-      case "Section_Form":          return renderSectionForm(p, zones);
-      case "Section_Countdown":     return renderSectionCountdown(p, zones);
-      case "Section_MediaCarousel": return renderSectionMediaCarousel(p, zones);
-      case "Section_Services":      return renderSectionServices(p, zones);
-      case "Section_Pricing":       return renderSectionPricing(p, zones);
-      case "Section_CTA":           return renderSectionCTA(p, zones);
-      case "Section_FAQ":           return renderSectionFAQ(p, zones);
-      case "Section_Team":          return renderSectionTeam(p, zones);
-      case "Section_Logos":         return renderSectionLogos(p, zones);
-      case "Section_Features":      return renderSectionFeatures(p, zones);
-      case "Section_Newsletter":    return renderSectionNewsletter(p, zones);
-      case "Section_Video":         return renderSectionVideo(p, zones);
-      case "Section_Stats":         return renderSectionStats(p, zones);
+      case "Section_Hero":          html = renderSectionHero(p, zones); break;
+      case "Section_About":         html = renderSectionAbout(p, zones); break;
+      case "Section_Gallery":       html = renderSectionGallery(p, zones); break;
+      case "Section_Testimonial":   html = renderSectionTestimonial(p, zones); break;
+      case "Section_Carousel":      html = renderSectionCarousel(p, zones); break;
+      case "Section_Form":          html = renderSectionForm(p, zones); break;
+      case "Section_Countdown":     html = renderSectionCountdown(p, zones); break;
+      case "Section_MediaCarousel": html = renderSectionMediaCarousel(p, zones); break;
+      case "Section_Services":      html = renderSectionServices(p, zones); break;
+      case "Section_Pricing":       html = renderSectionPricing(p, zones); break;
+      case "Section_CTA":           html = renderSectionCTA(p, zones); break;
+      case "Section_FAQ":           html = renderSectionFAQ(p, zones); break;
+      case "Section_Team":          html = renderSectionTeam(p, zones); break;
+      case "Section_Logos":         html = renderSectionLogos(p, zones); break;
+      case "Section_Features":      html = renderSectionFeatures(p, zones); break;
+      case "Section_Newsletter":    html = renderSectionNewsletter(p, zones); break;
+      case "Section_Video":         html = renderSectionVideo(p, zones); break;
+      case "Section_Stats":         html = renderSectionStats(p, zones); break;
       // GlobalHeader/Footer are theme concerns; GlobalBlock needs DB lookup (skip)
-      default:                 return "";
+      default: return "";
     }
+    return applyHideClasses(html, p);
   } catch {
     return "";
   }

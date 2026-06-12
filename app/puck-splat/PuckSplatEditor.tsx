@@ -929,10 +929,7 @@ function PublishButton({
       (b) => b.type === "Image" && !b.props?.imageUrl
     );
     if (emptyImages.length > 0) {
-      setPublishError(
-        `${emptyImages.length === 1 ? "An Image block has" : `${emptyImages.length} Image blocks have`} no image set. Add an image before publishing.`,
-      );
-      setTimeout(() => setPublishError(null), 5000);
+      window.dispatchEvent(new CustomEvent("pb:image-validation-failed"));
       return;
     }
 
@@ -975,10 +972,7 @@ function PublishButton({
   };
 
   return (
-    <InlineStack gap="200" align="center">
-      {publishError && (
-        <Text as="span" variant="bodySm" tone="critical">{publishError}</Text>
-      )}
+    <div style={{ position: "relative" }}>
       <Button
         variant="primary"
         loading={publishing}
@@ -987,7 +981,27 @@ function PublishButton({
       >
         Publish
       </Button>
-    </InlineStack>
+      {publishError && (
+        <div style={{
+          position: "absolute",
+          top: "calc(100% + 8px)",
+          right: 0,
+          background: "#fff",
+          border: "1px solid #fca5a5",
+          borderRadius: 6,
+          padding: "8px 12px",
+          fontSize: 12,
+          color: "#d72c0d",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+          zIndex: 9999,
+          maxWidth: 300,
+          lineHeight: 1.4,
+          whiteSpace: "normal" as any,
+        }}>
+          {publishError}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -21,7 +21,7 @@ import {
   Image,
   LayoutGrid,
   Menu,
-  MousePointerClick,
+  Upload,
   Pencil,
   ReceiptText,
   WalletCards,
@@ -123,7 +123,7 @@ export const COMPONENT_ICONS: Record<string, React.ReactNode> = {
   Video:      <Play size={24} strokeWidth={1.5} />,
 
   // UI
-  Button:       <MousePointerClick size={24} strokeWidth={1.5} />,
+  Button:       <Upload size={24} strokeWidth={1.5} />,
   Divider:      <SeparatorHorizontal size={24} strokeWidth={1.5} />,
   Spacer:       <Minus size={24} strokeWidth={1.5} />,
   Space:        <Minus size={24} strokeWidth={1.5} />,
