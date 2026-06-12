@@ -67,10 +67,6 @@ import {
   createSavedBlockComponents,
   savedBlockItemIds,
 } from "@/puck-splat/utils";
-import {
-  SECTION_TEMPLATES,
-  createSectionTemplateComponents,
-} from "@/puck-splat/section-templates";
 import { createGlobalSettingsPlugin } from "@/puck-splat/plugins/GlobalSettingsPlugin";
 import { GlobalSettingsProvider, useGlobalSettings } from "@/puck-splat/context/GlobalSettingsContext";
 import { IframeThemeInjector } from "@/puck-splat/components/IframeThemeInjector";
@@ -252,9 +248,6 @@ function DrawerItemOverride({ name }: { name: string }) {
 
   const isSaved = name.startsWith("SavedBlock_");
   const isGlobal = name.startsWith("GlobalBlock_");
-  const isSectionTemplate = name.startsWith("Section_");
-
-  const sectionTpl = isSectionTemplate ? SECTION_TEMPLATES[name] : null;
 
   const icon = isSaved
     ? <WalletCards />
@@ -267,9 +260,7 @@ function DrawerItemOverride({ name }: { name: string }) {
     ? name.replace("SavedBlock_", "")
     : isGlobal
       ? (globalBlocksNow.find((b) => `GlobalBlock_${b.id}` === name)?.name ?? name.replace("GlobalBlock_", ""))
-      : isSectionTemplate
-        ? (sectionTpl?.label ?? name.replace("Section_", "").replace(/_/g, " "))
-        : name;
+      : name;
 
   const savedBlock = isSaved ? savedBlocks.find((b) => `SavedBlock_${b.name}` === name) ?? null : null;
   const globalBlock = isGlobal ? globalBlocksNow.find((b) => `GlobalBlock_${b.id}` === name) ?? null : null;
@@ -283,11 +274,7 @@ function DrawerItemOverride({ name }: { name: string }) {
   const formatDisplayName = (n: string) =>
     n.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim();
 
-  // Section templates already have a clean label via displayName above.
-  // For everything else use the curated label map, then auto-format.
-  const formattedName = isSectionTemplate
-    ? displayName
-    : (COMPONENT_LABELS[displayName] ?? formatDisplayName(displayName));
+  const formattedName = COMPONENT_LABELS[displayName] ?? formatDisplayName(displayName);
 
   return (
     <div
@@ -382,12 +369,13 @@ function PuckCategorySync({ globalBlocks, savedBlocks }: { globalBlocks: { id: s
 
   useEffect(() => {
     const globalComponentNames = globalBlocks.map((b) => `GlobalBlock_${b.id}`);
-    const savedBlockNames = savedBlocks.map((b) => `SavedBlock_${b.name}`);
+    const savedBlockItems = savedBlocks.filter((b) => b.blockType !== "section");
+    const savedSectionItems = savedBlocks.filter((b) => b.blockType === "section");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (dispatch as any)({
       type: "setUi",
       ui: (prev: any) => {
-        const { global: prevGlobal, savedBlocks: prevSaved, ...restComponentList } = prev.componentList ?? {};
+        const { global: prevGlobal, savedBlocks: prevSaved, mySections: prevSections, ...restComponentList } = prev.componentList ?? {};
         return {
           componentList: {
             ...restComponentList,
@@ -401,12 +389,22 @@ function PuckCategorySync({ globalBlocks, savedBlocks }: { globalBlocks: { id: s
                   },
                 }
               : {}),
-            ...(savedBlockNames.length > 0
+            ...(savedBlockItems.length > 0
               ? {
                   savedBlocks: {
                     title: "Saved Blocks",
-                    components: savedBlockNames,
+                    components: savedBlockItems.map((b) => `SavedBlock_${b.name}`),
                     expanded: prevSaved?.expanded ?? true,
+                    visible: true,
+                  },
+                }
+              : {}),
+            ...(savedSectionItems.length > 0
+              ? {
+                  mySections: {
+                    title: "My Sections",
+                    components: savedSectionItems.map((b) => `SavedBlock_${b.name}`),
+                    expanded: prevSections?.expanded ?? true,
                     visible: true,
                   },
                 }
@@ -1217,9 +1215,6 @@ export default function PuckSplatEditor({
 
   const globalSettingsPlugin = useMemo(() => createGlobalSettingsPlugin(), []);
 
-  // Build section template components once (stable reference)
-  const sectionTemplateComponents = useMemo(() => createSectionTemplateComponents(), []);
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dynamicConfig: any = useMemo(() => {
     const globalComponentNames = globalBlocks.map((b) => `GlobalBlock_${b.id}`);
@@ -1228,8 +1223,8 @@ export default function PuckSplatEditor({
       ...savedBlocks.map((b) => `SavedBlock_${b.name}`),
     ];
 
-    // All section template keys in a single flat list
-    const allSectionKeys = Object.keys(SECTION_TEMPLATES);
+    const savedBlockItems = savedBlocks.filter((b) => b.blockType !== "section");
+    const savedSectionItems = savedBlocks.filter((b) => b.blockType === "section");
 
     return {
       ...config,
@@ -1242,24 +1237,19 @@ export default function PuckSplatEditor({
           ),
           defaultExpanded: true,
         },
-        // Single "Sections" category — all section templates in one dropdown
-        sections: {
-          title: "Sections",
-          components: allSectionKeys,
-          defaultExpanded: false,
-        },
         ...(globalComponentNames.length > 0
           ? { global: { title: "Global Blocks", components: globalComponentNames, defaultExpanded: true } }
           : {}),
-        ...(savedBlocks.length > 0
-          ? { savedBlocks: { title: "Saved Blocks", components: savedBlocks.map((b) => `SavedBlock_${b.name}`), defaultExpanded: true } }
+        ...(savedBlockItems.length > 0
+          ? { savedBlocks: { title: "Saved Blocks", components: savedBlockItems.map((b) => `SavedBlock_${b.name}`), defaultExpanded: true } }
+          : {}),
+        ...(savedSectionItems.length > 0
+          ? { mySections: { title: "My Sections", components: savedSectionItems.map((b) => `SavedBlock_${b.name}`), defaultExpanded: true } }
           : {}),
         _internal: { title: "Internal", components: ["GlobalBlock"], visible: false, defaultExpanded: false },
       },
       components: {
         ...config.components,
-        // Section template virtual components
-        ...sectionTemplateComponents,
         GlobalBlock: {
           ...config.components.GlobalBlock,
           fields: {},

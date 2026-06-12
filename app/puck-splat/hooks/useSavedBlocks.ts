@@ -50,11 +50,27 @@ export function useSavedBlocks(): UseSavedBlocksReturn {
       const clonedContent = deepCloneWithIds(block.content);
       collectSavedBlockIds(clonedContent);
 
+      // For container-type blocks (Section, Container, Grid) restore zone children.
+      // Zone keys contain the saved block's original id — remap them to the new cloned id.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const clonedZones: Record<string, any> = {};
+      if (block.blockType === "section" && block.zones && block.content[0]) {
+        const originalId = (block.content[0] as any).props?.id as string | undefined;
+        const newId = (clonedContent[0] as any)?.props?.id as string | undefined;
+        for (const [key, items] of Object.entries(block.zones)) {
+          // Replace old id in the zone key with the new cloned id
+          const remappedKey = originalId && newId ? key.replace(originalId, newId) : key;
+          clonedZones[remappedKey] = deepCloneWithIds(items as import("../types").BlockItem[]);
+        }
+      }
+
       dispatch({
         type: "setData",
         data: {
           ...appState.data,
           content: [...clonedContent, ...(appState.data.content ?? [])],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          zones: { ...(appState.data.zones ?? {}), ...clonedZones } as any,
         },
       });
     },

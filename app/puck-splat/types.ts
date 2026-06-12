@@ -9,6 +9,8 @@ export type SavedBlock = {
   id: string;
   name: string;
   content: BlockItem[];
+  zones: Record<string, BlockItem[]>;
+  blockType: "block" | "section";
   thumbnail?: string;
 };
 

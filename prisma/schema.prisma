@@ -55,6 +55,8 @@ model SavedBlock {
   shop      String
   name      String
   content   String   @default("[]")
+  zones     String   @default("{}")
+  blockType String   @default("block")
   thumbnail String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

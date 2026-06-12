@@ -17,8 +17,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   if (request.method === "POST") {
-    const { name, content, thumbnail } = await request.json();
-    const block = await createSavedBlock(session.shop, name, content, thumbnail);
+    const { name, content, zones, blockType, thumbnail } = await request.json();
+    const block = await createSavedBlock(session.shop, name, content, zones, blockType, thumbnail);
     return new Response(JSON.stringify(block), {
       status: 201,
       headers: { "Content-Type": "application/json" },

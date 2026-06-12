@@ -15367,7 +15367,7 @@ const SectionBlockComponent = {
           <BlockTabBar blockKey="SectionBlock">
             {(tab) => (
               <>
-                {/* ── LAYOUT TAB (columns + container sizing) ── */}
+                {/* ── LAYOUT TAB ── */}
                 {tab === "content" && (
                   <>
                     <TabSection title="Section" />
@@ -15381,39 +15381,6 @@ const SectionBlockComponent = {
                       <SliderNumberField label="Max Width" value={props.containerWidth ?? 1140} onChange={(v) => set("containerWidth", v)} min={320} max={1920} step={10} unit="PX" />
                     )}
                     <SliderNumberField label="Min Height" value={props.minHeightPx ?? 0} onChange={(v) => set("minHeightPx", v)} min={0} max={1200} step={10} unit="PX" />
-
-                    <TabSection title="Columns" />
-                    <InlineSelect
-                      label="Desktop"
-                      value={String(props.columns ?? 2)}
-                      onChange={(v) => set("columns", Number(v))}
-                      options={[{ value: "1", label: "1" }, { value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }, { value: "6", label: "6" }]}
-                    />
-                    <InlineSelect
-                      label="Tablet"
-                      value={String(props.columnsTablet ?? 2)}
-                      onChange={(v) => set("columnsTablet", Number(v))}
-                      options={[{ value: "1", label: "1" }, { value: "2", label: "2" }, { value: "3", label: "3" }]}
-                    />
-                    <InlineSelect
-                      label="Mobile"
-                      value={String(props.columnsMobile ?? 1)}
-                      onChange={(v) => set("columnsMobile", Number(v))}
-                      options={[{ value: "1", label: "1" }, { value: "2", label: "2" }]}
-                    />
-                    <SliderNumberField label="Column Gap" value={props.columnGapPx ?? 24} onChange={(v) => set("columnGapPx", v)} min={0} max={120} step={4} unit="PX" />
-                    <SliderNumberField label="Row Gap" value={props.rowGapPx ?? 24} onChange={(v) => set("rowGapPx", v)} min={0} max={120} step={4} unit="PX" />
-                    <IconButtonGroup
-                      label="Align Items"
-                      value={props.alignItems ?? "stretch"}
-                      onChange={(v) => set("alignItems", v)}
-                      options={[
-                        { value: "flex-start", title: "Top", icon: ALIGN_ICONS["flex-start"] },
-                        { value: "center",     title: "Center", icon: ALIGN_ICONS.center },
-                        { value: "flex-end",   title: "Bottom", icon: ALIGN_ICONS["flex-end"] },
-                        { value: "stretch",    title: "Stretch", icon: ALIGN_ICONS.stretch },
-                      ]}
-                    />
                   </>
                 )}
 
@@ -15553,8 +15520,7 @@ const SectionBlockComponent = {
   render: ({
     id: puckId,
     contentWidth, containerWidth, minHeightPx,
-    columns, columnsTablet, columnsMobile, columnGapPx, rowGapPx, alignItems,
-    bgType, bgColor, bgGrad1, bgGrad2, bgGradDir, bgGradAngle,
+    bgType, bgColor, bgGrad1, bgGrad2, bgGradDir: _bgGradDir, bgGradAngle,
     bgImage, bgSize, bgPos, bgRepeat, bgFixed,
     overlayType, overlayColor, overlayOpacity, overlayGrad1, overlayGrad2,
     bgVideo, bgVideoLoop, bgVideoMute,
@@ -15572,7 +15538,6 @@ const SectionBlockComponent = {
       hideMobile  ? "puck-hide-mobile"  : "",
     ].filter(Boolean).join(" ");
 
-    const cols = columns || 2;
     const br = borderRadius4 ?? { top: 0, right: 0, bottom: 0, left: 0 };
     const bw = borderWidth4  ?? { top: 1, right: 1, bottom: 1, left: 1 };
 
@@ -15659,21 +15624,7 @@ const SectionBlockComponent = {
       >
         {/* CSS */}
         {(animCss || customCss) && (
-          <style>{`
-            ${animCss}
-            #${uid} .puck-sec-grid { display:grid; grid-template-columns:repeat(${cols},1fr); gap:${rowGapPx ?? 24}px ${columnGapPx ?? 24}px; align-items:${alignItems || "stretch"}; }
-            @media(max-width:768px){ #${uid} .puck-sec-grid{ grid-template-columns:repeat(${columnsTablet || 1},1fr); } }
-            @media(max-width:480px){ #${uid} .puck-sec-grid{ grid-template-columns:repeat(${columnsMobile || 1},1fr); } }
-            ${customCss || ""}
-          `}</style>
-        )}
-        {/* Also inject grid CSS even when no animation / custom CSS */}
-        {!(animCss || customCss) && (
-          <style>{`
-            #${uid} .puck-sec-grid { display:grid; grid-template-columns:repeat(${cols},1fr); gap:${rowGapPx ?? 24}px ${columnGapPx ?? 24}px; align-items:${alignItems || "stretch"}; }
-            @media(max-width:768px){ #${uid} .puck-sec-grid{ grid-template-columns:repeat(${columnsTablet || 1},1fr); } }
-            @media(max-width:480px){ #${uid} .puck-sec-grid{ grid-template-columns:repeat(${columnsMobile || 1},1fr); } }
-          `}</style>
+          <style>{`${animCss}${customCss || ""}`}</style>
         )}
 
         {/* Background video */}
@@ -15696,15 +15647,9 @@ const SectionBlockComponent = {
         {dividerTop    !== "none" && renderDivider(dividerTop,    dividerTopColor,    dividerTopHeight,    !!dividerTopFlip,    "top")}
         {dividerBottom !== "none" && renderDivider(dividerBottom, dividerBottomColor, dividerBottomHeight, !!dividerBottomFlip, "bottom")}
 
-        {/* Boxed inner → grid columns */}
+        {/* Boxed inner → free-flow drop zone */}
         <div style={innerWrapStyle}>
-          <div className="puck-sec-grid">
-            {Array.from({ length: cols }).map((_, i) => (
-              <div key={i} style={{ minHeight: 60, boxSizing: "border-box" }}>
-                <DropZone zone={`section-${uid}-col-${i}`} />
-              </div>
-            ))}
-          </div>
+          <DropZone zone={`section-${uid}-content`} />
         </div>
       </div>
     );

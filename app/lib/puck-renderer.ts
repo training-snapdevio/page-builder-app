@@ -1527,26 +1527,36 @@ function renderGridBlock(p: Props, zones: Zones): string {
 function renderSectionBlock(p: Props, zones: Zones): string {
   const blockId = String(p.id ?? "");
   const uid = (p.cssId as string) || `pb-section-${blockId.slice(-8)}`;
-  const cols = Math.max(1, Number(p.columns ?? 1));
-  const colGap = `${p.columnGapPx ?? 32}px`;
-  const rowGap = `${p.rowGapPx ?? 32}px`;
-  const cells = Array.from({length: cols}, (_, i) => {
-    const zoneName = `section-${uid}-col-${i}`;
-    const content = zoneContent(blockId, zoneName, zones);
-    return `<div style="min-width:0">${renderBlocks(content as Block[], zones)}</div>`;
-  }).join("");
+  // Single free-flow zone — all blocks stack vertically inside the section
+  const zoneName = `section-${uid}-content`;
+  const content = zoneContent(blockId, zoneName, zones);
+  const blocksHtml = renderBlocks(content as Block[], zones);
   const pt = (p.advPadding as {top?:number}|undefined)?.top ?? 60;
-  const pb = (p.advPadding as {bottom?:number}|undefined)?.bottom ?? 60;
+  const pb_val = (p.advPadding as {bottom?:number}|undefined)?.bottom ?? 60;
   const pl = (p.advPadding as {left?:number}|undefined)?.left ?? 0;
   const pr = (p.advPadding as {right?:number}|undefined)?.right ?? 0;
-  const maxW = p.contentWidth === "boxed" ? `max-width:${p.containerWidth ?? 1140}px;margin:0 auto;` : "";
+  const mt = (p.advMargin as {top?:number}|undefined)?.top ?? 0;
+  const mb = (p.advMargin as {bottom?:number}|undefined)?.bottom ?? 0;
+  const ml = (p.advMargin as {left?:number}|undefined)?.left ?? 0;
+  const mr = (p.advMargin as {right?:number}|undefined)?.right ?? 0;
+  const maxW = p.contentWidth === "boxed" ? `max-width:${p.containerWidth ?? 1140}px;margin-left:auto;margin-right:auto;` : "";
+  const minH = p.minHeightPx && Number(p.minHeightPx) > 0 ? `min-height:${p.minHeightPx}px;` : "";
   let bg = "";
   if (p.bgType === "color" && p.bgColor) bg = `background-color:${esc(p.bgColor as string)};`;
   else if (p.bgType === "gradient" && p.bgGrad1 && p.bgGrad2)
     bg = `background:linear-gradient(${p.bgGradAngle ?? 180}deg,${esc(p.bgGrad1 as string)},${esc(p.bgGrad2 as string)});`;
   else if (p.bgType === "image" && p.bgImage)
-    bg = `background-image:url(${esc(p.bgImage as string)});background-size:cover;background-position:center;`;
-  return `<section style="position:relative;overflow:hidden;${bg}padding:${pt}px ${pr}px ${pb}px ${pl}px;box-sizing:border-box"><div style="${maxW}width:100%;box-sizing:border-box"><div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${rowGap} ${colGap}">${cells}</div></div></section>`;
+    bg = `background-image:url(${esc(p.bgImage as string)});background-size:${esc((p.bgSize as string)||"cover")};background-position:${esc((p.bgPos as string)||"center center")};background-repeat:${esc((p.bgRepeat as string)||"no-repeat")};${p.bgFixed?"background-attachment:fixed;":""}`;
+  // Border
+  const borderStyle = (p.borderStyle as string) || "none";
+  const bw = (p.borderWidth4 as any) ?? {top:1,right:1,bottom:1,left:1};
+  const bc = borderStyle !== "none" ? esc((p.borderColor as string)||"transparent") : "transparent";
+  const borderCss = borderStyle !== "none"
+    ? `border-style:${esc(borderStyle)};border-top-width:${bw.top??1}px;border-right-width:${bw.right??1}px;border-bottom-width:${bw.bottom??1}px;border-left-width:${bw.left??1}px;border-color:${bc};`
+    : "";
+  const br = (p.borderRadius4 as any) ?? {top:0,right:0,bottom:0,left:0};
+  const radiusCss = `border-radius:${br.top??0}px ${br.right??0}px ${br.bottom??0}px ${br.left??0}px;`;
+  return `<section style="position:relative;overflow:hidden;${bg}${borderCss}${radiusCss}${minH}padding:${pt}px ${pr}px ${pb_val}px ${pl}px;margin:${mt}px ${mr}px ${mb}px ${ml}px;box-sizing:border-box"><div style="${maxW}width:100%;box-sizing:border-box">${blocksHtml}</div></section>`;
 }
 
 // ─── New block renderers ──────────────────────────────────────────────────────
