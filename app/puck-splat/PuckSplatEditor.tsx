@@ -427,16 +427,13 @@ function SelectionTracker({
   onSelect,
   globalSelect,
   inspectorEnabled,
-  onBackgroundTypeChange,
 }: {
   onSelect: () => void;
   globalSelect: string | null;
   inspectorEnabled: boolean;
-  onBackgroundTypeChange?: (type: string) => void;
 }) {
   const { appState, dispatch } = usePuck();
   const prevRef = useRef(appState.ui.itemSelector);
-  const prevBgTypeRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (appState.ui.itemSelector && !prevRef.current) {
@@ -445,31 +442,6 @@ function SelectionTracker({
     prevRef.current = appState.ui.itemSelector;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appState.ui.itemSelector]);
-
-  // Watch for backgroundType changes on the selected Hero block
-  useEffect(() => {
-    if (onBackgroundTypeChange && appState.ui.itemSelector && (appState.data as any)?.content) {
-      const content = (appState.data as any).content;
-      let selectedItem: any = null;
-
-      // Find the selected item in content
-      for (let i = 0; i < content.length; i++) {
-        if (content[i]?.type === "Hero") {
-          selectedItem = content[i];
-          break;
-        }
-      }
-
-      if (selectedItem?.props?.backgroundType) {
-        const bgType = selectedItem.props.backgroundType;
-        if (bgType !== prevBgTypeRef.current) {
-          onBackgroundTypeChange(bgType);
-          prevBgTypeRef.current = bgType;
-        }
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appState.data, appState.ui.itemSelector, onBackgroundTypeChange]);
 
   useEffect(() => {
     // Inspector OFF keeps the right sidebar open (it renders a disabled state via
@@ -1130,7 +1102,6 @@ export default function PuckSplatEditor({
 
   // ── Hero block appearance field visibility ──────────────────────────────────
   // Track the selected backgroundType so we can show/hide related fields via dynamicConfig
-  const [heroBackgroundType, setHeroBackgroundType] = useState<string>("media");
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -1233,7 +1204,10 @@ export default function PuckSplatEditor({
           title: "Blocks",
           components: allDynamicComponentNames.filter(
             (k) => !k.startsWith("GlobalBlock_") && !k.startsWith("SavedBlock_") && k !== "GlobalBlock"
-              && k !== "GradientHero" && k !== "Accordian",
+              && k !== "GradientHero" && k !== "Accordian"
+              && k !== "AboutSection" && k !== "GallerySection" && k !== "ServiceSection"
+              && k !== "ContactSection" && k !== "TestimonialSection"
+              && k !== "Hero",
           ),
           defaultExpanded: true,
         },
@@ -1272,58 +1246,11 @@ export default function PuckSplatEditor({
             );
           },
         },
-        Hero: {
-          ...(config.components.Hero as any),
-          fields: {
-            ...(config.components.Hero?.fields ?? {}),
-            // Pattern and appearance fields only visible for color/gradient backgrounds
-            mediaSection: {
-              ...(config.components.Hero?.fields as any)?.mediaSection,
-              visible: heroBackgroundType === "media",
-            },
-            patternType: {
-              ...(config.components.Hero?.fields as any)?.patternType,
-              visible: heroBackgroundType !== "media",
-            },
-            patternColor: {
-              ...(config.components.Hero?.fields as any)?.patternColor,
-              visible: heroBackgroundType !== "media",
-            },
-            mediaType: {
-              ...(config.components.Hero?.fields as any)?.mediaType,
-              visible: heroBackgroundType === "media",
-            },
-            image: {
-              ...(config.components.Hero?.fields as any)?.image,
-              visible: heroBackgroundType === "media",
-            },
-            videoSettings: {
-              ...(config.components.Hero?.fields as any)?.videoSettings,
-              visible: heroBackgroundType === "media",
-            },
-            backgroundColor: {
-              ...(config.components.Hero?.fields as any)?.backgroundColor,
-              visible: heroBackgroundType !== "media",
-            },
-            gradientStartColor: {
-              ...(config.components.Hero?.fields as any)?.gradientStartColor,
-              visible: heroBackgroundType === "gradient",
-            },
-            gradientEndColor: {
-              ...(config.components.Hero?.fields as any)?.gradientEndColor,
-              visible: heroBackgroundType === "gradient",
-            },
-            gradientDirection: {
-              ...(config.components.Hero?.fields as any)?.gradientDirection,
-              visible: heroBackgroundType === "gradient",
-            },
-          },
-        } as any,
         ...createSavedBlockComponents(savedBlocks, config),
         ...createGlobalBlockComponents(globalBlocks as never, config),
       },
     };
-  }, [savedBlocks, globalBlocks, heroBackgroundType]);
+  }, [savedBlocks, globalBlocks]);
 
   const overrideContextValue: EditorOverrideContextValue = useMemo(
     () => ({
@@ -1520,7 +1447,6 @@ export default function PuckSplatEditor({
                   onSelect={() => setGlobalSelect(null)}
                   globalSelect={globalSelect}
                   inspectorEnabled={inspectorEnabled}
-                  onBackgroundTypeChange={setHeroBackgroundType}
                 />
                 {showSaveModal && <PuckContextModal onClose={() => setShowSaveModal(false)} />}
                 {showSaveAsGlobalModal && <SaveAsGlobalBlockModal onClose={() => setShowSaveAsGlobalModal(false)} />}

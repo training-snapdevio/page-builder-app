@@ -195,6 +195,38 @@ select._Sidebar--right_o396p_25 ._Input-input_bsxfo_26,
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08) !important;
 }
 
+/* ── Canvas scrolling ───────────────────────────────────────────────────── */
+/*                                                                             */
+/* Goal: scrollbar sits at the right edge of the white page, not outside it. */
+/*                                                                             */
+/* Puck's default: root is position:absolute + bottom:0 (locked to viewport  */
+/* height) inside an inner div that is height:100%.                           */
+/*                                                                             */
+/* Fix: switch the white page (root) to position:relative so it grows with   */
+/* content. Make the outer canvas the scroller — its scrollbar appears at the */
+/* right edge of the canvas grid cell, which is flush with the page edge.    */
+/* Hide the root's outline (it draws a vertical line in the gutter otherwise).*/
+
+._PuckCanvas_t6s9b_1 {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+._PuckCanvas-inner_t6s9b_33 {
+  height: auto !important;
+  min-height: 100% !important;
+  align-items: stretch !important;
+}
+
+._PuckCanvas-root_t6s9b_42 {
+  position: relative !important;
+  top: auto !important;
+  bottom: auto !important;
+  height: auto !important;
+  min-height: 100% !important;
+  outline: none !important;
+}
+
 /* ── Thin Scrollbars — App-wide ─────────────────────────────────────────── */
 * {
   scrollbar-width: thin;
@@ -250,4 +282,21 @@ html::-webkit-scrollbar {
   .puck-hide-mobile {
     display: none !important;
   }
+}
+
+/* ── Editor canvas: never hide "hide on desktop/tablet/mobile" blocks ─────── */
+/* The puck-hide-* classes are only meant to take effect on the storefront and  */
+/* preview page, NOT inside the editor canvas — editors need to see all blocks. */
+._PuckCanvas-root_t6s9b_42 .puck-hide-desktop,
+._PuckCanvas-root_t6s9b_42 .puck-hide-tablet,
+._PuckCanvas-root_t6s9b_42 .puck-hide-mobile {
+  display: unset !important;
+}
+
+/* ── Canvas scrollbar: align with right edge of the white page ────────────── */
+/* The canvas has padding all around (gray gutter). Removing the right padding  */
+/* makes the scrollbar sit flush with the page's right edge instead of floating */
+/* in the gray area to the right of it.                                         */
+._PuckCanvas_t6s9b_1 {
+  padding-right: 0 !important;
 }

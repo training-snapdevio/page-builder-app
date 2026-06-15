@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 
 import Modal from "@/components/modal";
+import { loadGoogleFont } from "@/puck-splat/utils";
 
 import type { GlobalSettings } from "@/lib/settings.server";
 
@@ -1148,26 +1149,42 @@ function FourSideField({
   label,
   value,
   onChange,
+  min = 0,
+  max = 200,
 }: {
   label: string;
   value?: { top?: number; right?: number; bottom?: number; left?: number };
   onChange: (v: { top: number; right: number; bottom: number; left: number }) => void;
+  min?: number;
+  max?: number;
 }) {
   const v = value ?? {};
   const t = v.top ?? 0, r = v.right ?? 0, b = v.bottom ?? 0, l = v.left ?? 0;
   const allEqual = t === r && r === b && b === l;
   const [linked, setLinked] = useState(allEqual);
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%", padding: "4px 2px", fontSize: 11, textAlign: "center",
-    border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-100, 4px)",
-    outline: "none", boxSizing: "border-box",
-    background: "var(--p-color-bg-surface)", color: "var(--p-color-text)",
-  };
-
-  const setAll = (n: number) => onChange({ top: n, right: n, bottom: n, left: n });
+  const clamp = (n: number) => Math.max(min, Math.min(max, n));
+  const setAll = (n: number) => { const c = clamp(n); onChange({ top: c, right: c, bottom: c, left: c }); };
   const setSide = (side: "top" | "right" | "bottom" | "left", n: number) =>
-    onChange({ top: t, right: r, bottom: b, left: l, [side]: n });
+    onChange({ top: t, right: r, bottom: b, left: l, [side]: clamp(n) });
+
+  const numBox = (val: number, onCh: (n: number) => void) => (
+    <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--p-color-border)", borderRadius: 6, background: "var(--p-color-bg-surface)", height: 28, overflow: "hidden", flexShrink: 0 }}>
+      <input
+        type="number"
+        value={val}
+        min={min}
+        max={max}
+        onChange={(e) => onCh(Number(e.target.value))}
+        style={{ width: 36, padding: "0 6px", fontSize: 12, fontWeight: 500, border: "none", outline: "none", background: "transparent", color: "var(--p-color-text)", textAlign: "right", MozAppearance: "textfield" } as any}
+      />
+      <span style={{ padding: "0 7px", fontSize: 11, fontWeight: 500, color: "var(--p-color-text-secondary)", background: "var(--p-color-bg-surface-secondary, #f6f6f7)", borderLeft: "1px solid var(--p-color-border)", height: "100%", display: "flex", alignItems: "center", userSelect: "none", flexShrink: 0 }}>
+        px
+      </span>
+    </div>
+  );
+
+  const fill = `${((t - min) / (max - min)) * 100}%`;
 
   return (
     <div style={{ marginBottom: 8 }}>
@@ -1194,31 +1211,36 @@ function FourSideField({
       </div>
 
       {linked ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 10, color: "var(--p-color-text-secondary)", whiteSpace: "nowrap" }}>All sides</span>
-          <input
-            type="number"
-            value={t}
-            min={0}
-            onChange={(e) => setAll(Number(e.target.value))}
-            style={inputStyle}
-          />
-          <span style={{ fontSize: 10, color: "var(--p-color-text-secondary)" }}>px</span>
-        </div>
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <input
+              type="range"
+              min={min}
+              max={max}
+              step={1}
+              value={t}
+              onChange={(e) => setAll(Number(e.target.value))}
+              style={{ flex: 1, minWidth: 0, cursor: "pointer", appearance: "none", WebkitAppearance: "none", height: 11, background: "transparent", outline: "none", border: "none", padding: 0, "--fill": fill } as any}
+            />
+            {numBox(t, (n) => setAll(n))}
+          </div>
+          <style>{`
+            input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:99px;background:linear-gradient(to right,#1a1a1a var(--fill,0%),#d1d5db var(--fill,0%))}
+            input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:#1a1a1a;cursor:pointer;margin-top:-4px;box-shadow:none}
+            input[type=range]::-moz-range-track{height:3px;border-radius:99px;background:#d1d5db}
+            input[type=range]::-moz-range-progress{height:3px;border-radius:99px;background:#1a1a1a}
+            input[type=range]::-moz-range-thumb{width:11px;height:11px;border-radius:50%;background:#1a1a1a;cursor:pointer;border:none}
+            input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+          `}</style>
+        </>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6 }}>
           {(["top", "right", "bottom", "left"] as const).map((side) => (
-            <div key={side} style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
+            <div key={side} style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
               <span style={{ fontSize: 10, color: "var(--p-color-text-secondary)" }}>
                 {side === "top" ? "T" : side === "right" ? "R" : side === "bottom" ? "B" : "L"}
               </span>
-              <input
-                type="number"
-                value={v[side] ?? 0}
-                min={0}
-                onChange={(e) => setSide(side, Number(e.target.value))}
-                style={inputStyle}
-              />
+              {numBox(v[side] ?? 0, (n) => setSide(side, n))}
             </div>
           ))}
         </div>
@@ -1289,134 +1311,6 @@ export type RootProps = {
 };
 
 type Props = {
-  Hero: {
-    title: string;
-
-    subtitle?: string;
-
-    badge?: string;
-
-    description: string;
-
-    rating?: number;
-
-    reviewCount?: number;
-
-    features?: {
-      text: string;
-    }[];
-
-    buttons: {
-      label: string;
-
-      link: string;
-
-      variant: "primary" | "secondary" | "outline";
-    }[];
-
-    image: {
-      url: string;
-
-      mode: "inline" | "bg" | "custom";
-
-      position: "left" | "right";
-    };
-
-    backgroundColor?: string;
-
-    gradientStartColor?: string;
-
-    gradientEndColor?: string;
-
-    gradientDirection?: string;
-
-    glassEffect?: boolean;
-
-    glassBlur?: number;
-
-    patternType?: "none" | "dots" | "grid" | "waves" | "geometric";
-
-    patternColor?: string;
-
-    textColor?: string;
-
-    videoUrl?: string;
-
-    videoLoop?: boolean;
-
-    videoMuted?: boolean;
-
-    floatingElements?: {
-      enabled: boolean;
-
-      elements: Array<{
-        type: "circle" | "square" | "triangle" | "blob";
-
-        size: number;
-
-        color: string;
-
-        position: { x: string; y: string };
-
-        animation: "float" | "pulse" | "rotate" | "bounce";
-      }>;
-    };
-
-    geometricShapes?: {
-      enabled: boolean;
-
-      shapes: Array<{
-        type: "circle" | "square" | "triangle" | "hexagon";
-
-        size: number;
-
-        color: string;
-
-        position: { x: string; y: string };
-
-        rotation: number;
-
-        opacity: number;
-      }>;
-    };
-
-    parallaxEffect?: {
-      enabled: boolean;
-
-      intensity: number;
-    };
-
-    fullscreen?: boolean;
-
-    padding: number;
-
-    align: "text-left" | "text-center" | "text-right";
-
-    overlayOpacity?: number;
-
-    verticalAlign?: "items-start" | "items-center" | "items-end";
-
-    contentWidth?: "max-w-md" | "max-w-xl" | "max-w-full";
-
-    // ── Slider Mode ────────────────────────────────────────────────────────────────
-
-    sliderEnabled?: boolean;
-
-    slides?: any[];
-
-    autoplay?: boolean;
-
-    interval?: number;
-
-    showArrows?: boolean;
-
-    showDots?: boolean;
-
-    pauseOnHover?: boolean;
-
-    transitionDuration?: number;
-  };
-
   MarqueeBar: {
     text: string;
 
@@ -1482,224 +1376,19 @@ type Props = {
     contentWidth?: "small" | "medium" | "large";
   };
 
-  AboutSection: {
-    // Content
-    badge?: string;
-    title: string;
-    subtitle?: string;
-    description?: string;
-    stats?: { value: string; label: string }[];
-    primaryButtonLabel?: string;
-    primaryButtonLink?: string;
-    secondaryButtonLabel?: string;
-    secondaryButtonLink?: string;
-    // Image
-    image?: { url?: string };
-    imagePosition?: "left" | "right" | "top";
-    imageStyle?: "square" | "rounded" | "circle";
-    imageRadius?: number;
-    imageHeight?: number;
-    imageShadow?: boolean;
-    // Layout
-    textAlign?: "left" | "center" | "right";
-    verticalAlign?: "top" | "center" | "bottom";
-    columnGap?: number;
-    maxWidth?: number;
-    padding?: number;
-    showStats?: boolean;
-    // Style / colors
-    backgroundColor?: string;
-    badgeColor?: string;
-    titleColor?: string;
-    subtitleColor?: string;
-    descriptionColor?: string;
-    statValueColor?: string;
-    statLabelColor?: string;
-    buttonColor?: string;
-    buttonTextColor?: string;
-  };
-
-
-
-
-
-
-  GallerySection: {
-    title?: string;
-
-    subtitle?: string;
-
-    columns: 2 | 3 | 4;
-
-    gap: number;
-
-    images: { url: string; caption?: string; alt?: string }[];
-
-    backgroundColor?: string;
-
-    textColor?: string;
-
-    padding?: number;
-  };
-
-  ServiceSection: {
-    title?: string;
-
-    subtitle?: string;
-
-    description?: string;
-
-    columns: 2 | 3 | 4;
-
-    cardStyle: "bordered" | "shadow" | "flat";
-
-    layoutStyle?:
-      | "standard"
-      | "image-top"
-      | "image-left"
-      | "image-right"
-      | "icon-center";
-
-    services: {
-      icon?: string;
-      title: string;
-      description: string;
-      linkLabel?: string;
-      link?: string;
-      image?: { url: string };
-    }[];
-
-    backgroundColor?: string;
-
-    padding?: number;
-
-    contentAlign?: "left" | "center" | "right";
-  };
-
-  ContactSection: {
-    title?: string;
-
-    subtitle?: string;
-
-    description?: string;
-
-    email?: string;
-
-    phone?: string;
-
-    address?: string;
-
-    showForm: boolean;
-
-    buttonLabel?: string;
-
-    backgroundColor?: string;
-
-    padding?: number;
-
-    layoutStyle?: "split" | "centered" | "full-width" | "grid" | "cards";
-
-    cardStyle?: "modern" | "minimal" | "glassmorphism" | "gradient" | "shadow";
-
-    image?: {
-      url?: string;
-
-      mode?: "inline" | "bg" | "custom";
-
-      position?: "left" | "right";
-    };
-
-    columns?: 1 | 2 | 3 | 4;
-
-    accentColor?: string;
-
-    backgroundPattern?: "dots" | "lines" | "gradient" | "geometric" | "none";
-
-    socialLinks?: { platform: string; url: string; icon?: string }[];
-
-    workingHours?: { days: string; hours: string }[];
-
-    responseTime?: string;
-
-    mapEmbed?: string;
-
-    hoverEffects?: boolean;
-
-    borderRadius?: number;
-
-    spacing?: "compact" | "normal" | "generous";
-
-    contentCentered?: boolean;
-
-    imagePosition?: "left" | "right" | "top" | "bottom";
-
-    overlayOpacity?: number;
-
-    labelName?: string;
-
-    labelEmail?: string;
-
-    labelSubject?: string;
-
-    labelMessage?: string;
-  };
-
-  TestimonialSection: {
-    title?: string;
-
-    subtitle?: string;
-
-    columns: 1 | 2 | 3;
-
-    testimonials: {
-      quote: string;
-      author: string;
-      role?: string;
-      avatar?: string;
-      rating?: number;
-    }[];
-
-    backgroundColor?: string;
-
-    padding?: number;
-
-    layoutStyle?: "standard" | "avatar-top" | "centered" | "minimal";
-
-    cardStyle?: "bordered" | "shadow" | "minimal" | "glass";
-
-    avatarSize?: "small" | "medium" | "large";
-
-    showQuotes?: boolean;
-
-    contentAlign?: "left" | "center" | "right";
-
-    cardBackgroundColor?: string;
-
-    accentColor?: string;
-
-    sliderEnabled?: boolean;
-
-    autoplay?: boolean;
-
-    interval?: number;
-
-    showArrows?: boolean;
-
-    showDots?: boolean;
-  };
-
   PhotoCollage: {
-    layout: "simple" | "mixed" | "hero" | "balanced";
-
+    layout: "mixed" | "grid" | "brick" | "carousel";
     images: { url: string; alt?: string }[];
-
     gap: number;
-
-    padding: number;
-
-    backgroundColor?: string;
-
-    borderRadius?: number;
+    borderRadius: number;
+    objectFit: "cover" | "contain" | "fill";
+    aspectRatio: "1:1" | "4:3" | "16:9" | "3:2";
+    hoverEffect: "none" | "zoom" | "darken";
+    boxShadow: boolean;
+    shadowStrength: "subtle" | "medium" | "strong";
+    hideDesktop: boolean;
+    hideTablet: boolean;
+    hideMobile: boolean;
   };
 };
 
@@ -3095,12 +2784,7 @@ const commonComponents: any = {
             type: "custom",
             label: "Facebook URL",
             render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Facebook URL"
-                value={value}
-                onChange={onChange}
-                placeholder="https://facebook.com"
-              />
+              <LinkUrlField label="Facebook URL" value={value} onChange={onChange} />
             ),
           },
 
@@ -3108,12 +2792,7 @@ const commonComponents: any = {
             type: "custom",
             label: "Twitter / X URL",
             render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Twitter/X URL"
-                value={value}
-                onChange={onChange}
-                placeholder="https://twitter.com"
-              />
+              <LinkUrlField label="Twitter/X URL" value={value} onChange={onChange} />
             ),
           },
 
@@ -3121,12 +2800,7 @@ const commonComponents: any = {
             type: "custom",
             label: "Instagram URL",
             render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Instagram URL"
-                value={value}
-                onChange={onChange}
-                placeholder="https://instagram.com"
-              />
+              <LinkUrlField label="Instagram URL" value={value} onChange={onChange} />
             ),
           },
 
@@ -3134,12 +2808,7 @@ const commonComponents: any = {
             type: "custom",
             label: "LinkedIn URL",
             render: ({ value, onChange }) => (
-              <StackedTextField
-                label="LinkedIn URL"
-                value={value}
-                onChange={onChange}
-                placeholder="https://linkedin.com"
-              />
+              <LinkUrlField label="LinkedIn URL" value={value} onChange={onChange} />
             ),
           },
 
@@ -3147,12 +2816,7 @@ const commonComponents: any = {
             type: "custom",
             label: "GitHub URL",
             render: ({ value, onChange }) => (
-              <StackedTextField
-                label="GitHub URL"
-                value={value}
-                onChange={onChange}
-                placeholder="https://github.com"
-              />
+              <LinkUrlField label="GitHub URL" value={value} onChange={onChange} />
             ),
           },
 
@@ -3160,12 +2824,7 @@ const commonComponents: any = {
             type: "custom",
             label: "YouTube URL",
             render: ({ value, onChange }) => (
-              <StackedTextField
-                label="YouTube URL"
-                value={value}
-                onChange={onChange}
-                placeholder="https://youtube.com"
-              />
+              <LinkUrlField label="YouTube URL" value={value} onChange={onChange} />
             ),
           },
 
@@ -3173,12 +2832,7 @@ const commonComponents: any = {
             type: "custom",
             label: "TikTok URL",
             render: ({ value, onChange }) => (
-              <StackedTextField
-                label="TikTok URL"
-                value={value}
-                onChange={onChange}
-                placeholder="https://tiktok.com"
-              />
+              <LinkUrlField label="TikTok URL" value={value} onChange={onChange} />
             ),
           },
         },
@@ -3683,2628 +3337,136 @@ const commonComponents: any = {
     },
   },
 
-  Hero: {
-    label: "Hero Banner",
-    fields: {
-      contentSection: {
-        type: "custom",
-        label: "Content Section",
-        render: () => (
-          <SettingsSectionHeader
-            title="Content"
-            description="Main text, trust indicators, features, and call-to-action buttons."
-            icon={<Type size={15} />}
-          />
-        ),
-      },
-
-      title: {
-        type: "custom",
-
-        label: "Title",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Title"
-            value={value}
-            onChange={onChange}
-            icon={null}
-            placeholder="Enter title..."
-          />
-        ),
-      },
-
-      subtitle: {
-        type: "custom",
-
-        label: "Subtitle",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Subtitle"
-            value={value}
-            onChange={onChange}
-            icon={null}
-            placeholder="Enter subtitle..."
-          />
-        ),
-      },
-
-      badge: {
-        type: "custom",
-
-        label: "Badge",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Badge"
-            value={value}
-            onChange={onChange}
-            icon={null}
-            placeholder="e.g., New Feature"
-          />
-        ),
-      },
-
-      description: {
-        type: "custom",
-        label: "Description",
-        render: ({ value, onChange }) => (
-          <StackedTextareaField
-            label="Description"
-            value={value ?? ""}
-            onChange={onChange}
-            icon={null}
-            placeholder="Enter description..."
-            rows={2}
-          />
-        ),
-      },
-
-      rating: {
-        type: "custom",
-
-        label: "Rating",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Rating"
-            value={value}
-            onChange={onChange}
-            icon={null}
-            min={0}
-            max={5}
-            step={0.1}
-            placeholder="e.g., 4.3"
-          />
-        ),
-      },
-
-      reviewCount: {
-        type: "custom",
-
-        label: "Review Count",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Review Count"
-            value={value}
-            onChange={onChange}
-            icon={null}
-            placeholder="e.g., 100"
-          />
-        ),
-      },
-
-      features: {
-        type: "array",
-
-        label: "Features",
-
-        getItemSummary: (item) => item.text || "Feature",
-
-        arrayFields: {
-          text: {
-            type: "custom",
-
-            label: "Feature Text",
-
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Feature Text"
-                value={value}
-                onChange={onChange}
-                icon={null}
-                placeholder="e.g., Free shipping"
-              />
-            ),
-          },
-        },
-      },
-
-      buttons: {
-        type: "array",
-
-        label: "Buttons",
-
-        getItemSummary: (item) => item.label || "Button",
-
-        arrayFields: {
-          label: {
-            type: "custom",
-
-            label: "Button Text",
-
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Button Text"
-                value={value}
-                onChange={onChange}
-                icon={null}
-                placeholder="e.g., Get Started"
-              />
-            ),
-          },
-
-          link: {
-            type: "custom",
-
-            label: "URL",
-
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="URL"
-                value={value}
-                onChange={onChange}
-                icon={null}
-                placeholder="e.g., /signup"
-              />
-            ),
-          },
-
-          variant: {
-            type: "custom",
-            label: "Button Style",
-            render: ({ value, onChange }) => (
-              <StackedField label="Button Style">
-                <select
-                  value={value ?? "primary"}
-                  onChange={(e) => onChange(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "5px 8px",
-                    fontSize: 12,
-                    border: "1px solid var(--p-color-border)",
-                    borderRadius: "var(--p-border-radius-100, 4px)",
-                    outline: "none",
-                    boxSizing: "border-box",
-                    background: "var(--p-color-bg-surface)",
-                    color: "var(--p-color-text)",
-                  }}
-                >
-                  <option value="primary">Primary</option>
-                  <option value="secondary">Secondary</option>
-                  <option value="outline">Outline</option>
-                </select>
-              </StackedField>
-            ),
-          },
-        },
-      },
-
-      layoutSection: {
-        type: "custom",
-        label: "Layout Section",
-        render: () => (
-          <SettingsSectionHeader
-            title="Layout"
-            description="Control spacing, alignment, content width, and overall hero sizing."
-            icon={<LayoutGrid size={15} />}
-          />
-        ),
-      },
-
-      padding: {
-        type: "custom",
-
-        label: "Padding (px)",
-
-        render: ({ value, onChange }) => (
-          <StackedField
-            label="Padding (px)"
-          >
-            <input
-              type="number"
-              value={value}
-              onChange={(e) => onChange(Number(e.target.value))}
-              style={{
-                width: "100%",
-
-                padding: "8px 12px",
-
-                fontSize: 14,
-
-                border: "1px solid #d1d5db",
-
-                borderRadius: 6,
-
-                outline: "none",
-              }}
-            />
-          </StackedField>
-        ),
-      },
-
-      align: {
-        type: "custom",
-
-        label: "Text Align",
-
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value}
-            onChange={onChange}
-            label="Text Align"
-            labelIcon={<AlignJustify size={14} />}
-          />
-        ),
-      },
-
-      overlayOpacity: {
-        type: "custom",
-
-        label: "Overlay Opacity (0–1)",
-
-        // Only relevant when there's a background image or video behind the text
-        visible: ({ props }) =>
-          (props.backgroundType ?? "media") === "media" &&
-          (props.mediaType === "video" || (props.image as any)?.mode === "bg"),
-
-        render: ({ value, onChange }) => (
-          <StackedField
-            label="Overlay Opacity (0–1)"
-          >
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              max="1"
-              value={value}
-              onChange={(e) => onChange(Number(e.target.value))}
-              style={{
-                width: "100%",
-
-                padding: "8px 12px",
-
-                fontSize: 14,
-
-                border: "1px solid #d1d5db",
-
-                borderRadius: 6,
-
-                outline: "none",
-              }}
-            />
-          </StackedField>
-        ),
-      },
-
-      verticalAlign: {
-        type: "custom",
-
-        label: "Vertical Align",
-
-        render: ({ value, onChange }) => (
-          <StackedField label="Vertical Align">
-            <select
-              value={value ?? "items-center"}
-              onChange={(e) => onChange(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "5px 8px",
-                fontSize: 12,
-                border: "1px solid var(--p-color-border)",
-                borderRadius: "var(--p-border-radius-100, 4px)",
-                outline: "none",
-                boxSizing: "border-box",
-                background: "var(--p-color-bg-surface)",
-                color: "var(--p-color-text)",
-              }}
-            >
-              <option value="items-start">Top</option>
-              <option value="items-center">Center</option>
-              <option value="items-end">Bottom</option>
-            </select>
-          </StackedField>
-        ),
-      },
-
-      textPosition: {
-        type: "custom",
-
-        label: "Text Position (for BG image)",
-
-        // Only relevant when image is in background mode or video is the background
-        visible: ({ props }) =>
-          (props.backgroundType ?? "media") === "media" &&
-          (props.mediaType === "video" || (props.image as any)?.mode === "bg"),
-
-        render: ({ value, onChange }) => (
-          <StackedField label="Text Position (BG)">
-            <select
-              value={value ?? "justify-center"}
-              onChange={(e) => onChange(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "5px 8px",
-                fontSize: 12,
-                border: "1px solid var(--p-color-border)",
-                borderRadius: "var(--p-border-radius-100, 4px)",
-                outline: "none",
-                boxSizing: "border-box",
-                background: "var(--p-color-bg-surface)",
-                color: "var(--p-color-text)",
-              }}
-            >
-              <option value="justify-start">Top</option>
-              <option value="justify-center">Center</option>
-              <option value="justify-end">Bottom</option>
-            </select>
-          </StackedField>
-        ),
-      },
-
-      contentWidth: {
-        type: "custom",
-
-        label: "Content Width",
-
-        render: ({ value, onChange }) => (
-          <StackedField label="Content Width">
-            <select
-              value={value ?? "max-w-xl"}
-              onChange={(e) => onChange(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "5px 8px",
-                fontSize: 12,
-                border: "1px solid var(--p-color-border)",
-                borderRadius: "var(--p-border-radius-100, 4px)",
-                outline: "none",
-                boxSizing: "border-box",
-                background: "var(--p-color-bg-surface)",
-                color: "var(--p-color-text)",
-              }}
-            >
-              <option value="max-w-md">Small</option>
-              <option value="max-w-xl">Medium</option>
-              <option value="max-w-full">Full</option>
-            </select>
-          </StackedField>
-        ),
-      },
-
-      textColor: {
-        type: "custom",
-
-        label: "Text Color",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Text Color"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      appearanceSection: {
-        type: "custom",
-        label: "Appearance Section",
-        render: () => (
-          <SettingsSectionHeader
-            title="Appearance"
-            description="Adjust background, colors, overlay, gradients, and decorative patterns."
-            icon={<Sparkles size={15} />}
-          />
-        ),
-      },
-
-      backgroundType: {
-        type: "custom",
-        label: "Background Type",
-        render: ({ value, onChange }) => (
-          <StackedField label="Background Type">
-            <select
-              value={value ?? "media"}
-              onChange={(e) => onChange(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "5px 8px",
-                fontSize: 12,
-                border: "1px solid var(--p-color-border)",
-                borderRadius: "var(--p-border-radius-100, 4px)",
-                outline: "none",
-                boxSizing: "border-box",
-                background: "var(--p-color-bg-surface)",
-                color: "var(--p-color-text)",
-              }}
-            >
-              <option value="media">Media (Image / Video)</option>
-              <option value="color">Background Color</option>
-              <option value="gradient">Gradient Color</option>
-            </select>
-          </StackedField>
-        ),
-      },
-
-      mediaSection: {
-        type: "custom",
-        label: "Media Section",
-        visible: ({ props }) => (props.backgroundType ?? "media") === "media",
-        render: () => (
-          <SettingsSectionHeader
-            title="Media"
-            description="Manage the hero image and optional background video together."
-            icon={<ImageIcon size={15} />}
-          />
-        ),
-      },
-
-      mediaType: {
-        type: "custom",
-        label: "Media Type",
-        visible: ({ props }) => (props.backgroundType ?? "media") === "media",
-        render: ({ value, onChange }) => (
-          <StackedField label="Media Type">
-            <select
-              value={value ?? "image"}
-              onChange={(e) => onChange(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "5px 8px",
-                fontSize: 12,
-                border: "1px solid var(--p-color-border)",
-                borderRadius: "var(--p-border-radius-100, 4px)",
-                outline: "none",
-                boxSizing: "border-box",
-                background: "var(--p-color-bg-surface)",
-                color: "var(--p-color-text)",
-              }}
-            >
-              <option value="image">Image</option>
-              <option value="video">Video</option>
-            </select>
-          </StackedField>
-        ),
-      },
-
-      image: {
-        type: "custom",
-        label: "Image",
-        visible: ({ props }) =>
-          (props.backgroundType ?? "media") === "media" &&
-          (props.mediaType ?? "image") === "image",
-        render: ({ value, onChange }) => {
-          const imgVal = value ?? {};
-          const currentMode = imgVal.mode ?? "inline";
-          return (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <imageUploadField.render
-                value={imgVal.url ?? ""}
-                onChange={(url: string) => onChange({ ...imgVal, url })}
-                field={{ label: "Image", previewLayout: "standard" }}
-              />
-              <AlignField
-                value={currentMode}
-                onChange={(mode: string) => onChange({ ...imgVal, mode })}
-                label="Mode"
-                labelIcon={<Layers size={14} />}
-                options={[
-                  { value: "inline", icon: <ImageIcon size={15} />, title: "Inline" },
-                  { value: "bg",     icon: <Layers    size={15} />, title: "Background" },
-                  { value: "custom", icon: <Settings2 size={15} />, title: "Custom" },
-                ]}
-              />
-              {currentMode === "custom" && (
-                <AlignField
-                  value={imgVal.position ?? "left"}
-                  onChange={(position: string) => onChange({ ...imgVal, position })}
-                  label="Position"
-                  options={[
-                    { value: "left",  icon: <PanelLeft  size={15} />, title: "Left"  },
-                    { value: "right", icon: <PanelRight size={15} />, title: "Right" },
-                  ]}
-                />
-              )}
-            </div>
-          );
-        },
-      },
-
-      videoSettings: {
-        type: "custom",
-        label: "Video Settings",
-        visible: ({ props }) =>
-          (props.backgroundType ?? "media") === "media" &&
-          props.mediaType === "video",
-        render: ({ value, onChange }) => {
-          const vidVal = value ?? {};
-          return (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <videoUploadField.render
-                value={vidVal.url ?? ""}
-                onChange={(url: string) => onChange({ ...vidVal, url })}
-                field={{ label: "Background Video" }}
-              />
-              {vidVal.url && (
-                <>
-                  <ToggleField
-                    label="Autoplay"
-                    value={vidVal.autoplay !== false}
-                    onChange={(autoplay: boolean) => onChange({ ...vidVal, autoplay })}
-                  />
-                  <ToggleField
-                    label="Loop Video"
-                    value={vidVal.loop !== false}
-                    onChange={(loop: boolean) => onChange({ ...vidVal, loop })}
-                  />
-                  <ToggleField
-                    label="Mute Video"
-                    value={vidVal.muted !== false}
-                    onChange={(muted: boolean) => onChange({ ...vidVal, muted })}
-                  />
-                </>
-              )}
-            </div>
-          );
-        },
-      },
-
-      backgroundColor: {
-        type: "custom",
-
-        label: "Background Color",
-
-        visible: ({ props }) => (props.backgroundType ?? "media") === "color",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Background Color"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      gradientStartColor: {
-        type: "custom",
-
-        label: "Gradient Start Color",
-
-        visible: ({ props }) => (props.backgroundType ?? "media") === "gradient",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Gradient Start Color"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      gradientEndColor: {
-        type: "custom",
-
-        label: "Gradient End Color",
-
-        visible: ({ props }) => (props.backgroundType ?? "media") === "gradient",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Gradient End Color"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      gradientDirection: {
-        type: "custom",
-
-        label: "Gradient Angle",
-
-        visible: ({ props }) => (props.backgroundType ?? "media") === "gradient",
-
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value ?? "135deg"}
-            onChange={onChange}
-            label="Gradient Angle"
-            layout="stacked"
-            options={[
-              { value: "0deg", icon: <ArrowUp size={15} />, title: "↑ Top" },
-              { value: "45deg", icon: <ArrowUp size={15} />, title: "↗ Top Right" },
-              { value: "90deg", icon: <ArrowRight size={15} />, title: "→ Right" },
-              { value: "135deg", icon: <ArrowUp size={15} />, title: "↘ Bottom Right" },
-              { value: "180deg", icon: <ArrowDown size={15} />, title: "↓ Bottom" },
-            ]}
-          />
-        ),
-      },
-
-      patternType: {
-        type: "custom",
-
-        label: "Background Pattern",
-
-        visible: ({ props }) =>
-          (props.backgroundType ?? "media") === "color" ||
-          (props.backgroundType ?? "media") === "gradient",
-
-        render: ({ value, onChange }) => (
-          <StackedField label="Pattern Type">
-            <select
-              value={value ?? "none"}
-              onChange={(e) => onChange(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "5px 8px",
-                fontSize: 12,
-                border: "1px solid var(--p-color-border)",
-                borderRadius: "var(--p-border-radius-100, 4px)",
-                outline: "none",
-                boxSizing: "border-box",
-                background: "var(--p-color-bg-surface)",
-                color: "var(--p-color-text)",
-              }}
-            >
-              <option value="none">None</option>
-              <option value="dots">Dots</option>
-              <option value="grid">Grid</option>
-              <option value="waves">Waves</option>
-              <option value="geometric">Geometric</option>
-              <option value="diagonal">Diagonal Lines</option>
-              <option value="crosshatch">Crosshatch</option>
-              <option value="zigzag">Zigzag</option>
-              <option value="checkerboard">Checkerboard</option>
-              <option value="circles">Circles</option>
-            </select>
-          </StackedField>
-        ),
-      },
-
-      patternColor: {
-        type: "custom",
-
-        label: "Pattern Color",
-
-        visible: ({ props }) =>
-          (props?.patternType ?? "none") !== "none" &&
-          (
-            (props.backgroundType ?? "media") === "color" ||
-            (props.backgroundType ?? "media") === "gradient"
-          ),
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Pattern Color"
-            value={value ?? "rgba(0,0,0,0.1)"}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      fullscreen: {
-        type: "custom",
-
-        label: "Full Screen",
-
-        render: ({ value, onChange }) => (
-          <ToggleField
-            label="Full Screen Hero"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      sliderSection: {
-        type: "custom",
-        label: "Slider Section",
-        visible: ({ props }) => !!props?.sliderEnabled,
-        render: () => (
-          <SettingsSectionHeader
-            title="Slider"
-            description="Enable rotating slides and tune autoplay, timing, and navigation controls."
-            icon={<Video size={15} />}
-          />
-        ),
-      },
-
-      // ── Slider Section ─────────────────────────────────────────────────────────
-
-      sliderEnabled: {
-        type: "custom",
-
-        label: "Enable Hero Slider",
-
-        render: ({ value, onChange }) => (
-          <ToggleField
-            label="Enable Hero Slider"
-            value={!!value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      slides: {
-        type: "array",
-
-        label: "Hero Slides (for Slider Mode)",
-
-        visible: ({ props }) => !!props?.sliderEnabled,
-
-        getItemSummary: (item) => item.title || item.subtitle || "Slide",
-
-        arrayFields: {
-          title: {
-            type: "custom",
-            label: "Title",
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Title"
-                value={value ?? ""}
-                onChange={onChange}
-                icon={null}
-                placeholder="Slide title..."
-              />
-            ),
-          },
-
-          subtitle: {
-            type: "custom",
-            label: "Subtitle",
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Subtitle"
-                value={value ?? ""}
-                onChange={onChange}
-                icon={null}
-                placeholder="Slide subtitle..."
-              />
-            ),
-          },
-
-          badge: {
-            type: "custom",
-            label: "Badge",
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Badge"
-                value={value ?? ""}
-                onChange={onChange}
-                icon={null}
-                placeholder="e.g., New"
-              />
-            ),
-          },
-
-          description: { type: "richtext" },
-
-          rating: {
-            type: "custom",
-            label: "Rating",
-            render: ({ value, onChange }) => (
-              <StackedNumberField
-                label="Rating"
-                value={value}
-                onChange={onChange}
-                icon={null}
-                min={0}
-                max={5}
-                step={0.1}
-                placeholder="e.g., 4.3"
-              />
-            ),
-          },
-
-          reviewCount: {
-            type: "custom",
-            label: "Review Count",
-            render: ({ value, onChange }) => (
-              <StackedNumberField
-                label="Review Count"
-                value={value}
-                onChange={onChange}
-                icon={null}
-                placeholder="e.g., 100"
-              />
-            ),
-          },
-
-          features: {
-            type: "array",
-            label: "Features",
-            getItemSummary: (item) => item.text || "Feature",
-            arrayFields: {
-              text: {
-                type: "custom",
-                label: "Feature Text",
-                render: ({ value, onChange }) => (
-                  <StackedTextField
-                    label="Feature Text"
-                    value={value ?? ""}
-                    onChange={onChange}
-                    icon={null}
-                    placeholder="e.g., Free shipping"
-                  />
-                ),
-              },
-            },
-          },
-
-          buttons: {
-            type: "array",
-            label: "Buttons",
-            getItemSummary: (item) => item.label || "Button",
-            arrayFields: {
-              label: {
-                type: "custom",
-                label: "Button Text",
-                render: ({ value, onChange }) => (
-                  <StackedTextField
-                    label="Button Text"
-                    value={value ?? ""}
-                    onChange={onChange}
-                    icon={null}
-                    placeholder="e.g., Get Started"
-                  />
-                ),
-              },
-              link: {
-                type: "custom",
-                label: "URL",
-                render: ({ value, onChange }) => (
-                  <StackedTextField
-                    label="URL"
-                    value={value ?? ""}
-                    onChange={onChange}
-                    icon={null}
-                    placeholder="e.g., /signup"
-                  />
-                ),
-              },
-              variant: {
-                type: "select",
-                label: "Variant",
-                options: [
-                  { label: "Primary", value: "primary" },
-                  { label: "Secondary", value: "secondary" },
-                  { label: "Outline", value: "outline" },
-                ],
-              },
-            },
-          },
-
-          image: {
-            type: "object",
-            label: "Image",
-            objectFields: {
-              url: {
-                type: "custom",
-                label: "Image",
-                render: ({ value, onChange }) => (
-                  <imageUploadField.render
-                    value={value}
-                    onChange={onChange}
-                    field={{ label: "Image", previewLayout: "standard" }}
-                  />
-                ),
-              },
-              mode: {
-                type: "custom",
-                label: "Mode",
-                render: ({ value, onChange }) => (
-                  <AlignField
-                    value={value}
-                    onChange={onChange}
-                    label="Mode"
-                    options={[
-                      {
-                        value: "inline",
-                        icon: <ImageIcon size={15} />,
-                        title: "Inline",
-                      },
-                      {
-                        value: "bg",
-                        icon: <Layers size={15} />,
-                        title: "Background",
-                      },
-                      {
-                        value: "custom",
-                        icon: <Settings2 size={15} />,
-                        title: "Custom",
-                      },
-                    ]}
-                  />
-                ),
-              },
-              position: {
-                type: "custom",
-                label: "Position",
-                render: ({ value, onChange }) => (
-                  <AlignField
-                    value={value}
-                    onChange={onChange}
-                    label="Position"
-                    options={[
-                      {
-                        value: "left",
-                        icon: <PanelLeft size={15} />,
-                        title: "Left",
-                      },
-                      {
-                        value: "right",
-                        icon: <PanelRight size={15} />,
-                        title: "Right",
-                      },
-                    ]}
-                  />
-                ),
-              },
-            },
-          },
-
-          videoSettings: {
-            type: "custom",
-            label: "Video Settings",
-            visible: ({ props }) => props.mediaType === "video",
-            render: ({ value, onChange }) => {
-              const v = value ?? {};
-              return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <videoUploadField.render
-                    value={v.url ?? ""}
-                    onChange={(url: string) => onChange({ ...v, url })}
-                    field={{ label: "Background Video" }}
-                  />
-                  {v.url && (
-                    <>
-                      <ToggleField label="Autoplay"    value={v.autoplay !== false} onChange={(autoplay: boolean) => onChange({ ...v, autoplay })} />
-                      <ToggleField label="Loop Video"  value={v.loop    !== false} onChange={(loop: boolean)    => onChange({ ...v, loop    })} />
-                      <ToggleField label="Mute Video"  value={v.muted   !== false} onChange={(muted: boolean)   => onChange({ ...v, muted   })} />
-                    </>
-                  )}
-                </div>
-              );
-            },
-          },
-
-          backgroundColor: {
-            type: "custom",
-            label: "Background Color",
-            render: ({ value, onChange }) => (
-              <ColorPickerField
-                label="Background Color"
-                value={value}
-                onChange={onChange}
-              />
-            ),
-          },
-
-          overlayOpacity: {
-            type: "custom",
-            label: "Overlay Opacity (0–1)",
-            render: ({ value, onChange }) => (
-              <StackedNumberField
-                label="Overlay Opacity (0–1)"
-                value={value}
-                onChange={onChange}
-                min={0}
-                max={1}
-                placeholder="e.g., 0.4"
-              />
-            ),
-          },
-
-          gradientStartColor: {
-            type: "custom",
-            label: "Gradient Start",
-            render: ({ value, onChange }) => (
-              <ColorPickerField
-                label="Gradient Start"
-                value={value}
-                onChange={onChange}
-              />
-            ),
-          },
-
-          gradientEndColor: {
-            type: "custom",
-            label: "Gradient End",
-            render: ({ value, onChange }) => (
-              <ColorPickerField
-                label="Gradient End"
-                value={value}
-                onChange={onChange}
-              />
-            ),
-          },
-
-          gradientDirection: {
-            type: "custom",
-            label: "Gradient Angle",
-            render: ({ value, onChange }) => (
-              <AlignField
-                value={value ?? "135deg"}
-                onChange={onChange}
-                label="Gradient Angle"
-                layout="stacked"
-                options={[
-                  { value: "0deg", icon: <ArrowUp size={15} />, title: "↑ Top" },
-                  { value: "45deg", icon: <ArrowUp size={15} />, title: "↗ Top Right" },
-                  { value: "90deg", icon: <ArrowRight size={15} />, title: "→ Right" },
-                  { value: "135deg", icon: <ArrowUp size={15} />, title: "↘ Bottom Right" },
-                  { value: "180deg", icon: <ArrowDown size={15} />, title: "↓ Bottom" },
-                ]}
-              />
-            ),
-          },
-
-          patternType: {
-            type: "custom",
-            label: "Background Pattern",
-            render: ({ value, onChange }) => (
-              <AlignField
-                value={value}
-                onChange={onChange}
-                label="Pattern Type"
-                options={[
-                  { value: "none", icon: <Square size={15} />, title: "None" },
-                  {
-                    value: "dots",
-                    icon: <span style={{ fontSize: 12 }}>•••</span>,
-                    title: "Dots",
-                  },
-                  {
-                    value: "grid",
-                    icon: <span style={{ fontSize: 12 }}>⊞</span>,
-                    title: "Grid",
-                  },
-                  {
-                    value: "waves",
-                    icon: <span style={{ fontSize: 12 }}>〰</span>,
-                    title: "Waves",
-                  },
-                  {
-                    value: "geometric",
-                    icon: <span style={{ fontSize: 12 }}>◇</span>,
-                    title: "Geometric",
-                  },
-                ]}
-              />
-            ),
-          },
-
-          patternColor: {
-            type: "custom",
-            label: "Pattern Color",
-            render: ({ value, onChange }) => (
-              <ColorPickerField
-                label="Pattern Color"
-                value={value ?? "rgba(0,0,0,0.1)"}
-                onChange={onChange}
-              />
-            ),
-          },
-
-          textColor: {
-            type: "custom",
-            label: "Text Color",
-            render: ({ value, onChange }) => (
-              <ColorPickerField
-                label="Text Color"
-                value={value}
-                onChange={onChange}
-              />
-            ),
-          },
-
-          padding: {
-            type: "custom",
-            label: "Padding (px)",
-            render: ({ value, onChange }) => (
-              <StackedNumberField
-                label="Padding (px)"
-                value={value ?? 80}
-                onChange={onChange}
-                placeholder="e.g., 80"
-              />
-            ),
-          },
-
-          align: {
-            type: "custom",
-            label: "Text Align",
-            render: ({ value, onChange }) => (
-              <AlignField
-                value={value}
-                onChange={onChange}
-                label="Text Align"
-              />
-            ),
-          },
-
-          verticalAlign: {
-            type: "custom",
-            label: "Vertical Align",
-            render: ({ value, onChange }) => (
-              <AlignField
-                value={value}
-                onChange={onChange}
-                label="Vertical Align"
-                options={[
-                  {
-                    value: "items-start",
-                    icon: <AlignVerticalJustifyStart size={15} />,
-                    title: "Top",
-                  },
-                  {
-                    value: "items-center",
-                    icon: <AlignVerticalJustifyCenter size={15} />,
-                    title: "Center",
-                  },
-                  {
-                    value: "items-end",
-                    icon: <AlignVerticalJustifyEnd size={15} />,
-                    title: "Bottom",
-                  },
-                ]}
-              />
-            ),
-          },
-
-          contentWidth: {
-            type: "custom",
-            label: "Content Width",
-            render: ({ value, onChange }) => (
-              <AlignField
-                value={value}
-                onChange={onChange}
-                label="Content Width"
-                options={[
-                  {
-                    value: "max-w-md",
-                    icon: (
-                      <span style={{ display: "flex", alignItems: "center" }}>
-                        <span
-                          style={{
-                            width: 10,
-                            height: 4,
-                            background: "currentColor",
-                            borderRadius: 2,
-                            display: "inline-block",
-                          }}
-                        />
-                      </span>
-                    ),
-                    title: "Small",
-                  },
-                  {
-                    value: "max-w-xl",
-                    icon: (
-                      <span style={{ display: "flex", alignItems: "center" }}>
-                        <span
-                          style={{
-                            width: 16,
-                            height: 4,
-                            background: "currentColor",
-                            borderRadius: 2,
-                            display: "inline-block",
-                          }}
-                        />
-                      </span>
-                    ),
-                    title: "Medium",
-                  },
-                  {
-                    value: "max-w-full",
-                    icon: (
-                      <span style={{ display: "flex", alignItems: "center" }}>
-                        <span
-                          style={{
-                            width: 22,
-                            height: 4,
-                            background: "currentColor",
-                            borderRadius: 2,
-                            display: "inline-block",
-                          }}
-                        />
-                      </span>
-                    ),
-                    title: "Full",
-                  },
-                ]}
-              />
-            ),
-          },
-
-          textPosition: {
-            type: "custom",
-            label: "Text Position (BG)",
-            render: ({ value, onChange }) => (
-              <AlignField
-                value={value ?? "justify-center"}
-                onChange={onChange}
-                label="Text Position (BG)"
-                options={[
-                  { value: "justify-start",  icon: <AlignVerticalJustifyStart  size={15} />, title: "Top"    },
-                  { value: "justify-center", icon: <AlignVerticalJustifyCenter size={15} />, title: "Center" },
-                  { value: "justify-end",    icon: <AlignVerticalJustifyEnd    size={15} />, title: "Bottom" },
-                ]}
-              />
-            ),
-          },
-
-          mediaType: {
-            type: "custom",
-            label: "Media Type",
-            render: ({ value, onChange }) => (
-              <StackedField label="Media Type">
-                <select
-                  value={value ?? "image"}
-                  onChange={(e) => onChange(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "5px 8px",
-                    fontSize: 12,
-                    border: "1px solid var(--p-color-border)",
-                    borderRadius: "var(--p-border-radius-100, 4px)",
-                    outline: "none",
-                    boxSizing: "border-box",
-                    background: "var(--p-color-bg-surface)",
-                    color: "var(--p-color-text)",
-                  }}
-                >
-                  <option value="image">Image</option>
-                  <option value="video">Video</option>
-                </select>
-              </StackedField>
-            ),
-          },
-
-          backgroundType: {
-            type: "custom",
-            label: "Background Type",
-            render: ({ value, onChange }) => (
-              <StackedField label="Background Type">
-                <select
-                  value={value ?? "media"}
-                  onChange={(e) => onChange(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "5px 8px",
-                    fontSize: 12,
-                    border: "1px solid var(--p-color-border)",
-                    borderRadius: "var(--p-border-radius-100, 4px)",
-                    outline: "none",
-                    boxSizing: "border-box",
-                    background: "var(--p-color-bg-surface)",
-                    color: "var(--p-color-text)",
-                  }}
-                >
-                  <option value="media">Media (Image / Video)</option>
-                  <option value="color">Background Color</option>
-                  <option value="gradient">Gradient Color</option>
-                </select>
-              </StackedField>
-            ),
-          },
-
-          fullscreen: {
-            type: "custom",
-            label: "Full Screen",
-            render: ({ value, onChange }) => (
-              <ToggleField label="Full Screen Slide" value={!!value} onChange={onChange} />
-            ),
-          },
-
-        },
-      },
-
-      autoplay: {
-        type: "custom",
-
-        label: "Autoplay",
-
-        visible: ({ props }) => !!props?.sliderEnabled,
-
-        render: ({ value, onChange }) => {
-          const sliderOn = (() => {
-            try {
-              const puck = usePuck();
-
-              const selectedId = puck?.appState?.ui?.selectedItem?.id;
-
-              const selectedItem = puck?.appState?.data?.content?.find(
-                (item) => item.id === selectedId,
-              );
-
-              return !!selectedItem?.props?.sliderEnabled;
-            } catch (_) {
-              return false;
-            }
-          })();
-
-          if (!sliderOn) return null;
-
-          return (
-            <ToggleField
-              label="Autoplay"
-              value={value !== false}
-              onChange={onChange}
-            />
-          );
-        },
-      },
-
-      interval: {
-        type: "custom",
-
-        label: "Slide Interval (seconds)",
-
-        visible: ({ props }) => !!props?.sliderEnabled,
-
-        render: ({ value, onChange }) => {
-          const sliderOn = (() => {
-            try {
-              const puck = usePuck();
-
-              const selectedId = puck?.appState?.ui?.selectedItem?.id;
-
-              const selectedItem = puck?.appState?.data?.content?.find(
-                (item) => item.id === selectedId,
-              );
-
-              return !!selectedItem?.props?.sliderEnabled;
-            } catch (_) {
-              return false;
-            }
-          })();
-
-          if (!sliderOn) return null;
-
-          return (
-            <StackedNumberField
-              label="Slide Interval (seconds)"
-              value={value ?? 5}
-              onChange={onChange}
-              min={1}
-              max={60}
-              placeholder="e.g., 5"
-            />
-          );
-        },
-      },
-
-      showArrows: {
-        type: "custom",
-
-        label: "Show Arrows",
-
-        visible: ({ props }) => !!props?.sliderEnabled,
-
-        render: ({ value, onChange }) => {
-          const sliderOn = (() => {
-            try {
-              const puck = usePuck();
-
-              const selectedId = puck?.appState?.ui?.selectedItem?.id;
-
-              const selectedItem = puck?.appState?.data?.content?.find(
-                (item) => item.id === selectedId,
-              );
-
-              return !!selectedItem?.props?.sliderEnabled;
-            } catch (_) {
-              return false;
-            }
-          })();
-
-          if (!sliderOn) return null;
-
-          return (
-            <ToggleField
-              label="Show Navigation Arrows"
-              value={value !== false}
-              onChange={onChange}
-            />
-          );
-        },
-      },
-
-      showDots: {
-        type: "custom",
-
-        label: "Show Dots",
-
-        visible: ({ props }) => !!props?.sliderEnabled,
-
-        render: ({ value, onChange }) => {
-          const sliderOn = (() => {
-            try {
-              const puck = usePuck();
-
-              const selectedId = puck?.appState?.ui?.selectedItem?.id;
-
-              const selectedItem = puck?.appState?.data?.content?.find(
-                (item) => item.id === selectedId,
-              );
-
-              return !!selectedItem?.props?.sliderEnabled;
-            } catch (_) {
-              return false;
-            }
-          })();
-
-          if (!sliderOn) return null;
-
-          return (
-            <ToggleField
-              label="Show Slide Dots"
-              value={value !== false}
-              onChange={onChange}
-            />
-          );
-        },
-      },
-
-      pauseOnHover: {
-        type: "custom",
-
-        label: "Pause On Hover",
-
-        visible: ({ props }) => !!props?.sliderEnabled,
-
-        render: ({ value, onChange }) => {
-          const sliderOn = (() => {
-            try {
-              const puck = usePuck();
-
-              const selectedId = puck?.appState?.ui?.selectedItem?.id;
-
-              const selectedItem = puck?.appState?.data?.content?.find(
-                (item) => item.id === selectedId,
-              );
-
-              return !!selectedItem?.props?.sliderEnabled;
-            } catch (_) {
-              return false;
-            }
-          })();
-
-          if (!sliderOn) return null;
-
-          return (
-            <ToggleField
-              label="Pause Autoplay on Hover"
-              value={value !== false}
-              onChange={onChange}
-            />
-          );
-        },
-      },
-
-      transitionDuration: {
-        type: "custom",
-
-        label: "Transition Duration (ms)",
-
-        visible: ({ props }) => !!props?.sliderEnabled,
-
-        render: ({ value, onChange }) => {
-          const sliderOn = (() => {
-            try {
-              const puck = usePuck();
-
-              const selectedId = puck?.appState?.ui?.selectedItem?.id;
-
-              const selectedItem = puck?.appState?.data?.content?.find(
-                (item) => item.id === selectedId,
-              );
-
-              return !!selectedItem?.props?.sliderEnabled;
-            } catch (_) {
-              return false;
-            }
-          })();
-
-          if (!sliderOn) return null;
-
-          return (
-            <StackedNumberField
-              label="Transition Duration (ms)"
-              value={value ?? 500}
-              onChange={onChange}
-              min={100}
-              max={2000}
-              step={100}
-              placeholder="e.g., 500"
-            />
-          );
-        },
-      },
-    },
-
-    defaultProps: {
-      title: "Welcome to My Store",
-
-      subtitle: "New Collection 2026",
-
-      badge: "🔥 Limited Offer",
-
-      description: "Discover premium products crafted just for you.",
-
-      rating: 4.8,
-
-      reviewCount: 1200,
-
-      features: [
-        { text: "Free Shipping" },
-
-        { text: "30 Days Return" },
-
-        { text: "Premium Quality" },
-      ],
-
-      buttons: [
-        {
-          label: "Shop Now",
-
-          link: "#",
-
-          variant: "primary",
-        },
-
-        {
-          label: "Learn More",
-
-          link: "#",
-
-          variant: "outline",
-        },
-      ],
-
-      image: {
-        url: "https://picsum.photos/seed/hero1/1200/500",
-
-        mode: "bg",
-
-        position: "right",
-      },
-
-      padding: 80,
-
-      backgroundImage: "",
-
-      textPosition: "justify-center",
-
-      align: "text-left",
-
-      overlayOpacity: 0.4,
-
-      backgroundColor: "#f8fafc",
-
-      verticalAlign: "items-center",
-
-      contentWidth: "max-w-xl",
-
-      patternType: "none",
-
-      patternColor: "rgba(0,0,0,0.1)",
-
-      videoSettings: {
-        url: "",
-        autoplay: true,
-        loop: true,
-        muted: true,
-      },
-
-      mediaType: "image",
-
-      backgroundType: "media",
-
-      sliderEnabled: false,
-
-      slides: [],
-
-      autoplay: true,
-
-      interval: 5,
-
-      showArrows: true,
-
-      showDots: true,
-
-      pauseOnHover: true,
-
-      transitionDuration: 500,
-    },
-
-    render: ({
-      title,
-      subtitle,
-      badge,
-      description,
-      rating,
-      reviewCount,
-      features,
-      buttons,
-      image,
-      padding,
-      align,
-      overlayOpacity,
-      backgroundColor,
-      verticalAlign,
-      contentWidth,
-      textPosition,
-      gradientStartColor,
-      gradientEndColor,
-      gradientDirection,
-      glassEffect,
-      glassBlur,
-      patternType,
-      patternColor,
-      textColor,
-      videoSettings,
-      mediaType,
-      backgroundType,
-      floatingElements,
-      geometricShapes,
-      parallaxEffect,
-      fullscreen,
-      sliderEnabled,
-      slides,
-      autoplay,
-      interval,
-      showArrows,
-      showDots,
-      pauseOnHover,
-      transitionDuration,
-    }) => {
-      // HeroSlide component for single hero and each slider slide
-
-      const HeroSlide = (props: any) => {
-        const {
-          title: t = "",
-          subtitle: sub,
-          badge: bdg,
-          description: desc = "",
-          rating: rat,
-          reviewCount: revCount,
-          features: feats = [],
-          buttons: btns = [],
-          image: img,
-          padding: pad = 80,
-          align: al = "text-left",
-          overlayOpacity: opacity = 0.3,
-          backgroundColor: bgColor = "transparent",
-          verticalAlign: vAlign = "items-center",
-          contentWidth: cWidth = "max-w-xl",
-          textPosition: tPos = "justify-center",
-          gradientStartColor: gradStart,
-          gradientEndColor: gradEnd,
-          gradientDirection: gradDir = "135deg",
-          glassEffect: glass,
-          glassBlur: blur = 10,
-          patternType: pattern,
-          patternColor: patColor = "rgba(0,0,0,0.1)",
-          textColor: txtColor,
-          videoSettings: vidSettings,
-          mediaType: media = "image",
-          backgroundType: bgType = "media",
-          floatingElements: floatEls,
-          geometricShapes: geoShapes,
-          parallaxEffect: parallax,
-          fullscreen: fs,
-        } = props;
-
-        const {
-          url: vUrl,
-          autoplay: vAutoplay,
-          loop: vLoop,
-          muted: vMuted,
-          poster: vPoster,
-        } = vidSettings || { url: "", autoplay: true, loop: true, muted: true, poster: "" };
-
-        const { url, mode, position } = img || {};
-
-        const isBg = mode === "bg",
-          isInline = mode === "inline",
-          isCustom = mode === "custom";
-
-        // backgroundType is the source of truth for what the hero looks like
-        const isMediaType   = bgType === "media" || !bgType;
-        const isColorType   = bgType === "color";
-        const isGradientType = bgType === "gradient";
-
-        const hasVideo =
-          isMediaType && media === "video" && !!(vUrl && vUrl.trim() !== "");
-
-        const hasNoImage = !isBg && !isInline && !isCustom;
-
-        const imageOrder =
-          isCustom && position === "left" ? "order-1" : "order-2";
-
-        const textOrder =
-          isCustom && position === "left" ? "order-2" : "order-1";
-
-        // Derive the CSS background-image only for the active background type
-        let heroBackgroundImage = "none";
-        let heroBgColor = "transparent";
-
-        if (isGradientType && gradStart && gradEnd) {
-          heroBackgroundImage = `linear-gradient(${gradDir ?? "135deg"}, ${gradStart}, ${gradEnd})`;
-          heroBgColor = gradStart; // visible while gradient loads
-        } else if (isColorType) {
-          heroBgColor = bgColor || "transparent";
-        } else if (isMediaType && !hasVideo && isBg && url) {
-          heroBackgroundImage = `url(${url})`;
-          heroBgColor = "transparent";
-        } else {
-          // media type without a bg-mode image, or video — let bgColor show through
-          heroBgColor = bgColor || "transparent";
-        }
-
-        // Patterns only apply on top of solid/gradient backgrounds
-        const applyPattern = (isColorType || isGradientType) && pattern && pattern !== "none";
-
-        const getPatternGradient = (baseColor: string, opacity: number) => {
-          if (!baseColor) return `rgba(0, 0, 0, ${opacity})`;
-          
-          // Handle hex colors (#fff or #ffffff)
-          if (baseColor.startsWith("#")) {
-            const hex = baseColor.slice(1);
-            const r = parseInt(hex.slice(0, 2), 16);
-            const g = parseInt(hex.slice(2, 4), 16);
-            const b = parseInt(hex.slice(4, 6), 16);
-            return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-          }
-          
-          // Handle rgb/rgba colors
-          const rgbaMatch = baseColor.match(/rgba?\((.*?)\)/);
-          if (rgbaMatch) {
-            const values = rgbaMatch[1].split(",").map((v) => v.trim());
-            return `rgba(${values[0]}, ${values[1]}, ${values[2]}, ${opacity})`;
-          }
-          
-          // Fallback to black
-          return `rgba(0, 0, 0, ${opacity})`;
-        };
-
-        const patternStyles: { [k: string]: React.CSSProperties } = {
-          dots:        { backgroundImage: `radial-gradient(circle, ${getPatternGradient(patColor, 0.18)} 1.5px, transparent 1.5px)`, backgroundSize: "20px 20px" },
-          grid:        { backgroundImage: `linear-gradient(${getPatternGradient(patColor, 0.12)} 1px, transparent 1px), linear-gradient(90deg, ${getPatternGradient(patColor, 0.12)} 1px, transparent 1px)`, backgroundSize: "40px 40px" },
-          waves:       { backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 10px, ${getPatternGradient(patColor, 0.08)} 10px, ${getPatternGradient(patColor, 0.08)} 11px)` },
-          geometric:   { backgroundImage: `linear-gradient(30deg, ${getPatternGradient(patColor, 0.08)} 12%, transparent 12.5%, transparent 87%, ${getPatternGradient(patColor, 0.08)} 87.5%), linear-gradient(150deg, ${getPatternGradient(patColor, 0.08)} 12%, transparent 12.5%, transparent 87%, ${getPatternGradient(patColor, 0.08)} 87.5%), linear-gradient(60deg, ${getPatternGradient(patColor, 0.08)} 25%, transparent 25.5%, transparent 75%, ${getPatternGradient(patColor, 0.08)} 75%)`, backgroundSize: "80px 140px", backgroundPosition: "0 0, 0 0, 40px 70px" },
-          diagonal:    { backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 8px, ${getPatternGradient(patColor, 0.12)} 8px, ${getPatternGradient(patColor, 0.12)} 9px)` },
-          crosshatch:  { backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 14px, ${getPatternGradient(patColor, 0.12)} 14px, ${getPatternGradient(patColor, 0.12)} 15px), repeating-linear-gradient(90deg, transparent, transparent 14px, ${getPatternGradient(patColor, 0.12)} 14px, ${getPatternGradient(patColor, 0.12)} 15px)` },
-          zigzag:      { backgroundImage: `linear-gradient(135deg, ${getPatternGradient(patColor, 0.12)} 25%, transparent 25%, transparent 50%, ${getPatternGradient(patColor, 0.12)} 50%, ${getPatternGradient(patColor, 0.12)} 75%, transparent 75%, transparent), linear-gradient(225deg, ${getPatternGradient(patColor, 0.12)} 25%, transparent 25%, transparent 50%, ${getPatternGradient(patColor, 0.12)} 50%, ${getPatternGradient(patColor, 0.12)} 75%, transparent 75%, transparent)`, backgroundSize: "20px 20px" },
-          checkerboard:{ backgroundImage: `linear-gradient(45deg, ${getPatternGradient(patColor, 0.12)} 25%, transparent 25%, transparent 75%, ${getPatternGradient(patColor, 0.12)} 75%), linear-gradient(45deg, ${getPatternGradient(patColor, 0.12)} 25%, transparent 25%, transparent 75%, ${getPatternGradient(patColor, 0.12)} 75%)`, backgroundSize: "30px 30px", backgroundPosition: "0 0, 15px 15px" },
-          circles:     { backgroundImage: `radial-gradient(circle, transparent 40%, ${getPatternGradient(patColor, 0.18)} 41%, ${getPatternGradient(patColor, 0.18)} 43%, transparent 44%)`, backgroundSize: "30px 30px" },
-        };
-
-        const currentPattern =
-          pattern && pattern !== "none" ? patternStyles[pattern] : {};
-
-        const hasDarkBg = hasVideo || (isMediaType && isBg) || isGradientType;
-
-        return (
-          <div
-            className={`relative flex flex-col md:flex-row ${vAlign} gap-8 ${hasDarkBg ? "text-white" : ""} ${tPos} pb-hero`}
-            style={{
-              backgroundImage: hasVideo ? "none" : heroBackgroundImage,
-              backgroundColor: glass ? "rgba(255,255,255,0.1)" : heroBgColor,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              minHeight: "100vh",
-              padding: pad,
-              overflow: "hidden",
-              ...(glass
-                ? {
-                    backdropFilter: `blur(${blur}px)`,
-                    border: "1px solid rgba(255,255,255,0.2)",
-                  }
-                : {}),
-              ...(applyPattern ? currentPattern : {}),
-            }}
-          >
-            {hasVideo && (
-              <video
-                autoPlay={vAutoplay !== false}
-                loop={vLoop !== false}
-                muted={vMuted !== false}
-                playsInline
-                poster={vPoster || undefined}
-                className="absolute inset-0 w-full h-full object-cover z-0"
-                style={{ opacity: 1 }}
-              >
-                <source src={vUrl} />
-              </video>
-            )}
-
-            {/* Dark overlay — only for media backgrounds (bg image or video) */}
-            {(hasVideo || (isMediaType && isBg)) && opacity > 0 && (
-              <div
-                className="absolute inset-0 bg-black z-0"
-                style={{ opacity }}
-              />
-            )}
-
-            {geoShapes?.enabled &&
-              geoShapes.shapes?.map((s: any, i: number) => (
-                <div
-                  key={`geo-${i}`}
-                  className="absolute z-0"
-                  style={{
-                    left: s.position.x,
-                    top: s.position.y,
-                    width: s.size,
-                    height: s.size,
-                    backgroundColor: s.color,
-                    opacity: s.opacity || 0.3,
-                    transform: `rotate(${s.rotation || 0}deg)`,
-                    ...(s.type === "circle" ? { borderRadius: "50%" } : {}),
-                    ...(s.type === "triangle"
-                      ? {
-                          width: 0,
-                          height: 0,
-                          backgroundColor: "transparent",
-                          borderLeft: `${s.size / 2}px solid transparent`,
-                          borderRight: `${s.size / 2}px solid transparent`,
-                          borderBottom: `${s.size}px solid ${s.color}`,
-                        }
-                      : {}),
-                  }}
-                />
-              ))}
-
-            {floatEls?.enabled &&
-              floatEls.elements?.map((e: any, i: number) => (
-                <div
-                  key={`float-${i}`}
-                  className="absolute z-0"
-                  style={{
-                    left: e.position.x,
-                    top: e.position.y,
-                    width: e.size,
-                    height: e.size,
-                    backgroundColor: e.color,
-                    borderRadius:
-                      e.type === "circle"
-                        ? "50%"
-                        : e.type === "blob"
-                          ? "30% 70% 70% 30% / 30% 30% 70% 70%"
-                          : "0",
-                    animation:
-                      e.animation === "float"
-                        ? "float 3s ease-in-out infinite"
-                        : e.animation === "pulse"
-                          ? "pulse 2s ease-in-out infinite"
-                          : e.animation === "rotate"
-                            ? "rotate 4s linear infinite"
-                            : e.animation === "bounce"
-                              ? "bounce 2s ease-in-out infinite"
-                              : "none",
-                  }}
-                />
-              ))}
-
-            {(isInline || isCustom) && url && (
-              <div className={`w-full md:w-1/2 ${imageOrder}`}>
-                <img
-                  src={url}
-                  alt="Hero"
-                  className="w-full h-full object-cover rounded"
-                />
-              </div>
-            )}
-
-            <div
-              className={`relative ${hasNoImage ? "w-full" : "w-full md:w-1/2"} p-8 z-10 ${textOrder} ${al} ${cWidth} ${tPos}`}
-              style={{ color: txtColor || "inherit" }}
-            >
-              {bdg && (
-                <span
-                  className="inline-block mb-2 px-3 py-1 text-xs text-white rounded"
-                  style={{
-                    backgroundColor: "var(--accent-color)",
-                    borderRadius: "var(--button-border-radius)",
-                  }}
-                >
-                  {bdg}
-                </span>
-              )}
-
-              {sub && (
-                <p
-                  className="text-lg mb-2"
-                  style={{ color: txtColor || "var(--secondary-color)" }}
-                >
-                  {sub}
-                </p>
-              )}
-
-              <h1
-                className="mb-4"
-                style={{
-                  color: txtColor || "var(--primary-color)",
-                  fontFamily: "var(--heading-font)",
-                  fontSize: "var(--h1-size)",
-                  fontWeight: "var(--heading-weight)",
-                  lineHeight: "var(--heading-line-height)",
-                }}
-              >
-                {t}
-              </h1>
-
-              {rat && (
-                <div
-                  className="flex items-center gap-2 mb-3"
-                  style={{
-                    justifyContent:
-                      al === "text-center"
-                        ? "center"
-                        : al === "text-right"
-                          ? "flex-end"
-                          : "flex-start",
-                  }}
-                >
-                  <div className="flex text-lg" style={{ gap: 1 }}>
-                    {Array.from({ length: 5 }, (_, j) => {
-                      const full = j < Math.floor(rat);
-                      const fraction = rat % 1;
-                      const partial = j === Math.floor(rat) && fraction > 0;
-                      if (full)
-                        return (
-                          <span key={j} style={{ color: "#facc15" }}>★</span>
-                        );
-                      if (partial)
-                        return (
-                          <span key={j} style={{ position: "relative", display: "inline-block" }}>
-                            <span style={{ color: "#d1d5db" }}>★</span>
-                            <span style={{
-                              position: "absolute",
-                              left: 0,
-                              top: 0,
-                              width: `${fraction * 100}%`,
-                              overflow: "hidden",
-                              color: "#facc15",
-                              whiteSpace: "nowrap",
-                            }}>★</span>
-                          </span>
-                        );
-                      return (
-                        <span key={j} style={{ color: "#d1d5db" }}>★</span>
-                      );
-                    })}
-                  </div>
-                  <span className="text-sm opacity-80">
-                    {rat}
-                    {revCount ? ` (${revCount} reviews)` : ""}
-                  </span>
-                </div>
-              )}
-
-              {feats && feats.length > 0 && (
-                <ul
-                  className="mb-4 space-y-1 text-sm"
-                  style={{
-                    textAlign:
-                      al === "text-center"
-                        ? "center"
-                        : al === "text-right"
-                          ? "right"
-                          : "left",
-                    listStylePosition: "inside",
-                  }}
-                >
-                  {feats.map((f: any, i: number) => (
-                    <li key={i} style={{ color: "var(--secondary-color)" }}>
-                      ✔ {f.text}
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <div className="mb-6">{desc}</div>
-
-              <div
-                className="flex gap-4 flex-wrap mb-6"
-                style={{
-                  justifyContent:
-                    al === "text-center"
-                      ? "center"
-                      : al === "text-right"
-                        ? "flex-end"
-                        : "flex-start",
-                }}
-              >
-                {btns?.map((b: any, i: number) => {
-                  const s: React.CSSProperties = {
-                    borderRadius: "var(--button-border-radius)",
-                    paddingLeft: "var(--button-padding-x)",
-                    paddingRight: "var(--button-padding-x)",
-                    paddingTop: "var(--button-padding-y)",
-                    paddingBottom: "var(--button-padding-y)",
-                    fontWeight: "var(--button-font-weight)" as any,
-                    textTransform: "var(--button-text-transform)" as any,
-                    display: "inline-block",
-                    cursor: "pointer",
-                    ...(b.variant === "primary"
-                      ? {
-                          backgroundColor: "var(--primary-color)",
-                          color: "#fff",
-                          border: "none",
-                        }
-                      : b.variant === "secondary"
-                        ? {
-                            backgroundColor: "var(--secondary-color)",
-                            color: "#fff",
-                            border: "none",
-                          }
-                        : {
-                            backgroundColor: "transparent",
-                            border: "2px solid currentColor",
-                          }),
-                  };
-                  return (
-                    <a
-                      key={i}
-                      href={b.link}
-                      className={b.variant === "outline" ? "pb-btn pb-btn-outline" : "pb-btn"}
-                      style={s}
-                    >
-                      {b.label}
-                    </a>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        );
-      };
-
-      const baseSlideProps = {
-        title,
-
-        subtitle,
-
-        badge,
-
-        description,
-
-        rating,
-
-        reviewCount,
-
-        features,
-
-        buttons,
-
-        image,
-
-        padding,
-
-        align,
-
-        overlayOpacity,
-
-        backgroundColor,
-
-        verticalAlign,
-
-        contentWidth,
-
-        textPosition,
-
-        gradientStartColor,
-
-        gradientEndColor,
-
-        gradientDirection,
-
-        glassEffect,
-
-        glassBlur,
-
-        patternType,
-
-        patternColor,
-
-        textColor,
-
-        videoSettings,
-
-        mediaType,
-
-        floatingElements,
-
-        geometricShapes,
-
-        parallaxEffect,
-
-        fullscreen,
-
-        backgroundType,
-      };
-
-      // --- SLIDER: Main hero as first slide ---
-
-      let activeSlides = null;
-
-      if (sliderEnabled && Array.isArray(slides) && slides.length > 0) {
-        // Prepend the main hero as the first slide
-
-        activeSlides = [baseSlideProps, ...slides];
-      }
-
-      const [currentIndex, setCurrentIndex] = useState(0);
-
-      const [isHovered, setIsHovered] = useState(false);
-
-      const slideIntervalMs = Math.max(1, Number(interval) || 5) * 1000;
-
-      const fadeDurationMs = Math.max(100, Number(transitionDuration) || 500);
-
-      const shouldPause = pauseOnHover !== false && isHovered;
-
-      useEffect(() => {
-        if (
-          !activeSlides ||
-          activeSlides.length < 2 ||
-          autoplay === false ||
-          shouldPause
-        )
-          return;
-
-        const timer = window.setInterval(() => {
-          setCurrentIndex((prev) => (prev + 1) % activeSlides.length);
-        }, slideIntervalMs);
-
-        return () => window.clearInterval(timer);
-      }, [activeSlides?.length, autoplay, shouldPause, slideIntervalMs]);
-
-      useEffect(() => {
-        if (!activeSlides || activeSlides.length === 0) {
-          setCurrentIndex(0);
-
-          return;
-        }
-
-        if (currentIndex >= activeSlides.length) {
-          setCurrentIndex(0);
-        }
-      }, [activeSlides?.length, currentIndex]);
-
-      if (!activeSlides) {
-        return <HeroSlide {...baseSlideProps} />;
-      }
-
-      return (
-        <div
-          className="relative"
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          style={{ overflow: "hidden" }}
-        >
-          {/* Only the active slide is mounted — no ghost DOM nodes from inactive slides */}
-          <style>{`@keyframes pb-slide-fadein{from{opacity:0}to{opacity:1}}`}</style>
-          <div
-            key={`hero-slide-${currentIndex}`}
-            style={{ animation: `pb-slide-fadein ${fadeDurationMs}ms ease` }}
-          >
-            <HeroSlide {...activeSlides[currentIndex]} />
-          </div>
-
-          {showArrows !== false && activeSlides.length > 1 && (
-            <>
-              <button
-                type="button"
-                className="no-global-style"
-                aria-label="Previous slide"
-                onClick={() =>
-                  setCurrentIndex(
-                    (prev) =>
-                      (prev - 1 + activeSlides.length) % activeSlides.length,
-                  )
-                }
-                style={{
-                  position: "absolute",
-
-                  left: 16,
-
-                  top: "50%",
-
-                  transform: "translateY(-50%)",
-
-                  width: 44,
-
-                  height: 44,
-
-                  borderRadius: "50%",
-
-                  border: "1px solid rgba(255,255,255,0.35)",
-
-                  backgroundColor: "rgba(10,20,40,0.55)",
-
-                  backdropFilter: "blur(8px)",
-
-                  color: "#fff",
-
-                  cursor: "pointer",
-
-                  display: "flex",
-
-                  alignItems: "center",
-
-                  justifyContent: "center",
-
-                  zIndex: 5,
-                }}
-              >
-                <ArrowLeft size={20} />
-              </button>
-
-              <button
-                type="button"
-                className="no-global-style"
-                aria-label="Next slide"
-                onClick={() =>
-                  setCurrentIndex((prev) => (prev + 1) % activeSlides.length)
-                }
-                style={{
-                  position: "absolute",
-
-                  right: 16,
-
-                  top: "50%",
-
-                  transform: "translateY(-50%)",
-
-                  width: 44,
-
-                  height: 44,
-
-                  borderRadius: "50%",
-
-                  border: "1px solid rgba(255,255,255,0.35)",
-
-                  backgroundColor: "rgba(10,20,40,0.55)",
-
-                  backdropFilter: "blur(8px)",
-
-                  color: "#fff",
-
-                  cursor: "pointer",
-
-                  display: "flex",
-
-                  alignItems: "center",
-
-                  justifyContent: "center",
-
-                  zIndex: 5,
-                }}
-              >
-                <ArrowRight size={20} />
-              </button>
-            </>
-          )}
-
-          {showDots !== false && activeSlides.length > 1 && (
-            <div
-              style={{
-                position: "absolute",
-
-                left: "50%",
-
-                bottom: 18,
-
-                transform: "translateX(-50%)",
-
-                display: "flex",
-
-                gap: 8,
-
-                zIndex: 5,
-              }}
-            >
-              {activeSlides.map((_, idx) => {
-                const isActive = idx === currentIndex;
-
-                return (
-                  <button
-                    key={`hero-dot-${idx}`}
-                    type="button"
-                    className="no-global-style"
-                    aria-label={`Go to slide ${idx + 1}`}
-                    onClick={() => setCurrentIndex(idx)}
-                    style={{
-                      width: isActive ? 28 : 10,
-
-                      height: 10,
-
-                      borderRadius: 9999,
-
-                      border: "none",
-
-                      backgroundColor: isActive
-                        ? "#ffffff"
-                        : "rgba(255,255,255,0.45)",
-
-                      boxShadow: "0 1px 4px rgba(0,0,0,0.35)",
-
-                      cursor: "pointer",
-
-                      transition: "all 0.25s ease",
-                    }}
-                  />
-                );
-              })}
-            </div>
-          )}
-        </div>
-      );
-    },
-  },
-
-  // ─── Gradient Hero with Dividers ─────────────────────────────────────────
-
   MarqueeBar: {
     label: "Info Bar",
     fields: {
-      text: {
+      _tabs: {
         type: "custom",
-
-        label: "Announcement Text",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Announcement Text"
-            value={value}
-            onChange={onChange}
-            placeholder="Enter announcement text..."
-          />
-        ),
-      },
-
-      speed: {
-        type: "custom",
-
-        label: "Speed (seconds)",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Speed (seconds)"
-            value={value}
-            onChange={onChange}
-            placeholder="e.g., 20"
-          />
-        ),
-      },
-
-      direction: {
-        type: "custom",
-
-        label: "Direction",
-
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value}
-            onChange={onChange}
-            label="Direction"
-            options={[
-              { value: "left", icon: <ArrowLeft size={15} />, title: "Left" },
-
-              {
-                value: "right",
-                icon: <ArrowRight size={15} />,
-                title: "Right",
-              },
-            ]}
-          />
-        ),
-      },
-
-      pauseOnHover: {
-        type: "custom",
-
-        label: "Pause on Hover",
-
-        render: ({ value, onChange }) => (
-          <ToggleField
-            value={!!value}
-            onChange={onChange}
-            label="Pause on Hover"
-          />
-        ),
-      },
-
-      backgroundColor: {
-        type: "custom",
-
-        label: "Background Color (CSS)",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Background Color"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      textColor: {
-        type: "custom",
-
-        label: "Text Color (CSS)",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Text Color"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      fontSize: {
-        type: "custom",
-
-        label: "Font Size",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Font Size"
-            value={value}
-            onChange={onChange}
-            placeholder="e.g., 16"
-          />
-        ),
-      },
-
-      padding: {
-        type: "custom",
-
-        label: "Padding (px)",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Padding (px)"
-            value={value}
-            onChange={onChange}
-            placeholder="e.g., 12"
-          />
-        ),
-      },
-
-      repeat: {
-        type: "custom",
-
-        label: "Repeat Count",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Repeat Count"
-            value={value}
-            onChange={onChange}
-            placeholder="e.g., 3"
-          />
-        ),
+        label: "",
+        render: ({ value: _v, onChange: _onChange }: any) => {
+          const { selectedItem, appState, dispatch } = usePuck();
+          const props = selectedItem?.props ?? {};
+          const set = (key: string, val: any) => {
+            if (!selectedItem) return;
+            const state = appState.data;
+            let destinationZone = "root:default-zone", destinationIndex = 0;
+            const zones: Record<string, any[]> = { "root:default-zone": state.content, ...(state.zones ?? {}) };
+            for (const [zone, items] of Object.entries(zones)) {
+              const idx = (items as any[]).findIndex((it: any) => it.props?.id === selectedItem.props?.id);
+              if (idx !== -1) { destinationZone = zone; destinationIndex = idx; break; }
+            }
+            dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } });
+          };
+          return (
+            <BlockTabBar blockKey="MarqueeBar">
+              {(tab) => (
+                <>
+                  {tab === "content" && (
+                    <>
+                      <TabSection title="Text" />
+                      <StackedTextField label="Announcement Text" value={props.text ?? ""} onChange={(v) => set("text", v)} placeholder="Free Shipping · Sale Now On ·" />
+                      <SliderNumberField label="Repeat Count" value={props.repeat ?? 10} onChange={(v) => set("repeat", v)} min={1} max={30} step={1} unit="" />
+                      <TabSection title="Scroll" />
+                      <AlignField
+                        label="Direction"
+                        value={props.direction ?? "left"}
+                        onChange={(v) => set("direction", v)}
+                        options={[
+                          { value: "left",  icon: <ArrowLeft  size={15} />, title: "Left"  },
+                          { value: "right", icon: <ArrowRight size={15} />, title: "Right" },
+                        ]}
+                      />
+                      <SliderNumberField label="Speed (s)" value={props.speed ?? 20} onChange={(v) => set("speed", v)} min={2} max={120} step={1} unit="S" />
+                      <ToggleField label="Pause on Hover" value={props.pauseOnHover !== false} onChange={(v) => set("pauseOnHover", v)} />
+                    </>
+                  )}
+                  {tab === "style" && (
+                    <>
+                      <TabSection title="Colors" />
+                      <ColorPickerField label="Background Color" value={props.backgroundColor ?? "#000000"} onChange={(v) => set("backgroundColor", v)} />
+                      <ColorPickerField label="Text Color" value={props.textColor ?? "#ffffff"} onChange={(v) => set("textColor", v)} />
+                      <TabSection title="Typography" />
+                      <SliderNumberField label="Font Size (px)" value={props.fontSize ?? 14} onChange={(v) => set("fontSize", v)} min={10} max={36} step={1} unit="PX" />
+                      <InlineSelect
+                        label="Font Weight"
+                        value={String(props.fontWeight ?? "500")}
+                        onChange={(v) => set("fontWeight", v)}
+                        options={[
+                          { value: "400", label: "Normal" },
+                          { value: "500", label: "Medium" },
+                          { value: "600", label: "Semi Bold" },
+                          { value: "700", label: "Bold" },
+                        ]}
+                      />
+                      <InlineSelect
+                        label="Text Transform"
+                        value={props.textTransform ?? "uppercase"}
+                        onChange={(v) => set("textTransform", v)}
+                        options={[
+                          { value: "uppercase",  label: "Uppercase"  },
+                          { value: "capitalize", label: "Capitalize" },
+                          { value: "lowercase",  label: "Lowercase"  },
+                        ]}
+                      />
+                      <TabSection title="Spacing" />
+                      <SliderNumberField label="Padding (px)" value={props.padding ?? 10} onChange={(v) => set("padding", v)} min={0} max={60} step={2} unit="PX" />
+                      <SliderNumberField label="Item Gap (px)" value={props.itemGap ?? 40} onChange={(v) => set("itemGap", v)} min={8} max={200} step={4} unit="PX" />
+                    </>
+                  )}
+                  {tab === "advanced" && (
+                    <>
+                      <TabSection title="Responsive" />
+                      <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
+                      <ToggleField label="Hide on Tablet"  value={!!props.hideTablet}  onChange={(v) => set("hideTablet", v)} />
+                      <ToggleField label="Hide on Mobile"  value={!!props.hideMobile}  onChange={(v) => set("hideMobile", v)} />
+                    </>
+                  )}
+                </>
+              )}
+            </BlockTabBar>
+          );
+        },
       },
     },
 
     defaultProps: {
       text: "🔥 Free Shipping on All Orders | 30 Days Return | COD Available 🔥",
-
       speed: 20,
-
       direction: "left",
-
       pauseOnHover: true,
-
-      backgroundColor: "#000",
-
-      textColor: "#fff",
-
+      backgroundColor: "#000000",
+      textColor: "#ffffff",
       fontSize: 14,
-
+      fontWeight: "500",
+      textTransform: "uppercase",
       padding: 10,
-
+      itemGap: 40,
       repeat: 10,
+      hideDesktop: false,
+      hideTablet: false,
+      hideMobile: false,
     },
 
-    render: ({
-      text,
-
-      speed,
-
-      direction,
-
-      pauseOnHover,
-
-      backgroundColor,
-
-      textColor,
-
-      fontSize,
-
-      padding,
-
-      repeat,
-    }) => {
+    render: ({ text, speed, direction, pauseOnHover, backgroundColor, textColor, fontSize, fontWeight, textTransform, padding, itemGap, repeat, hideDesktop, hideTablet, hideMobile }: any) => {
       const [hovered, setHovered] = useState(false);
-
-      const animationName =
-        direction === "left" ? "marqueeLeft" : "marqueeRight";
-
-      const repeatedText = Array.from({ length: repeat }).map((_, i) => (
-        <span key={i} style={{ marginRight: 40 }}>
-          {text}
-        </span>
+      const animationName = direction === "right" ? "mqRight" : "mqLeft";
+      const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
+      const repeatedText = Array.from({ length: repeat ?? 10 }).map((_, i) => (
+        <span key={i} style={{ marginRight: itemGap ?? 40 }}>{text}</span>
       ));
-
       return (
         <div
           onMouseEnter={() => pauseOnHover && setHovered(true)}
           onMouseLeave={() => setHovered(false)}
-          style={{
-            width: "100%",
-            maxWidth: "100%",
-            minWidth: 0,
-            boxSizing: "border-box",
-            overflow: "hidden",
-
-            whiteSpace: "nowrap",
-
-            backgroundColor,
-
-            color: textColor,
-
-            fontSize,
-
-            padding,
-          }}
+          style={{ width: "100%", overflow: "hidden", whiteSpace: "nowrap", backgroundColor, color: textColor, fontSize, fontWeight, textTransform: textTransform as any, padding: `${padding ?? 10}px 0`, boxSizing: "border-box" }}
         >
-          <div
-            style={{
-              display: "inline-block",
-
-              animation: `${animationName} ${speed}s linear infinite`,
-
-              animationPlayState:
-                pauseOnHover && hovered ? "paused" : "running",
-            }}
-          >
+          <div style={{ display: "inline-block", animation: `${animationName} ${speed}s linear infinite`, animationPlayState: pauseOnHover && hovered ? "paused" : "running" }}>
             {repeatedText}
           </div>
-
-          {/* KEYFRAMES */}
-
-          <style>
-            {`
-            @keyframes marqueeLeft {
-              0% { transform: translateX(0%); }
-              100% { transform: translateX(-50%); }
-            }
-            @keyframes marqueeRight {
-              0% { transform: translateX(-50%); }
-              100% { transform: translateX(0%); }
-            }
-          `}
-          </style>
+          <style>{`
+            @keyframes mqLeft  { 0% { transform:translateX(0) }  100% { transform:translateX(-50%) } }
+            @keyframes mqRight { 0% { transform:translateX(-50%) } 100% { transform:translateX(0) } }
+          `}</style>
         </div>
       );
     },
@@ -6365,28 +3527,18 @@ const commonComponents: any = {
                       <InlineSelect
                         label="HTML Tag"
                         value={String(props.level ?? "1")}
-                        onChange={(v) => set("level", Number(v))}
+                        onChange={(v) => set("level", v === "custom" ? "custom" : Number(v))}
                         options={[
                           { value: "1", label: "H1" }, { value: "2", label: "H2" },
                           { value: "3", label: "H3" }, { value: "4", label: "H4" },
                           { value: "5", label: "H5" }, { value: "6", label: "H6" },
+                          { value: "custom", label: "Custom" },
                         ]}
                       />
-                      <StackedTextField
-                        label="Link URL"
-                        value={props.linkUrl ?? ""}
-                        onChange={(v) => set("linkUrl", v)}
-                        placeholder="https://..."
-                      />
-                      <InlineSelect
-                        label="Link Target"
-                        value={props.linkTarget ?? "_self"}
-                        onChange={(v) => set("linkTarget", v)}
-                        options={[
-                          { value: "_self", label: "Same Tab" },
-                          { value: "_blank", label: "New Tab" },
-                        ]}
-                      />
+                      {props.level === "custom" && (
+                        <SliderNumberField label="Font Size (px)" value={props.fontSize ?? 32} onChange={(v) => set("fontSize", v)} min={8} max={200} step={1} unit="px" />
+                      )}
+                      <LinkUrlField value={props.linkUrl ?? ""} onChange={(v) => set("linkUrl", v)} />
                       <StackedTextField
                         label="Subtitle"
                         value={props.subtitle ?? ""}
@@ -6403,41 +3555,28 @@ const commonComponents: any = {
                       <InlineSelect
                         label="Font Family"
                         value={props.fontFamily ?? "inherit"}
-                        onChange={(v) => set("fontFamily", v)}
+                        onChange={(v) => { set("fontFamily", v); loadGoogleFont(v); }}
                         options={[
-                          { value: "inherit", label: "Theme Default" },
-                          { value: "serif", label: "Serif" },
-                          { value: "sans-serif", label: "Sans-serif" },
-                          { value: "monospace", label: "Monospace" },
-                          { value: "Georgia, serif", label: "Georgia" },
-                          { value: "'Times New Roman', serif", label: "Times New Roman" },
-                          { value: "Arial, sans-serif", label: "Arial" },
-                          { value: "'Helvetica Neue', sans-serif", label: "Helvetica" },
-                          { value: "'Trebuchet MS', sans-serif", label: "Trebuchet MS" },
-                          { value: "'Courier New', monospace", label: "Courier New" },
+                          { value: "inherit",                       label: "Theme Default" },
+                          { value: "Arial, Helvetica, sans-serif",   label: "Arial" },
+                          { value: "Georgia, serif",                 label: "Georgia" },
+                          { value: "'Courier New', monospace",       label: "Courier New" },
+                          { value: "Impact, sans-serif",             label: "Impact" },
+                          { value: "Inter, sans-serif",              label: "Inter" },
+                          { value: "Poppins, sans-serif",            label: "Poppins" },
+                          { value: "'Roboto Serif', serif",          label: "Roboto Serif" },
+                          { value: "'New York', 'New York Small', 'Times New Roman', serif", label: "New York" },
+                          { value: "'Open Sans', sans-serif",        label: "Open Sans" },
                         ]}
-                      />
-                      <StackedNumberField
-                        label="Font Size (px)"
-                        value={props.fontSize ?? null}
-                        onChange={(v) => set("fontSize", v)}
-                        placeholder="e.g. 32"
-                        min={8} max={200} step={1}
                       />
                       <InlineSelect
                         label="Font Weight"
                         value={String(props.fontWeight ?? "700")}
                         onChange={(v) => set("fontWeight", v)}
                         options={[
-                          { value: "100", label: "100 – Thin" },
-                          { value: "200", label: "200 – Extra Light" },
-                          { value: "300", label: "300 – Light" },
-                          { value: "400", label: "400 – Normal" },
-                          { value: "500", label: "500 – Medium" },
-                          { value: "600", label: "600 – Semi Bold" },
-                          { value: "700", label: "700 – Bold" },
-                          { value: "800", label: "800 – Extra Bold" },
-                          { value: "900", label: "900 – Black" },
+                          { value: "400", label: "Normal" },
+                          { value: "600", label: "Semi Bold" },
+                          { value: "900", label: "Bold" },
                         ]}
                       />
                       <InlineSelect
@@ -6451,13 +3590,12 @@ const commonComponents: any = {
                       />
                       <InlineSelect
                         label="Text Transform"
-                        value={props.textTransform ?? "none"}
+                        value={props.textTransform ?? "capitalize"}
                         onChange={(v) => set("textTransform", v)}
                         options={[
-                          { value: "none", label: "None" },
+                          { value: "capitalize", label: "Capitalize" },
                           { value: "uppercase", label: "Uppercase" },
                           { value: "lowercase", label: "Lowercase" },
-                          { value: "capitalize", label: "Capitalize" },
                         ]}
                       />
                       <InlineSelect
@@ -6470,20 +3608,8 @@ const commonComponents: any = {
                           { value: "line-through", label: "Line Through" },
                         ]}
                       />
-                      <StackedNumberField
-                        label="Line Height"
-                        value={props.lineHeight ?? null}
-                        onChange={(v) => set("lineHeight", v)}
-                        placeholder="e.g. 1.4"
-                        min={0.5} max={5} step={0.05}
-                      />
-                      <StackedNumberField
-                        label="Letter Spacing (px)"
-                        value={props.letterSpacing ?? null}
-                        onChange={(v) => set("letterSpacing", v)}
-                        placeholder="e.g. 0.5"
-                        min={-10} max={50} step={0.5}
-                      />
+                      <SliderNumberField label="Line Height" value={props.lineHeight ?? 1.4} onChange={(v) => set("lineHeight", v)} min={0.5} max={5} step={0.05} unit="" />
+                      <SliderNumberField label="Letter Spacing (px)" value={props.letterSpacing ?? 0} onChange={(v) => set("letterSpacing", v)} min={-10} max={50} step={0.5} unit="px" />
 
                       <TabSection title="Color" />
                       <ColorPickerField
@@ -6501,12 +3627,7 @@ const commonComponents: any = {
                         value={props.subtitleColor ?? ""}
                         onChange={(v) => set("subtitleColor", v)}
                       />
-                      <StackedNumberField
-                        label="Subtitle Size (px)"
-                        value={props.subtitleSize ?? 18}
-                        onChange={(v) => set("subtitleSize", v)}
-                        min={10} max={64} step={1}
-                      />
+                      <SliderNumberField label="Subtitle Size (px)" value={props.subtitleSize ?? 18} onChange={(v) => set("subtitleSize", v)} min={10} max={64} step={1} unit="px" />
 
 
                       <TabSection title="Alignment" />
@@ -6541,19 +3662,9 @@ const commonComponents: any = {
                             value={props.dividerColor ?? ""}
                             onChange={(v) => set("dividerColor", v)}
                           />
-                          <StackedNumberField
-                            label="Divider Length (px)"
-                            value={props.dividerLength ?? 60}
-                            onChange={(v) => set("dividerLength", v)}
-                            min={20} max={300} step={5}
-                          />
+                          <SliderNumberField label="Divider Length (px)" value={props.dividerLength ?? 60} onChange={(v) => set("dividerLength", v)} min={20} max={300} step={5} unit="px" />
                           {props.dividerType !== "line-with-icon" && (
-                            <StackedNumberField
-                              label="Divider Thickness (px)"
-                              value={props.dividerThickness ?? 3}
-                              onChange={(v) => set("dividerThickness", v)}
-                              min={1} max={50} step={1}
-                            />
+                            <SliderNumberField label="Divider Thickness (px)" value={props.dividerThickness ?? 3} onChange={(v) => set("dividerThickness", v)} min={1} max={50} step={1} unit="px" />
                           )}
                           <AlignField
                             label="Divider Alignment"
@@ -6624,12 +3735,7 @@ const commonComponents: any = {
                             value={props.advGradientColor2 ?? ""}
                             onChange={(v) => set("advGradientColor2", v)}
                           />
-                          <StackedNumberField
-                            label="Angle (deg)"
-                            value={props.advGradientAngle ?? 135}
-                            onChange={(v) => set("advGradientAngle", v)}
-                            min={0} max={360} step={15}
-                          />
+                          <SliderNumberField label="Angle (deg)" value={props.advGradientAngle ?? 135} onChange={(v) => set("advGradientAngle", v)} min={0} max={360} step={15} unit="°" />
                         </>
                       )}
                       {bgType === "image" && (
@@ -6692,11 +3798,7 @@ const commonComponents: any = {
                         onChange={(v) => set("hideMobile", v)}
                       />
 
-                      <StackedNumberField
-                        label="Opacity (%)"
-                        value={props.opacity ?? 100}
-                        onChange={(v) => set("opacity", v)}
-                        min={0} max={100} step={1}
+                      <SliderNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1}
                       />
                     </>
                   )}
@@ -6714,13 +3816,13 @@ const commonComponents: any = {
       subtitle: "",
       level: 1,
       linkUrl: "",
-      linkTarget: "_self",
+      linkTarget: "_blank",
       // Style – typography
       fontFamily: "inherit",
       fontSize: null,
       fontWeight: "700",
       fontStyle: "normal",
-      textTransform: "none",
+      textTransform: "capitalize",
       textDecoration: "none",
       lineHeight: null,
       letterSpacing: null,
@@ -6812,7 +3914,7 @@ const commonComponents: any = {
       zIndex,
       opacity,
     }) => {
-      const Tag = `h${level || 1}` as keyof JSX.IntrinsicElements;
+      const Tag = (level === "custom" ? "p" : `h${level || 1}`) as keyof JSX.IntrinsicElements;
 
       // Background
       const bgStyle: React.CSSProperties = (() => {
@@ -6854,7 +3956,8 @@ const commonComponents: any = {
       ].filter(Boolean).join(" ");
 
       const defaultFontSize =
-        level === 1 ? "var(--h1-size, 2.5rem)"
+        level === "custom" ? (fontSize ? `${fontSize}px` : "1rem")
+        : level === 1 ? "var(--h1-size, 2.5rem)"
         : level === 2 ? "var(--h2-size, 2rem)"
         : level === 3 ? "var(--h3-size, 1.75rem)"
         : level === 4 ? "var(--h4-size, 1.5rem)"
@@ -6881,11 +3984,11 @@ const commonComponents: any = {
       const headingEl = (
         <Tag
           style={{
-            fontSize: fontSize ? `${fontSize}px` : defaultFontSize,
+            fontSize: level === "custom" ? (fontSize ? `${fontSize}px` : "1rem") : defaultFontSize,
             fontWeight: fontWeight ?? "700",
             fontFamily: fontFamily && fontFamily !== "inherit" ? fontFamily : "var(--heading-font)",
             fontStyle: fontStyle ?? "normal",
-            textTransform: (textTransform ?? "none") as any,
+            textTransform: (textTransform ?? "capitalize") as any,
             textDecoration: textDecoration ?? "none",
             lineHeight: lineHeight ?? "var(--heading-line-height, 1.2)",
             letterSpacing: letterSpacing != null ? `${letterSpacing}px` : undefined,
@@ -6900,21 +4003,20 @@ const commonComponents: any = {
       return (
         <div
           id={cssId || undefined}
-          className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
+          className={[cssClass].filter(Boolean).join(" ") || undefined}
           style={wrapperStyle}
         >
           {customCss && <style>{`#${cssId || "heading-block"} { ${customCss} }`}</style>}
           {linkUrl
-            ? <a href={linkUrl} target={linkTarget ?? "_self"} style={{ textDecoration: "none", color: "inherit" }}>{headingEl}</a>
+            ? <a href={linkUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit" }}>{headingEl}</a>
             : headingEl
           }
 
           {subtitle && (
             <p style={{
               fontSize: subtitleSize ? `${subtitleSize}px` : "var(--base-font-size, 1rem)",
-              color: subtitleColor || textColor || "var(--text-color)",
+              color: subtitleColor || "var(--text-color)",
               marginTop: 8,
-              opacity: 0.75,
             }}>
               {subtitle}
             </p>
@@ -6998,22 +4100,6 @@ const commonComponents: any = {
                         placeholder="Enter text..."
                         rows={5}
                       />
-                      <InlineSelect
-                        label="Column Count"
-                        value={String(props.columnCount ?? "1")}
-                        onChange={(v) => set("columnCount", v)}
-                        options={[
-                          { value: "1", label: "1 Column" },
-                          { value: "2", label: "2 Columns" },
-                          { value: "3", label: "3 Columns" },
-                        ]}
-                      />
-                      <StackedTextField
-                        label="Column Gap"
-                        value={props.columnGap ?? ""}
-                        onChange={(v) => set("columnGap", v)}
-                        placeholder="e.g. 24px or 1.5rem"
-                      />
                     </>
                   )}
 
@@ -7024,35 +4110,29 @@ const commonComponents: any = {
                       <InlineSelect
                         label="Font Family"
                         value={props.fontFamily ?? "inherit"}
-                        onChange={(v) => set("fontFamily", v)}
+                        onChange={(v) => { set("fontFamily", v); loadGoogleFont(v); }}
                         options={[
-                          { value: "inherit", label: "Theme Default" },
-                          { value: "serif", label: "Serif" },
-                          { value: "sans-serif", label: "Sans-serif" },
-                          { value: "monospace", label: "Monospace" },
-                          { value: "Georgia, serif", label: "Georgia" },
-                          { value: "Arial, sans-serif", label: "Arial" },
-                          { value: "'Helvetica Neue', sans-serif", label: "Helvetica" },
-                          { value: "'Courier New', monospace", label: "Courier New" },
+                          { value: "inherit",                       label: "Theme Default" },
+                          { value: "Arial, Helvetica, sans-serif",   label: "Arial" },
+                          { value: "Georgia, serif",                 label: "Georgia" },
+                          { value: "'Courier New', monospace",       label: "Courier New" },
+                          { value: "Impact, sans-serif",             label: "Impact" },
+                          { value: "Inter, sans-serif",              label: "Inter" },
+                          { value: "Poppins, sans-serif",            label: "Poppins" },
+                          { value: "'Roboto Serif', serif",          label: "Roboto Serif" },
+                          { value: "'New York', 'New York Small', 'Times New Roman', serif", label: "New York" },
+                          { value: "'Open Sans', sans-serif",        label: "Open Sans" },
                         ]}
                       />
-                      <StackedNumberField
-                        label="Font Size (px)"
-                        value={props.fontSize ?? null}
-                        onChange={(v) => set("fontSize", v)}
-                        placeholder="e.g. 16"
-                        min={8} max={120} step={1}
-                      />
+                      <SliderNumberField label="Font Size (px)" value={props.fontSize ?? 16} onChange={(v) => set("fontSize", v)} min={8} max={120} step={1} unit="px" />
                       <InlineSelect
                         label="Font Weight"
                         value={String(props.fontWeight ?? "400")}
                         onChange={(v) => set("fontWeight", v)}
                         options={[
-                          { value: "300", label: "300 – Light" },
-                          { value: "400", label: "400 – Normal" },
-                          { value: "500", label: "500 – Medium" },
-                          { value: "600", label: "600 – Semi Bold" },
-                          { value: "700", label: "700 – Bold" },
+                          { value: "400", label: "Normal" },
+                          { value: "600", label: "Semi Bold" },
+                          { value: "900", label: "Bold" },
                         ]}
                       />
                       <InlineSelect
@@ -7064,20 +4144,8 @@ const commonComponents: any = {
                           { value: "italic", label: "Italic" },
                         ]}
                       />
-                      <StackedNumberField
-                        label="Line Height"
-                        value={props.lineHeight ?? null}
-                        onChange={(v) => set("lineHeight", v)}
-                        placeholder="e.g. 1.6"
-                        min={0.8} max={5} step={0.05}
-                      />
-                      <StackedNumberField
-                        label="Letter Spacing (px)"
-                        value={props.letterSpacing ?? null}
-                        onChange={(v) => set("letterSpacing", v)}
-                        placeholder="e.g. 0.5"
-                        min={-10} max={50} step={0.5}
-                      />
+                      <SliderNumberField label="Line Height" value={props.lineHeight ?? 1.6} onChange={(v) => set("lineHeight", v)} min={0.8} max={5} step={0.05} unit="" />
+                      <SliderNumberField label="Letter Spacing (px)" value={props.letterSpacing ?? 0} onChange={(v) => set("letterSpacing", v)} min={-10} max={50} step={0.5} unit="px" />
                       <InlineSelect
                         label="Text Decoration"
                         value={props.textDecoration ?? "none"}
@@ -7090,13 +4158,12 @@ const commonComponents: any = {
                       />
                       <InlineSelect
                         label="Text Transform"
-                        value={props.textTransform ?? "none"}
+                        value={props.textTransform ?? "capitalize"}
                         onChange={(v) => set("textTransform", v)}
                         options={[
-                          { value: "none", label: "None" },
+                          { value: "capitalize", label: "Capitalize" },
                           { value: "uppercase", label: "Uppercase" },
                           { value: "lowercase", label: "Lowercase" },
-                          { value: "capitalize", label: "Capitalize" },
                         ]}
                       />
 
@@ -7106,17 +4173,6 @@ const commonComponents: any = {
                         value={props.textColor ?? ""}
                         onChange={(v) => set("textColor", v)}
                       />
-                      <ColorPickerField
-                        label="Link Color"
-                        value={props.linkColor ?? ""}
-                        onChange={(v) => set("linkColor", v)}
-                      />
-                      <ColorPickerField
-                        label="Link Hover Color"
-                        value={props.linkHoverColor ?? ""}
-                        onChange={(v) => set("linkHoverColor", v)}
-                      />
-
                       <TabSection title="Alignment" />
                       <AlignField
                         label="Text Align"
@@ -7157,7 +4213,7 @@ const commonComponents: any = {
                         <>
                           <ColorPickerField label="Color 1" value={props.advGradientColor1 ?? ""} onChange={(v) => set("advGradientColor1", v)} />
                           <ColorPickerField label="Color 2" value={props.advGradientColor2 ?? ""} onChange={(v) => set("advGradientColor2", v)} />
-                          <StackedNumberField label="Angle (deg)" value={props.advGradientAngle ?? 135} onChange={(v) => set("advGradientAngle", v)} min={0} max={360} step={15} />
+                          <SliderNumberField label="Angle (deg)" value={props.advGradientAngle ?? 135} onChange={(v) => set("advGradientAngle", v)} min={0} max={360} step={15} unit="°" />
                         </>
                       )}
 
@@ -7188,7 +4244,7 @@ const commonComponents: any = {
                       <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                       <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
 
-                      <StackedNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1} />
+                      <SliderNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1} unit="%" />
                     </>
                   )}
                 </>
@@ -7210,7 +4266,7 @@ const commonComponents: any = {
       lineHeight: null,
       letterSpacing: null,
       textDecoration: "none",
-      textTransform: "none",
+      textTransform: "capitalize",
       textColor: "",
       linkColor: "",
       linkHoverColor: "",
@@ -7293,7 +4349,7 @@ const commonComponents: any = {
       return (
         <div
           id={cssId || undefined}
-          className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
+          className={[cssClass].filter(Boolean).join(" ") || undefined}
           style={{
             paddingTop: advPadding?.top ?? 16, paddingRight: advPadding?.right ?? 0,
             paddingBottom: advPadding?.bottom ?? 16, paddingLeft: advPadding?.left ?? 0,
@@ -7338,219 +4394,93 @@ const commonComponents: any = {
   Article: {
     label: "Article Block",
     fields: {
-      // ── Content ────────────────────────────────────────────────────────
-      articleTitle: {
+      _tabs: {
         type: "custom",
-        label: "Article Title",
-        render: ({ value, onChange }) => (
-          <StackedTextField label="Article Title" value={value ?? ""} onChange={onChange} placeholder="Enter article title..." />
-        ),
-      },
-      author: {
-        type: "custom",
-        label: "Author",
-        render: ({ value, onChange }) => (
-          <StackedTextField label="Author" value={value ?? ""} onChange={onChange} placeholder="e.g., Jane Smith" />
-        ),
-      },
-      showAuthor: {
-        type: "custom",
-        label: "Show Author",
-        render: ({ value, onChange }) => (
-          <ToggleField value={value !== false} onChange={onChange} label="Show Author" />
-        ),
-      },
-      publishDate: {
-        type: "custom",
-        label: "Published Date",
-        render: ({ value, onChange }) => (
-          <StackedDateField label="Published Date" value={value ?? ""} onChange={onChange} />
-        ),
-      },
-      showDate: {
-        type: "custom",
-        label: "Show Date",
-        render: ({ value, onChange }) => (
-          <ToggleField value={value !== false} onChange={onChange} label="Show Date" />
-        ),
-      },
-      body: {
-        type: "richtext",
-      },
-      // ── Featured Image ──────────────────────────────────────────────────
-      featuredImage: { ...imageUploadField, label: "Featured Image" },
-      imagePosition: {
-        type: "custom",
-        label: "Featured Image Position",
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value ?? "top"}
-            onChange={onChange}
-            label="Featured Image Position"
-            options={[
-              { value: "top",   title: "Top"   },
-              { value: "left",  icon: <PanelLeft  size={15} />, title: "Left"  },
-              { value: "right", icon: <PanelRight size={15} />, title: "Right" },
-            ]}
-          />
-        ),
-      },
-      imageStyle: {
-        type: "custom",
-        label: "Image Style",
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value ?? "none"}
-            onChange={onChange}
-            label="Image Style"
-            options={[
-              { value: "none",      title: "Original" },
-              { value: "rectangle", title: "Rect"     },
-              { value: "square",    icon: <Square size={15} />, title: "Square" },
-              { value: "circle",    icon: <Circle size={15} />, title: "Circle" },
-            ]}
-          />
-        ),
-      },
-      imageHeight: {
-        type: "custom",
-        label: "Image Height (px)",
-        render: ({ value, onChange }) => (
-          <StackedNumberField label="Image Height (px)" value={value ?? 400} onChange={onChange} placeholder="e.g., 400" min={60} max={900} />
-        ),
-      },
-      imageBorderRadius: {
-        type: "custom",
-        label: "Image Border Radius (px)",
-        render: ({ value, onChange }) => (
-          <StackedNumberField label="Image Border Radius (px)" value={value ?? 8} onChange={onChange} placeholder="e.g., 8" min={0} max={200} />
-        ),
-      },
-      // ── Typography ──────────────────────────────────────────────────────
-      titleAlign: {
-        type: "custom",
-        label: "Title Alignment",
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value ?? "left"}
-            onChange={onChange}
-            label="Title Alignment"
-            options={[
-              { value: "left",   icon: <AlignLeft   size={15} />, title: "Left"   },
-              { value: "center", icon: <AlignCenter size={15} />, title: "Center" },
-              { value: "right",  icon: <AlignRight  size={15} />, title: "Right"  },
-            ]}
-          />
-        ),
-      },
-      lineHeight: {
-        type: "custom",
-        label: "Line Height",
-        render: ({ value, onChange }) => (
-          <StackedNumberField label="Line Height" value={value ?? 1.75} onChange={onChange} placeholder="e.g., 1.75" min={1} max={4} step={0.1} />
-        ),
-      },
-      letterSpacing: {
-        type: "custom",
-        label: "Letter Spacing (px)",
-        render: ({ value, onChange }) => (
-          <StackedNumberField label="Letter Spacing (px)" value={value ?? 0} onChange={onChange} placeholder="e.g., 0" min={-2} max={10} step={0.1} />
-        ),
-      },
-      titleFontWeight: {
-        type: "custom",
-        label: "Title Font Weight",
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={String(value ?? "700")}
-            onChange={onChange}
-            label="Title Font Weight"
-            options={[
-              { value: "400", title: "400" },
-              { value: "600", title: "600" },
-              { value: "700", title: "700" },
-              { value: "800", title: "800" },
-            ]}
-          />
-        ),
-      },
-      metaFontWeight: {
-        type: "custom",
-        label: "Meta Font Weight",
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={String(value ?? "400")}
-            onChange={onChange}
-            label="Meta Font Weight"
-            options={[
-              { value: "400", title: "400" },
-              { value: "500", title: "500" },
-              { value: "600", title: "600" },
-            ]}
-          />
-        ),
-      },
-      bodyFontWeight: {
-        type: "custom",
-        label: "Body Font Weight",
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={String(value ?? "400")}
-            onChange={onChange}
-            label="Body Font Weight"
-            options={[
-              { value: "400", title: "400" },
-              { value: "500", title: "500" },
-              { value: "600", title: "600" },
-            ]}
-          />
-        ),
-      },
-      // ── Colors ──────────────────────────────────────────────────────────
-      backgroundColor: {
-        type: "custom",
-        label: "Background Color",
-        render: ({ value, onChange }) => (
-          <ColorPickerField label="Background Color" value={value ?? ""} onChange={onChange} />
-        ),
-      },
-      titleColor: {
-        type: "custom",
-        label: "Title Color",
-        render: ({ value, onChange }) => (
-          <ColorPickerField label="Title Color" value={value ?? ""} onChange={onChange} />
-        ),
-      },
-      bodyColor: {
-        type: "custom",
-        label: "Body Color",
-        render: ({ value, onChange }) => (
-          <ColorPickerField label="Body Color" value={value ?? ""} onChange={onChange} />
-        ),
-      },
-      metaColor: {
-        type: "custom",
-        label: "Meta Color",
-        render: ({ value, onChange }) => (
-          <ColorPickerField label="Meta Color" value={value ?? ""} onChange={onChange} />
-        ),
-      },
-      // ── Layout ──────────────────────────────────────────────────────────
-      contentWidth: {
-        type: "custom",
-        label: "Content Width",
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value ?? "medium"}
-            onChange={onChange}
-            label="Content Width"
-            options={[
-              { value: "small",  title: "S" },
-              { value: "medium", title: "M" },
-              { value: "large",  title: "L" },
-            ]}
-          />
-        ),
+        label: "",
+        render: ({ value: _v, onChange: _onChange }: any) => {
+          const { selectedItem, appState, dispatch } = usePuck();
+          const props = selectedItem?.props ?? {};
+          const set = (key: string, val: any) => {
+            if (!selectedItem) return;
+            const state = appState.data;
+            let destinationZone = "root:default-zone", destinationIndex = 0;
+            const zones: Record<string, any[]> = { "root:default-zone": state.content, ...(state.zones ?? {}) };
+            for (const [zone, items] of Object.entries(zones)) {
+              const idx = (items as any[]).findIndex((it: any) => it.props?.id === selectedItem.props?.id);
+              if (idx !== -1) { destinationZone = zone; destinationIndex = idx; break; }
+            }
+            dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } });
+          };
+          return (
+            <BlockTabBar blockKey="Article">
+              {(tab) => (
+                <>
+                  {tab === "content" && (
+                    <>
+                      <TabSection title="Article" />
+                      <StackedTextField label="Title" value={props.articleTitle ?? ""} onChange={(v) => set("articleTitle", v)} placeholder="Enter article title..." />
+                      <StackedTextareaField label="Body" value={props.body ?? ""} onChange={(v) => set("body", v)} placeholder="Enter article body..." rows={6} />
+                      <StackedTextField label="Author" value={props.author ?? ""} onChange={(v) => set("author", v)} placeholder="e.g., Jane Smith" />
+                      <ToggleField label="Show Author" value={props.showAuthor !== false} onChange={(v) => set("showAuthor", v)} />
+                      <StackedDateField label="Published Date" value={props.publishDate ?? ""} onChange={(v) => set("publishDate", v)} />
+                      <ToggleField label="Show Date" value={props.showDate !== false} onChange={(v) => set("showDate", v)} />
+                      <TabSection title="Featured Image" />
+                      <ImageField label="Featured Image" value={props.featuredImage ?? ""} onChange={(v: any) => set("featuredImage", v)} />
+                    </>
+                  )}
+                  {tab === "style" && (
+                    <>
+                      <TabSection title="Colors" />
+                      <ColorPickerField label="Title Color" value={props.titleColor ?? ""} onChange={(v) => set("titleColor", v)} />
+                      <ColorPickerField label="Body Color" value={props.bodyColor ?? ""} onChange={(v) => set("bodyColor", v)} />
+                      <ColorPickerField label="Author Color" value={props.authorColor ?? ""} onChange={(v) => set("authorColor", v)} />
+                      <ColorPickerField label="Date Color" value={props.dateColor ?? ""} onChange={(v) => set("dateColor", v)} />
+
+                      <TabSection title="Title Typography" />
+                      <InlineSelect label="Font Family" value={props.titleFontFamily ?? "inherit"} onChange={(v) => { set("titleFontFamily", v); loadGoogleFont(v); }} options={[{ value: "inherit", label: "Theme Default" }, { value: "Arial, Helvetica, sans-serif", label: "Arial" }, { value: "Georgia, serif", label: "Georgia" }, { value: "'Courier New', monospace", label: "Courier New" }, { value: "Impact, sans-serif", label: "Impact" }, { value: "Inter, sans-serif", label: "Inter" }, { value: "Poppins, sans-serif", label: "Poppins" }, { value: "'Roboto Serif', serif", label: "Roboto Serif" }, { value: "'New York', 'New York Small', 'Times New Roman', serif", label: "New York" }, { value: "'Open Sans', sans-serif", label: "Open Sans" }]} />
+                      <SliderNumberField label="Font Size (px)" value={props.titleFontSize ?? 32} onChange={(v) => set("titleFontSize", v)} min={10} max={120} step={1} unit="px" />
+                      <InlineSelect label="Font Weight" value={String(props.titleFontWeight ?? "700")} onChange={(v) => set("titleFontWeight", v)} options={[{value:"400",label:"Normal"},{value:"600",label:"Semi Bold"},{value:"900",label:"Bold"}]} />
+                      <SliderNumberField label="Line Height" value={props.titleLineHeight ?? 1.3} onChange={(v) => set("titleLineHeight", v)} min={0.8} max={3} step={0.05} unit="" />
+                      <AlignField label="Text Alignment" value={props.titleAlign ?? "left"} onChange={(v) => set("titleAlign", v)} options={[{value:"left",icon:<AlignLeft size={15}/>,title:"Left"},{value:"center",icon:<AlignCenter size={15}/>,title:"Center"},{value:"right",icon:<AlignRight size={15}/>,title:"Right"}]} />
+
+                      <TabSection title="Body Typography" />
+                      <InlineSelect label="Font Family" value={props.bodyFontFamily ?? "inherit"} onChange={(v) => { set("bodyFontFamily", v); loadGoogleFont(v); }} options={[{ value: "inherit", label: "Theme Default" }, { value: "Arial, Helvetica, sans-serif", label: "Arial" }, { value: "Georgia, serif", label: "Georgia" }, { value: "'Courier New', monospace", label: "Courier New" }, { value: "Impact, sans-serif", label: "Impact" }, { value: "Inter, sans-serif", label: "Inter" }, { value: "Poppins, sans-serif", label: "Poppins" }, { value: "'Roboto Serif', serif", label: "Roboto Serif" }, { value: "'New York', 'New York Small', 'Times New Roman', serif", label: "New York" }, { value: "'Open Sans', sans-serif", label: "Open Sans" }]} />
+                      <SliderNumberField label="Font Size (px)" value={props.bodyFontSize ?? 16} onChange={(v) => set("bodyFontSize", v)} min={10} max={60} step={1} unit="px" />
+                      <InlineSelect label="Font Weight" value={String(props.bodyFontWeight ?? "400")} onChange={(v) => set("bodyFontWeight", v)} options={[{value:"400",label:"Normal"},{value:"600",label:"Semi Bold"},{value:"900",label:"Bold"}]} />
+                      <SliderNumberField label="Line Height" value={props.bodyLineHeight ?? 1.75} onChange={(v) => set("bodyLineHeight", v)} min={0.8} max={4} step={0.05} unit="" />
+
+                      <TabSection title="Author Typography" />
+                      <InlineSelect label="Font Family" value={props.authorFontFamily ?? "inherit"} onChange={(v) => { set("authorFontFamily", v); loadGoogleFont(v); }} options={[{ value: "inherit", label: "Theme Default" }, { value: "Arial, Helvetica, sans-serif", label: "Arial" }, { value: "Georgia, serif", label: "Georgia" }, { value: "'Courier New', monospace", label: "Courier New" }, { value: "Impact, sans-serif", label: "Impact" }, { value: "Inter, sans-serif", label: "Inter" }, { value: "Poppins, sans-serif", label: "Poppins" }, { value: "'Roboto Serif', serif", label: "Roboto Serif" }, { value: "'New York', 'New York Small', 'Times New Roman', serif", label: "New York" }, { value: "'Open Sans', sans-serif", label: "Open Sans" }]} />
+                      <SliderNumberField label="Font Size (px)" value={props.authorFontSize ?? 14} onChange={(v) => set("authorFontSize", v)} min={10} max={40} step={1} unit="px" />
+                      <InlineSelect label="Font Weight" value={String(props.authorFontWeight ?? "400")} onChange={(v) => set("authorFontWeight", v)} options={[{value:"400",label:"Normal"},{value:"600",label:"Semi Bold"},{value:"900",label:"Bold"}]} />
+
+                      <TabSection title="Date Typography" />
+                      <InlineSelect label="Font Family" value={props.dateFontFamily ?? "inherit"} onChange={(v) => { set("dateFontFamily", v); loadGoogleFont(v); }} options={[{ value: "inherit", label: "Theme Default" }, { value: "Arial, Helvetica, sans-serif", label: "Arial" }, { value: "Georgia, serif", label: "Georgia" }, { value: "'Courier New', monospace", label: "Courier New" }, { value: "Impact, sans-serif", label: "Impact" }, { value: "Inter, sans-serif", label: "Inter" }, { value: "Poppins, sans-serif", label: "Poppins" }, { value: "'Roboto Serif', serif", label: "Roboto Serif" }, { value: "'New York', 'New York Small', 'Times New Roman', serif", label: "New York" }, { value: "'Open Sans', sans-serif", label: "Open Sans" }]} />
+                      <SliderNumberField label="Font Size (px)" value={props.dateFontSize ?? 13} onChange={(v) => set("dateFontSize", v)} min={10} max={40} step={1} unit="px" />
+                      <InlineSelect label="Font Weight" value={String(props.dateFontWeight ?? "400")} onChange={(v) => set("dateFontWeight", v)} options={[{value:"400",label:"Normal"},{value:"600",label:"Semi Bold"},{value:"900",label:"Bold"}]} />
+
+                      <TabSection title="Featured Image" />
+                      <InlineSelect label="Object Fit" value={props.imageFit ?? "cover"} onChange={(v) => set("imageFit", v)} options={[{value:"cover",label:"Cover"},{value:"contain",label:"Contain"},{value:"fill",label:"Fill"}]} />
+                      <SliderNumberField label="Border Radius (px)" value={props.imageBorderRadius ?? 8} onChange={(v) => set("imageBorderRadius", v)} min={0} max={100} step={1} unit="px" />
+                      <SliderNumberField label="Margin Bottom (px)" value={props.imageMarginBottom ?? 24} onChange={(v) => set("imageMarginBottom", v)} min={0} max={120} step={4} unit="px" />
+                    </>
+                  )}
+                  {tab === "advanced" && (
+                    <>
+                      <TabSection title="Spacing" />
+                      <FourSideField label="Margin"  value={props.advMargin  ?? { top: 0, right: 0, bottom: 0, left: 0 }}   onChange={(v) => set("advMargin", v)} />
+                      <FourSideField label="Padding" value={props.advPadding ?? { top: 48, right: 24, bottom: 48, left: 24 }} onChange={(v) => set("advPadding", v)} />
+                      <TabSection title="Responsive" />
+                      <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
+                      <ToggleField label="Hide on Tablet"  value={!!props.hideTablet}  onChange={(v) => set("hideTablet", v)} />
+                      <ToggleField label="Hide on Mobile"  value={!!props.hideMobile}  onChange={(v) => set("hideMobile", v)} />
+                    </>
+                  )}
+                </>
+              )}
+            </BlockTabBar>
+          );
+        },
       },
     },
 
@@ -7563,43 +4493,64 @@ const commonComponents: any = {
       body: "<p></p>",
       featuredImage: "",
       imagePosition: "top",
-      imageStyle: "none",
       imageHeight: 400,
       imageBorderRadius: 8,
+      imageFit: "cover",
+      imageMarginBottom: 24,
       titleAlign: "left",
-      lineHeight: 1.75,
-      letterSpacing: 0,
-      titleFontWeight: "700",
-      metaFontWeight: "400",
-      bodyFontWeight: "400",
-      backgroundColor: "",
       titleColor: "",
+      titleFontFamily: "inherit",
+      titleFontSize: 32,
+      titleFontWeight: "700",
+      titleLineHeight: 1.3,
       bodyColor: "",
-      metaColor: "",
-      contentWidth: "medium",
+      bodyFontFamily: "inherit",
+      bodyFontSize: 16,
+      bodyFontWeight: "400",
+      bodyLineHeight: 1.75,
+      authorColor: "",
+      authorFontFamily: "inherit",
+      authorFontSize: 14,
+      authorFontWeight: "400",
+      dateColor: "",
+      dateFontFamily: "inherit",
+      dateFontSize: 13,
+      dateFontWeight: "400",
+      advMargin:  { top: 0,  right: 0,  bottom: 0,  left: 0  },
+      advPadding: { top: 48, right: 24, bottom: 48, left: 24 },
+      hideDesktop: false,
+      hideTablet:  false,
+      hideMobile:  false,
     },
 
     render: ({
       articleTitle, author, showAuthor, publishDate, showDate, body,
-      featuredImage, imagePosition, imageStyle, imageHeight, imageBorderRadius,
-      titleAlign, lineHeight, letterSpacing,
-      titleFontWeight, metaFontWeight, bodyFontWeight,
-      backgroundColor, titleColor, bodyColor, metaColor, contentWidth,
-    }) => {
-      const maxWidthMap: Record<string, number> = { small: 680, medium: 860, large: 1100 };
-      const maxWidth = maxWidthMap[contentWidth ?? "medium"] ?? 860;
+      featuredImage, imagePosition, imageHeight, imageBorderRadius, imageFit, imageMarginBottom,
+      titleAlign, titleColor, titleFontFamily, titleFontSize, titleFontWeight, titleLineHeight,
+      bodyColor, bodyFontFamily, bodyFontSize, bodyFontWeight, bodyLineHeight,
+      authorColor, authorFontFamily, authorFontSize, authorFontWeight,
+      dateColor, dateFontFamily, dateFontSize, dateFontWeight,
+      advMargin, advPadding, hideDesktop, hideTablet, hideMobile,
+    }: any) => {
+      const m  = advMargin  ?? { top: 0,  right: 0,  bottom: 0,  left: 0  };
+      const pd = advPadding ?? { top: 48, right: 24, bottom: 48, left: 24 };
+      const hideClasses = [
+        hideDesktop ? "puck-hide-desktop" : "",
+        hideTablet  ? "puck-hide-tablet"  : "",
+        hideMobile  ? "puck-hide-mobile"  : "",
+      ].filter(Boolean).join(" ");
       const radius = imageBorderRadius ?? 8;
       const imgH = imageHeight ?? 400;
       const isHorizontal = imagePosition === "left" || imagePosition === "right";
+      const fit = imageFit ?? "cover";
+      const imgMarginBottom = imageMarginBottom ?? 24;
 
-      const imgStyle: React.CSSProperties =
-        imageStyle === "circle"
-          ? { width: imgH, height: imgH, borderRadius: "50%", objectFit: "cover", display: "block" }
-          : imageStyle === "square"
-          ? { width: "100%", aspectRatio: "1/1", height: imgH, borderRadius: radius, objectFit: "cover", display: "block" }
-          : imageStyle === "rectangle"
-          ? { width: "100%", aspectRatio: "16/9", borderRadius: radius, objectFit: "cover", display: "block" }
-          : { width: "100%", height: imgH, borderRadius: radius, objectFit: "cover", display: "block" };
+      const imgStyle: React.CSSProperties = {
+        width: "100%",
+        height: imgH,
+        objectFit: fit as React.CSSProperties["objectFit"],
+        display: "block",
+      };
 
       const formatDate = (d: string) => {
         if (!d) return "";
@@ -7611,8 +4562,10 @@ const commonComponents: any = {
         <div style={{
           flexShrink: 0,
           minWidth: 0,
-          width: isHorizontal ? (imageStyle === "circle" ? "auto" : "44%") : "100%",
-          marginBottom: isHorizontal ? 0 : 32,
+          width: isHorizontal ? "44%" : "100%",
+          marginBottom: isHorizontal ? 0 : imgMarginBottom,
+          borderRadius: radius,
+          overflow: "hidden",
         }}>
           <img src={featuredImage} alt={articleTitle || "Featured image"} style={imgStyle} />
         </div>
@@ -7624,13 +4577,12 @@ const commonComponents: any = {
         <div style={{ flex: 1, minWidth: 0 }}>
           {articleTitle && (
             <h1 style={{
-              fontSize: "2.25rem",
+              fontSize: titleFontSize ? `${titleFontSize}px` : "2rem",
               fontWeight: Number(titleFontWeight ?? 700),
-              fontFamily: "var(--heading-font)",
+              fontFamily: titleFontFamily && titleFontFamily !== "inherit" ? titleFontFamily : "var(--heading-font)",
               color: titleColor || "var(--primary-color)",
               textAlign: titleAlign as React.CSSProperties["textAlign"],
-              lineHeight: lineHeight ?? 1.2,
-              letterSpacing: letterSpacing ? `${letterSpacing}px` : undefined,
+              lineHeight: titleLineHeight ?? 1.3,
               marginBottom: 10,
             }}>
               {articleTitle}
@@ -7640,24 +4592,38 @@ const commonComponents: any = {
             <div style={{
               display: "flex",
               gap: 12,
-              fontSize: 13,
-              color: metaColor || "var(--text-color)",
-              opacity: 0.75,
               marginBottom: 28,
               flexWrap: "wrap",
-              fontWeight: Number(metaFontWeight ?? 400),
               justifyContent: titleAlign === "center" ? "center" : titleAlign === "right" ? "flex-end" : "flex-start",
             }}>
-              {showAuthor !== false && author && <span>By <strong>{author}</strong></span>}
-              {showDate !== false && publishDate && <span>{formatDate(publishDate)}</span>}
+              {showAuthor !== false && author && (
+                <span style={{
+                  fontSize: authorFontSize ? `${authorFontSize}px` : 14,
+                  fontWeight: Number(authorFontWeight ?? 400),
+                  fontFamily: authorFontFamily && authorFontFamily !== "inherit" ? authorFontFamily : undefined,
+                  color: authorColor || "var(--text-color)",
+                }}>
+                  By <strong>{author}</strong>
+                </span>
+              )}
+              {showDate !== false && publishDate && (
+                <span style={{
+                  fontSize: dateFontSize ? `${dateFontSize}px` : 13,
+                  fontWeight: Number(dateFontWeight ?? 400),
+                  fontFamily: dateFontFamily && dateFontFamily !== "inherit" ? dateFontFamily : undefined,
+                  color: dateColor || "var(--text-color)",
+                }}>
+                  {formatDate(publishDate)}
+                </span>
+              )}
             </div>
           )}
           <div style={{
-            fontSize: "var(--base-font-size, 1rem)",
-            lineHeight: lineHeight ?? 1.75,
+            fontSize: bodyFontSize ? `${bodyFontSize}px` : "1rem",
+            lineHeight: bodyLineHeight ?? 1.75,
             color: bodyColor || "var(--text-color)",
             fontWeight: Number(bodyFontWeight ?? 400),
-            letterSpacing: letterSpacing ? `${letterSpacing}px` : undefined,
+            fontFamily: bodyFontFamily && bodyFontFamily !== "inherit" ? bodyFontFamily : undefined,
           }}>
             {body}
           </div>
@@ -7665,15 +4631,16 @@ const commonComponents: any = {
       );
 
       return (
-        <div style={{ padding: "48px 24px", backgroundColor: backgroundColor || "transparent" }}>
-          <div style={{ maxWidth, margin: "0 auto" }}>
+        <div
+          className={hideClasses || undefined}
+          style={{
+            marginTop: m.top, marginRight: m.right, marginBottom: m.bottom, marginLeft: m.left,
+            paddingTop: pd.top, paddingRight: pd.right, paddingBottom: pd.bottom, paddingLeft: pd.left,
+          }}
+        >
+          <div style={{ maxWidth: 860, margin: "0 auto" }}>
             {isHorizontal ? (
-              <div style={{
-                display: "flex",
-                flexDirection: imagePosition === "left" ? "row" : "row-reverse",
-                gap: 48,
-                alignItems: "flex-start",
-              }}>
+              <div style={{ display: "flex", flexDirection: imagePosition === "left" ? "row" : "row-reverse", gap: 48, alignItems: "flex-start" }}>
                 {imageBox}
                 {articleContent}
               </div>
@@ -7691,4185 +4658,413 @@ const commonComponents: any = {
 
   // ─── About Section ───────────────────────────────────────────────────────
 
-  AboutSection: {
-    label: "About",
-    fields: {
-      // ── Content ──────────────────────────────────────────────────────────
-      badge: {
-        type: "custom",
-        label: "Badge",
-        render: ({ value, onChange }) => (
-          <StackedTextField label="Badge" value={value ?? ""} onChange={onChange} placeholder="e.g., About Us" />
-        ),
-      },
-      title: {
-        type: "custom",
-        label: "Title",
-        render: ({ value, onChange }) => (
-          <StackedTextField label="Title" value={value ?? ""} onChange={onChange} placeholder="Enter section title..." />
-        ),
-      },
-      subtitle: {
-        type: "custom",
-        label: "Subtitle",
-        render: ({ value, onChange }) => (
-          <StackedTextField label="Subtitle" value={value ?? ""} onChange={onChange} placeholder="Enter subtitle..." />
-        ),
-      },
-      description: {
-        type: "custom",
-        label: "Description",
-        render: ({ value, onChange }) => (
-          <StackedTextareaField label="Description" value={value ?? ""} onChange={onChange} placeholder="Enter description..." rows={4} />
-        ),
-      },
-      stats: {
-        type: "array",
-        label: "Stats",
-        getItemSummary: (item) => item.label || "Stat",
-        arrayFields: {
-          value: {
-            type: "custom",
-            label: "Value",
-            render: ({ value, onChange }) => (
-              <StackedTextField label="Value" value={value ?? ""} onChange={onChange} placeholder="e.g., 500+" />
-            ),
-          },
-          label: {
-            type: "custom",
-            label: "Label",
-            render: ({ value, onChange }) => (
-              <StackedTextField label="Label" value={value ?? ""} onChange={onChange} placeholder="e.g., Projects Done" />
-            ),
-          },
-        },
-      },
-      primaryButtonLabel: {
-        type: "custom",
-        label: "Primary Button Label",
-        render: ({ value, onChange }) => (
-          <StackedTextField label="Primary Button Label" value={value ?? ""} onChange={onChange} placeholder="e.g., Learn More" />
-        ),
-      },
-      primaryButtonLink: {
-        type: "custom",
-        label: "Primary Button URL",
-        render: ({ value, onChange }) => (
-          <StackedTextField label="Primary Button URL" value={value ?? ""} onChange={onChange} placeholder="e.g., /about" />
-        ),
-      },
-      secondaryButtonLabel: {
-        type: "custom",
-        label: "Secondary Button Label",
-        render: ({ value, onChange }) => (
-          <StackedTextField label="Secondary Button Label" value={value ?? ""} onChange={onChange} placeholder="e.g., Contact Us" />
-        ),
-      },
-      secondaryButtonLink: {
-        type: "custom",
-        label: "Secondary Button URL",
-        render: ({ value, onChange }) => (
-          <StackedTextField label="Secondary Button URL" value={value ?? ""} onChange={onChange} placeholder="e.g., /contact" />
-        ),
-      },
-      // ── Image ────────────────────────────────────────────────────────────
-      image: {
-        type: "object",
-        label: "Image",
-        objectFields: {
-          url: imageUploadField,
-        },
-      },
-      imagePosition: {
-        type: "custom",
-        label: "Image Position",
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value ?? "right"}
-            onChange={onChange}
-            label="Image Position"
-            options={[
-              { value: "left",  icon: <PanelLeft  size={15} />, title: "Left"  },
-              { value: "right", icon: <PanelRight size={15} />, title: "Right" },
-              { value: "top",   icon: <ArrowUp    size={15} />, title: "Top"   },
-            ]}
-          />
-        ),
-      },
-      imageStyle: {
-        type: "custom",
-        label: "Image Style",
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value ?? "rounded"}
-            onChange={onChange}
-            label="Image Style"
-            options={[
-              { value: "square",  icon: <Square size={15} />, title: "Square"  },
-              { value: "rounded", title: "Rounded" },
-              { value: "circle",  icon: <Circle size={15} />, title: "Circle"  },
-            ]}
-          />
-        ),
-      },
-      imageRadius: {
-        type: "custom",
-        label: "Image Corner Radius (px)",
-        render: ({ value, onChange }) => (
-          <StackedNumberField label="Image Corner Radius (px)" value={value ?? 16} onChange={onChange} placeholder="e.g., 16" min={0} max={80} />
-        ),
-      },
-      imageHeight: {
-        type: "custom",
-        label: "Image Height (px)",
-        render: ({ value, onChange }) => (
-          <StackedNumberField label="Image Height (px)" value={value ?? 460} onChange={onChange} placeholder="e.g., 460" min={120} max={900} />
-        ),
-      },
-      // ── Layout ───────────────────────────────────────────────────────────
-      textAlign: {
-        type: "custom",
-        label: "Text Alignment",
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value ?? "left"}
-            onChange={onChange}
-            label="Text Alignment"
-            options={[
-              { value: "left",   icon: <AlignLeft   size={15} />, title: "Left"   },
-              { value: "center", icon: <AlignCenter size={15} />, title: "Center" },
-              { value: "right",  icon: <AlignRight  size={15} />, title: "Right"  },
-            ]}
-          />
-        ),
-      },
-      verticalAlign: {
-        type: "custom",
-        label: "Vertical Alignment",
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value ?? "center"}
-            onChange={onChange}
-            label="Vertical Alignment"
-            options={[
-              { value: "top",    icon: <AlignVerticalJustifyStart  size={15} />, title: "Top"    },
-              { value: "center", icon: <AlignVerticalJustifyCenter size={15} />, title: "Center" },
-              { value: "bottom", icon: <AlignVerticalJustifyEnd    size={15} />, title: "Bottom" },
-            ]}
-          />
-        ),
-      },
-      columnGap: {
-        type: "custom",
-        label: "Column Gap (px)",
-        render: ({ value, onChange }) => (
-          <StackedNumberField label="Column Gap (px)" value={value ?? 64} onChange={onChange} placeholder="e.g., 64" min={0} max={160} />
-        ),
-      },
-      maxWidth: {
-        type: "custom",
-        label: "Max Width (px)",
-        render: ({ value, onChange }) => (
-          <StackedNumberField label="Max Width (px)" value={value ?? 1200} onChange={onChange} placeholder="e.g., 1200" min={480} max={1600} />
-        ),
-      },
-      padding: {
-        type: "custom",
-        label: "Padding (px)",
-        render: ({ value, onChange }) => (
-          <StackedNumberField label="Padding (px)" value={value ?? 80} onChange={onChange} placeholder="e.g., 80" min={0} max={240} />
-        ),
-      },
-      showStats: {
-        type: "custom",
-        label: "Show Stats",
-        render: ({ value, onChange }) => (
-          <ToggleField value={value !== false} onChange={onChange} label="Show Stats" />
-        ),
-      },
-      // ── Style / Colors ───────────────────────────────────────────────────
-      backgroundColor: {
-        type: "custom",
-        label: "Background Color",
-        render: ({ value, onChange }) => (
-          <ColorPickerField label="Background Color" value={value ?? ""} onChange={onChange} />
-        ),
-      },
-      badgeColor: {
-        type: "custom",
-        label: "Badge Color",
-        render: ({ value, onChange }) => (
-          <ColorPickerField label="Badge Color" value={value ?? ""} onChange={onChange} />
-        ),
-      },
-      titleColor: {
-        type: "custom",
-        label: "Title Color",
-        render: ({ value, onChange }) => (
-          <ColorPickerField label="Title Color" value={value ?? ""} onChange={onChange} />
-        ),
-      },
-      subtitleColor: {
-        type: "custom",
-        label: "Subtitle Color",
-        render: ({ value, onChange }) => (
-          <ColorPickerField label="Subtitle Color" value={value ?? ""} onChange={onChange} />
-        ),
-      },
-      descriptionColor: {
-        type: "custom",
-        label: "Description Color",
-        render: ({ value, onChange }) => (
-          <ColorPickerField label="Description Color" value={value ?? ""} onChange={onChange} />
-        ),
-      },
-      statValueColor: {
-        type: "custom",
-        label: "Stat Value Color",
-        render: ({ value, onChange }) => (
-          <ColorPickerField label="Stat Value Color" value={value ?? ""} onChange={onChange} />
-        ),
-      },
-      statLabelColor: {
-        type: "custom",
-        label: "Stat Label Color",
-        render: ({ value, onChange }) => (
-          <ColorPickerField label="Stat Label Color" value={value ?? ""} onChange={onChange} />
-        ),
-      },
-      buttonColor: {
-        type: "custom",
-        label: "Button Color",
-        render: ({ value, onChange }) => (
-          <ColorPickerField label="Button Color" value={value ?? ""} onChange={onChange} />
-        ),
-      },
-      buttonTextColor: {
-        type: "custom",
-        label: "Button Text Color",
-        render: ({ value, onChange }) => (
-          <ColorPickerField label="Button Text Color" value={value ?? ""} onChange={onChange} />
-        ),
-      },
-    },
-    defaultProps: {
-      badge: "About Us",
-      title: "We Are a Creative Team",
-      subtitle: "Who We Are",
-      description:
-        "We are a team of passionate designers and developers who create amazing digital experiences. Our mission is to help businesses grow online with beautiful, functional websites.",
-      stats: [
-        { value: "500+", label: "Projects Done" },
-        { value: "200+", label: "Happy Clients" },
-        { value: "10+", label: "Years Experience" },
-        { value: "15", label: "Team Members" },
-      ],
-      primaryButtonLabel: "Learn More",
-      primaryButtonLink: "#",
-      secondaryButtonLabel: "",
-      secondaryButtonLink: "",
-      image: { url: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=900&q=80" },
-      imagePosition: "right",
-      imageStyle: "rounded",
-      imageRadius: 16,
-      imageHeight: 460,
-      imageShadow: false,
-      textAlign: "left",
-      verticalAlign: "center",
-      columnGap: 64,
-      maxWidth: 1200,
-      padding: 80,
-      showStats: true,
-      backgroundColor: "#ffffff",
-      badgeColor: "",
-      titleColor: "",
-      subtitleColor: "",
-      descriptionColor: "",
-      statValueColor: "",
-      statLabelColor: "",
-      buttonColor: "",
-      buttonTextColor: "",
-    },
-    render: ({
-      badge, title, subtitle, description, stats,
-      primaryButtonLabel, primaryButtonLink, secondaryButtonLabel, secondaryButtonLink,
-      image, imagePosition, imageStyle, imageRadius, imageHeight, imageShadow,
-      textAlign, verticalAlign, columnGap, maxWidth, padding, showStats,
-      backgroundColor, badgeColor, titleColor, subtitleColor, descriptionColor,
-      statValueColor, statLabelColor, buttonColor, buttonTextColor,
-    }) => {
-      const url = image?.url || "";
-      const isTop = imagePosition === "top";
-      const isLeft = imagePosition === "left";
-      const radius = imageStyle === "circle" ? "50%" : imageStyle === "square" ? "0px" : `${imageRadius ?? 16}px`;
-      const vAlign = verticalAlign === "top" ? "flex-start" : verticalAlign === "bottom" ? "flex-end" : "center";
-      const justifyRow = textAlign === "center" ? "center" : textAlign === "right" ? "flex-end" : "flex-start";
-      const itemsAlign = textAlign === "center" ? "center" : textAlign === "right" ? "flex-end" : "flex-start";
-      const accent = buttonColor || "var(--primary-color)";
-      const btnText = buttonTextColor || "#ffffff";
 
-      const imageEl = url ? (
-        <img
-          src={url}
-          alt={title || "About"}
-          style={{
-            width: imageStyle === "circle" ? (imageHeight ?? 460) : "100%",
-            height: imageHeight ?? 460,
-            maxWidth: "100%",
-            objectFit: "cover",
-            display: "block",
-            borderRadius: radius,
-            margin: isTop || imageStyle === "circle" ? "0 auto" : undefined,
-            boxShadow: imageShadow ? "0 20px 45px rgba(0,0,0,0.18)" : "none",
-          }}
-        />
-      ) : null;
-
-      const contentEl = (
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: itemsAlign,
-          textAlign,
-          minWidth: 0,
-        }}>
-          {badge && (
-            <span style={{ display: "inline-block", fontSize: 12, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: badgeColor || "var(--primary-color)", marginBottom: 12 }}>
-              {badge}
-            </span>
-          )}
-          {subtitle && (
-            <p style={{ fontSize: 16, color: subtitleColor || "var(--secondary-color)", marginBottom: 8 }}>{subtitle}</p>
-          )}
-          {title && (
-            <h2 style={{ fontSize: "var(--h2-size, 2rem)", fontWeight: "var(--heading-weight, 700)", fontFamily: "var(--heading-font)", color: titleColor || "var(--primary-color)", lineHeight: "var(--heading-line-height, 1.2)", marginBottom: 16 }}>
-              {title}
-            </h2>
-          )}
-          {description && (
-            <p style={{ fontSize: "var(--base-font-size, 1rem)", lineHeight: "var(--line-height, 1.7)", color: descriptionColor || "var(--text-color)", marginBottom: 32 }}>
-              {description}
-            </p>
-          )}
-          {showStats !== false && stats && stats.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(stats.length, 4)}, 1fr)`, gap: 16, marginBottom: 32, padding: "24px 0", borderTop: "1px solid #e5e7eb", borderBottom: "1px solid #e5e7eb", width: "100%" }}>
-              {stats.map((stat, i) => (
-                <div key={i} style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "1.75rem", fontWeight: 700, color: statValueColor || "var(--primary-color)", lineHeight: 1.1 }}>{stat.value}</div>
-                  <div style={{ fontSize: "0.8rem", color: statLabelColor || "var(--text-color)", opacity: 0.7, marginTop: 4 }}>{stat.label}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          {(primaryButtonLabel || secondaryButtonLabel) && (
-            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", justifyContent: justifyRow }}>
-              {primaryButtonLabel && (
-                <a href={primaryButtonLink || "#"} style={{ display: "inline-block", backgroundColor: accent, color: btnText, padding: "12px 28px", borderRadius: "var(--button-border-radius, 8px)", fontWeight: 600, textDecoration: "none", fontSize: "var(--base-font-size, 1rem)" }}>
-                  {primaryButtonLabel}
-                </a>
-              )}
-              {secondaryButtonLabel && (
-                <a href={secondaryButtonLink || "#"} style={{ display: "inline-block", backgroundColor: "transparent", color: accent, padding: "12px 28px", borderRadius: "var(--button-border-radius, 8px)", fontWeight: 600, textDecoration: "none", fontSize: "var(--base-font-size, 1rem)", border: `2px solid ${accent}` }}>
-                  {secondaryButtonLabel}
-                </a>
-              )}
-            </div>
-          )}
-        </div>
-      );
-
-      return (
-        <section style={{ backgroundColor: backgroundColor || "#ffffff", padding: `${padding ?? 80}px 0` }}>
-          <div style={{ maxWidth: maxWidth ?? 1200, margin: "0 auto", padding: "0 24px" }}>
-            {isTop ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 40, alignItems: textAlign === "center" ? "center" : itemsAlign }}>
-                {imageEl}
-                {contentEl}
-              </div>
-            ) : (
-              <div
-                className="pb-grid-2col"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: url ? "1fr 1fr" : "1fr",
-                  gap: columnGap ?? 64,
-                  alignItems: vAlign,
-                }}
-              >
-                <div style={{ order: isLeft ? 0 : 1, minWidth: 0 }}>{imageEl}</div>
-                <div style={{ order: isLeft ? 1 : 0, minWidth: 0 }}>{contentEl}</div>
-              </div>
-            )}
-          </div>
-        </section>
-      );
-    },
-  },
-
-  // ─── Gallery Section ─────────────────────────────────────────────────────
-
-  GallerySection: {
-    label: "Gallery",
-    fields: {
-      title: {
-        type: "custom",
-
-        label: "Title",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Title"
-            value={value}
-            onChange={onChange}
-            placeholder="Enter gallery title..."
-          />
-        ),
-      },
-
-      subtitle: {
-        type: "custom",
-
-        label: "Subtitle",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Subtitle"
-            value={value}
-            onChange={onChange}
-            placeholder="Enter subtitle..."
-          />
-        ),
-      },
-
-      columns: {
-        type: "custom",
-
-        label: "Columns",
-
-        render: ({ value, onChange }) => (
-          <ColumnsField
-            value={value}
-            onChange={onChange}
-            label="Columns"
-            options={[{ value: 2 }, { value: 3 }, { value: 4 }]}
-          />
-        ),
-      },
-
-      gap: {
-        type: "custom",
-
-        label: "Gap (px)",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Gap (px)"
-            value={value}
-            onChange={onChange}
-            placeholder="e.g., 16"
-          />
-        ),
-      },
-
-      images: {
-        type: "array",
-
-        label: "Images",
-
-        getItemSummary: (item) => item.caption || item.alt || "Image",
-
-        arrayFields: {
-          url: imageUploadField,
-
-          caption: {
-            type: "custom",
-
-            label: "Caption",
-
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Caption"
-                value={value}
-                onChange={onChange}
-                placeholder="Image caption..."
-              />
-            ),
-          },
-
-          alt: {
-            type: "custom",
-
-            label: "Alt Text",
-
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Alt Text"
-                value={value}
-                onChange={onChange}
-                placeholder="Describe the image..."
-              />
-            ),
-          },
-        },
-      },
-
-      backgroundColor: {
-        type: "custom",
-
-        label: "Background Color",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Background Color"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      textColor: {
-        type: "custom",
-
-        label: "Text Color",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Text Color"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      padding: {
-        type: "custom",
-
-        label: "Padding (px)",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Padding (px)"
-            value={value}
-            onChange={onChange}
-            placeholder="e.g., 80"
-            min={0}
-          />
-        ),
-      },
-    },
-
-    defaultProps: {
-      title: "Our Gallery",
-
-      subtitle: "A Glimpse of Our Work",
-
-      columns: 3,
-
-      gap: 16,
-
-      images: [
-        {
-          url: "https://picsum.photos/seed/gallery1/400/300",
-          caption: "Project 1",
-          alt: "Project 1",
-        },
-
-        {
-          url: "https://picsum.photos/seed/gallery2/400/300",
-          caption: "Project 2",
-          alt: "Project 2",
-        },
-
-        {
-          url: "https://picsum.photos/seed/gallery3/400/300",
-          caption: "Project 3",
-          alt: "Project 3",
-        },
-
-        {
-          url: "https://picsum.photos/seed/gallery4/400/300",
-          caption: "Project 4",
-          alt: "Project 4",
-        },
-
-        {
-          url: "https://picsum.photos/seed/gallery5/400/300",
-          caption: "Project 5",
-          alt: "Project 5",
-        },
-
-        {
-          url: "https://picsum.photos/seed/gallery6/400/300",
-          caption: "Project 6",
-          alt: "Project 6",
-        },
-      ],
-
-      backgroundColor: "#f8fafc",
-
-      textColor: "#1f2937",
-
-      padding: 80,
-    },
-
-    render: ({
-      title,
-      subtitle,
-      columns,
-      gap,
-      images,
-      backgroundColor,
-      textColor,
-      padding,
-    }) => (
-      <>
-        <section style={{ backgroundColor, padding: `${padding}px 0` }}>
-          <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
-            {(title || subtitle) && (
-              <div style={{ textAlign: "center", marginBottom: 48 }}>
-                {subtitle && (
-                  <p
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      color: textColor || "var(--primary-color)",
-                      marginBottom: 8,
-                    }}
-                  >
-                    {subtitle}
-                  </p>
-                )}
-
-                {title && (
-                  <h2
-                    style={{
-                      fontSize: "var(--h2-size, 2rem)",
-                      fontWeight: "var(--heading-weight, 700)",
-                      fontFamily: "var(--heading-font)",
-                      color: textColor || "var(--primary-color)",
-                      lineHeight: "var(--heading-line-height, 1.2)",
-                    }}
-                  >
-                    {title}
-                  </h2>
-                )}
-              </div>
-            )}
-
-            <div
-              className="pb-grid-ncol"
-              style={{
-                display: "grid",
-                gridTemplateColumns: `repeat(${columns}, 1fr)`,
-                gap,
-              }}
-            >
-              {images.map((img, i) => (
-                <div
-                  key={i}
-                  style={{
-                    position: "relative",
-                    overflow: "hidden",
-                    borderRadius: 8,
-                  }}
-                >
-                  <img
-                    src={img.url}
-                    alt={img.alt || img.caption || `Gallery ${i + 1}`}
-                    style={{
-                      width: "100%",
-                      aspectRatio: "4/3",
-                      objectFit: "cover",
-                      display: "block",
-                    }}
-                  />
-
-                  {img.caption && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        padding: "8px 12px",
-                        background:
-                          "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
-                        color: "#fff",
-                        fontSize: 13,
-                        fontWeight: 500,
-                      }}
-                    >
-                      {img.caption}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      </>
-    ),
-  },
-
-  // ─── Service Section ─────────────────────────────────────────────────────
-
-  ServiceSection: {
-    label: "Services",
-    fields: {
-      title: {
-        type: "custom",
-
-        label: "Section Title",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Section Title"
-            value={value}
-            onChange={onChange}
-            placeholder="Enter section title..."
-          />
-        ),
-      },
-
-      subtitle: {
-        type: "custom",
-
-        label: "Subtitle",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Subtitle"
-            value={value}
-            onChange={onChange}
-            placeholder="Enter subtitle..."
-          />
-        ),
-      },
-
-      description: {
-        type: "custom",
-
-        label: "Description",
-
-        render: ({ value, onChange }) => (
-          <StackedTextareaField
-            label="Description"
-            value={value}
-            onChange={onChange}
-            placeholder="Enter description..."
-            rows={3}
-          />
-        ),
-      },
-
-      columns: {
-        type: "custom",
-
-        label: "Columns",
-
-        render: ({ value, onChange }) => (
-          <ColumnsField
-            value={value}
-            onChange={onChange}
-            label="Columns"
-            options={[{ value: 2 }, { value: 3 }, { value: 4 }]}
-          />
-        ),
-      },
-
-      cardStyle: {
-        type: "custom",
-
-        label: "Card Style",
-
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value}
-            onChange={onChange}
-            label="Card Style"
-            options={[
-              {
-                value: "bordered",
-                icon: <Square size={15} />,
-                title: "Bordered",
-              },
-
-              { value: "shadow", icon: <Copy size={15} />, title: "Shadow" },
-
-              { value: "flat", icon: <Minus size={15} />, title: "Flat" },
-            ]}
-          />
-        ),
-      },
-
-      layoutStyle: {
-        type: "custom",
-
-        label: "Layout Style",
-
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value}
-            onChange={onChange}
-            label="Layout Style"
-            options={[
-              {
-                value: "standard",
-                icon: <LayoutGrid size={15} />,
-                title: "Standard",
-              },
-
-              {
-                value: "image-top",
-                icon: <ImageIcon size={15} />,
-                title: "Image Top",
-              },
-
-              {
-                value: "image-left",
-                icon: <PanelLeft size={15} />,
-                title: "Image Left",
-              },
-
-              {
-                value: "image-right",
-                icon: <PanelRight size={15} />,
-                title: "Image Right",
-              },
-
-              {
-                value: "icon-center",
-                icon: <AlignCenter size={15} />,
-                title: "Icon Center",
-              },
-            ]}
-          />
-        ),
-      },
-
-      services: {
-        type: "array",
-
-        label: "Services",
-
-        getItemSummary: (item) => item.title || "Service",
-
-        arrayFields: {
-          icon: {
-            type: "custom",
-
-            label: "Icon (emoji)",
-
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Icon (emoji)"
-                value={value}
-                onChange={onChange}
-                placeholder="e.g., 🎨"
-              />
-            ),
-          },
-
-          title: {
-            type: "custom",
-
-            label: "Title",
-
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Title"
-                value={value}
-                onChange={onChange}
-                placeholder="Service title..."
-              />
-            ),
-          },
-
-          description: {
-            type: "custom",
-
-            label: "Description",
-
-            render: ({ value, onChange }) => (
-              <StackedTextareaField
-                label="Description"
-                value={value}
-                onChange={onChange}
-                placeholder="Service description..."
-                rows={2}
-              />
-            ),
-          },
-
-          linkLabel: {
-            type: "custom",
-
-            label: "Link Label",
-
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Link Label"
-                value={value}
-                onChange={onChange}
-                placeholder="e.g., Learn More"
-              />
-            ),
-          },
-
-          link: {
-            type: "custom",
-
-            label: "Link URL",
-
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Link URL"
-                value={value}
-                onChange={onChange}
-                placeholder="e.g., /services"
-              />
-            ),
-          },
-
-          image: {
-            type: "custom" as const,
-
-            label: "Image",
-
-            render: ({
-              value,
-              onChange,
-              field,
-            }: {
-              value: { url: string } | undefined;
-              onChange: (val: { url: string } | undefined) => void;
-              field: any;
-            }) => {
-              return imageUploadField.render({
-                value: value?.url || "",
-
-                onChange: (url: string) => onChange(url ? { url } : undefined),
-
-                field,
-              });
-            },
-          },
-        },
-      },
-
-      backgroundColor: {
-        type: "custom",
-
-        label: "Background Color",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Background Color"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      padding: {
-        type: "custom",
-
-        label: "Padding (px)",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Padding (px)"
-            value={value}
-            onChange={onChange}
-            placeholder="e.g., 80"
-          />
-        ),
-      },
-
-      contentAlign: {
-        type: "custom",
-
-        label: "Content Alignment",
-
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value}
-            onChange={onChange}
-            label="Content Align"
-            options={[
-              { value: "left", icon: <AlignLeft size={15} />, title: "Left" },
-
-              {
-                value: "center",
-                icon: <AlignCenter size={15} />,
-                title: "Center",
-              },
-
-              {
-                value: "right",
-                icon: <AlignRight size={15} />,
-                title: "Right",
-              },
-            ]}
-          />
-        ),
-      },
-    },
-
-    defaultProps: {
-      title: "Our Services",
-
-      subtitle: "What We Offer",
-
-      description:
-        "We provide comprehensive solutions to help your business succeed in the digital world.",
-
-      columns: 3,
-
-      cardStyle: "shadow",
-
-      services: [
-        {
-          icon: "🎨",
-          title: "Web Design",
-          description:
-            "Beautiful, modern designs that capture your brand and engage your audience.",
-          linkLabel: "Learn More",
-          link: "#",
-        },
-
-        {
-          icon: "⚙️",
-          title: "Development",
-          description:
-            "Robust and scalable web applications built with the latest technologies.",
-          linkLabel: "Learn More",
-          link: "#",
-        },
-
-        {
-          icon: "📈",
-          title: "SEO & Marketing",
-          description:
-            "Grow your online presence and reach more customers with proven strategies.",
-          linkLabel: "Learn More",
-          link: "#",
-        },
-
-        {
-          icon: "📱",
-          title: "Mobile Apps",
-          description:
-            "Cross-platform mobile applications that deliver a seamless user experience.",
-          linkLabel: "Learn More",
-          link: "#",
-        },
-
-        {
-          icon: "🔒",
-          title: "Security",
-          description:
-            "Protect your digital assets with enterprise-grade security solutions.",
-          linkLabel: "Learn More",
-          link: "#",
-        },
-
-        {
-          icon: "☁️",
-          title: "Cloud Services",
-          description:
-            "Scalable cloud infrastructure that grows with your business needs.",
-          linkLabel: "Learn More",
-          link: "#",
-        },
-      ],
-
-      backgroundColor: "#ffffff",
-
-      padding: 80,
-
-      contentAlign: "left",
-
-      layoutStyle: "standard",
-    },
-
-    render: ({
-      title,
-      subtitle,
-      description,
-      columns,
-      cardStyle,
-      services,
-      backgroundColor,
-      padding,
-      contentAlign,
-      layoutStyle,
-    }) => {
-      const cardStyleMap: Record<string, React.CSSProperties> = {
-        bordered: { border: "1px solid #e5e7eb", boxShadow: "none" },
-
-
-        flat: { border: "none", boxShadow: "none", backgroundColor: "#f8fafc" },
-      };
-
-      return (
-        <>
-          <section style={{ backgroundColor, padding: `${padding}px 0` }}>
-            <div
-              style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}
-            >
-              <div style={{ textAlign: "center", marginBottom: 48 }}>
-                {subtitle && (
-                  <p
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      color: "var(--primary-color)",
-                      marginBottom: 8,
-                    }}
-                  >
-                    {subtitle}
-                  </p>
-                )}
-
-                {title && (
-                  <h2
-                    style={{
-                      fontSize: "var(--h2-size, 2rem)",
-                      fontWeight: "var(--heading-weight, 700)",
-                      fontFamily: "var(--heading-font)",
-                      color: "var(--primary-color)",
-                      marginBottom: 16,
-                      lineHeight: "var(--heading-line-height, 1.2)",
-                    }}
-                  >
-                    {title}
-                  </h2>
-                )}
-
-                {description && (
-                  <p
-                    style={{
-                      maxWidth: 600,
-                      margin: "0 auto",
-                      color: "var(--text-color)",
-                      opacity: 0.75,
-                      lineHeight: "var(--line-height, 1.7)",
-                    }}
-                  >
-                    {description}
-                  </p>
-                )}
-              </div>
-
-              <div
-                className="pb-grid-ncol"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: `repeat(${columns}, 1fr)`,
-                  gap: 24,
-                }}
-              >
-                {services.map((service, i) => {
-                  // Image Left/Right layouts use horizontal flex
-
-                  if (
-                    layoutStyle === "image-left" ||
-                    layoutStyle === "image-right"
-                  ) {
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          padding: "32px 24px",
-                          borderRadius: 12,
-                          ...cardStyleMap[cardStyle],
-                          display: "flex",
-                          flexDirection:
-                            layoutStyle === "image-right"
-                              ? "row-reverse"
-                              : "row",
-                          gap: 20,
-                          alignItems: "center",
-                        }}
-                      >
-                        {service.image?.url && (
-                          <img
-                            src={service.image.url}
-                            alt={service.title}
-                            style={{
-                              width: 120,
-                              height: 120,
-                              objectFit: "cover",
-                              borderRadius: 8,
-                              flexShrink: 0,
-                            }}
-                          />
-                        )}
-
-                        <div style={{ flex: 1, textAlign: contentAlign }}>
-                          <h3
-                            style={{
-                              fontSize: "var(--h3-size, 1.25rem)",
-                              fontWeight: "var(--heading-weight, 600)",
-                              fontFamily: "var(--heading-font)",
-                              color: "var(--primary-color)",
-                              marginBottom: 12,
-                              lineHeight: "var(--heading-line-height, 1.2)",
-                            }}
-                          >
-                            {service.title}
-                          </h3>
-
-                          <p
-                            style={{
-                              fontSize: "var(--base-font-size, 0.95rem)",
-                              color: "var(--text-color)",
-                              opacity: 0.8,
-                              lineHeight: "var(--line-height, 1.7)",
-                              marginBottom: service.linkLabel ? 20 : 0,
-                            }}
-                          >
-                            {service.description}
-                          </p>
-
-                          {service.linkLabel && (
-                            <a
-                              href={service.link || "#"}
-                              style={{
-                                color: "var(--primary-color)",
-                                fontWeight: 600,
-                                fontSize: 14,
-                                textDecoration: "none",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 4,
-                              }}
-                            >
-                              {service.linkLabel} →
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Icon Center layout
-
-                  if (layoutStyle === "icon-center") {
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          padding: "32px 24px",
-                          borderRadius: 12,
-                          ...cardStyleMap[cardStyle],
-                          textAlign: "center",
-                        }}
-                      >
-                        {service.icon && (
-                          <div
-                            style={{
-                              fontSize: 64,
-                              marginBottom: 20,
-                              lineHeight: 1,
-                            }}
-                          >
-                            {service.icon}
-                          </div>
-                        )}
-
-                        <h3
-                          style={{
-                            fontSize: "var(--h3-size, 1.25rem)",
-                            fontWeight: "var(--heading-weight, 600)",
-                            fontFamily: "var(--heading-font)",
-                            color: "var(--primary-color)",
-                            marginBottom: 12,
-                            lineHeight: "var(--heading-line-height, 1.2)",
-                          }}
-                        >
-                          {service.title}
-                        </h3>
-
-                        <p
-                          style={{
-                            fontSize: "var(--base-font-size, 0.95rem)",
-                            color: "var(--text-color)",
-                            opacity: 0.8,
-                            lineHeight: "var(--line-height, 1.7)",
-                            marginBottom: service.linkLabel ? 20 : 0,
-                          }}
-                        >
-                          {service.description}
-                        </p>
-
-                        {service.linkLabel && (
-                          <a
-                            href={service.link || "#"}
-                            style={{
-                              color: "var(--primary-color)",
-                              fontWeight: 600,
-                              fontSize: 14,
-                              textDecoration: "none",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 4,
-                            }}
-                          >
-                            {service.linkLabel} →
-                          </a>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  // Standard and Image Top layouts (vertical)
-
-                  return (
-                    <div
-                      key={i}
-                      style={{
-                        padding: "32px 24px",
-                        borderRadius: 12,
-                        ...cardStyleMap[cardStyle],
-                        textAlign: contentAlign,
-                      }}
-                    >
-                      {service.image?.url ? (
-                        <img
-                          src={service.image.url}
-                          alt={service.title}
-                          style={{
-                            width: "100%",
-                            height: layoutStyle === "image-top" ? 180 : 200,
-                            objectFit: "cover",
-                            borderRadius: 8,
-                            marginBottom: 16,
-                          }}
-                        />
-                      ) : (
-                        service.icon && (
-                          <div
-                            style={{
-                              fontSize: 40,
-                              marginBottom: 16,
-                              lineHeight: 1,
-                            }}
-                          >
-                            {service.icon}
-                          </div>
-                        )
-                      )}
-
-                      <h3
-                        style={{
-                          fontSize: "var(--h3-size, 1.25rem)",
-                          fontWeight: "var(--heading-weight, 600)",
-                          fontFamily: "var(--heading-font)",
-                          color: "var(--primary-color)",
-                          marginBottom: 12,
-                          lineHeight: "var(--heading-line-height, 1.2)",
-                        }}
-                      >
-                        {service.title}
-                      </h3>
-
-                      <p
-                        style={{
-                          fontSize: "var(--base-font-size, 0.95rem)",
-                          color: "var(--text-color)",
-                          opacity: 0.8,
-                          lineHeight: "var(--line-height, 1.7)",
-                          marginBottom: service.linkLabel ? 20 : 0,
-                        }}
-                      >
-                        {service.description}
-                      </p>
-
-                      {service.linkLabel && (
-                        <a
-                          href={service.link || "#"}
-                          style={{
-                            color: "var(--primary-color)",
-                            fontWeight: 600,
-                            fontSize: 14,
-                            textDecoration: "none",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                          }}
-                        >
-                          {service.linkLabel} →
-                        </a>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-        </>
-      );
-    },
-  },
-
-  // ─── Contact Section ─────────────────────────────────────────────────────
-
-  ContactSection: {
-    label: "Contact",
-    fields: {
-      title: {
-        type: "custom",
-
-        label: "Contact heading",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Contact heading"
-            value={value}
-            onChange={onChange}
-            placeholder="Enter contact heading..."
-          />
-        ),
-      },
-
-      subtitle: {
-        type: "custom",
-
-        label: "Contact subheading",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Contact subheading"
-            value={value}
-            onChange={onChange}
-            placeholder="Enter contact subheading..."
-          />
-        ),
-      },
-
-      description: {
-        type: "custom",
-
-        label: "Contact description",
-
-        render: ({ value, onChange }) => (
-          <StackedTextareaField
-            label="Contact description"
-            value={value}
-            onChange={onChange}
-            placeholder="Enter contact description..."
-            rows={3}
-          />
-        ),
-      },
-
-      email: {
-        type: "custom",
-
-        label: "Contact email",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Contact email"
-            value={value}
-            onChange={onChange}
-            placeholder="contact@example.com"
-          />
-        ),
-      },
-
-      phone: {
-        type: "custom",
-
-        label: "Contact phone",
-
-        render: ({ value, onChange }) => {
-          const digits = (value ?? "").replace(/\D/g, "");
-          const tooLong = digits.length > 15;
-          const tooShort = digits.length > 0 && digits.length < 7;
-          const hasError = tooLong || tooShort;
-
-          const handleChange = (raw: string) => {
-            // Strip anything that isn't +, digit, space, -, (, )
-            const sanitised = raw.replace(/[^\d\s\+\-\(\)]/g, "");
-            // Enforce max 15 digits
-            const digitCount = sanitised.replace(/\D/g, "").length;
-            if (digitCount > 15) return;
-            onChange(sanitised);
-          };
-
-          return (
-            <StackedField label="Contact phone" icon={<span style={{ fontSize: 14 }}>📞</span>}>
-              <input
-                type="tel"
-                value={value ?? ""}
-                placeholder="+1 234 567 8900"
-                onChange={(e) => handleChange(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  fontSize: 14,
-                  border: `1px solid ${hasError ? "#ef4444" : "#d1d5db"}`,
-                  borderRadius: 6,
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
-              />
-              {tooLong && (
-                <p style={{ margin: "4px 0 0", fontSize: 11, color: "#ef4444" }}>
-                  Phone number must not exceed 15 digits.
-                </p>
-              )}
-              {tooShort && (
-                <p style={{ margin: "4px 0 0", fontSize: 11, color: "#ef4444" }}>
-                  Phone number must have at least 7 digits.
-                </p>
-              )}
-            </StackedField>
-          );
-        },
-      },
-
-      address: {
-        type: "custom",
-
-        label: "Contact address",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Contact address"
-            value={value}
-            onChange={onChange}
-            placeholder="123 Main St, City, Country"
-          />
-        ),
-      },
-
-      showForm: {
-        type: "custom",
-
-        label: "Display contact form",
-
-        render: ({ value, onChange }) => (
-          <ToggleField
-            value={!!value}
-            onChange={onChange}
-            label="Display contact form"
-          />
-        ),
-      },
-
-      buttonLabel: {
-        type: "custom",
-
-        label: "Form button text",
-
-        visible: ({ props }) => !!props?.showForm,
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Form button text"
-            value={value}
-            onChange={onChange}
-            placeholder="Enter button text..."
-          />
-        ),
-      },
-
-      backgroundColor: {
-        type: "custom",
-
-        label: "Background Color",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Background Color"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      padding: {
-        type: "custom",
-
-        label: "Padding (px)",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Padding (px)"
-            value={value}
-            onChange={onChange}
-            placeholder="e.g., 80"
-          />
-        ),
-      },
-
-      layoutStyle: {
-        type: "select",
-
-        options: [
-          { label: "Split", value: "split" },
-
-          { label: "Centered", value: "centered" },
-
-          { label: "Full Width", value: "full-width" },
-
-          { label: "Grid", value: "grid" },
-
-          { label: "Cards", value: "cards" },
-        ],
-      },
-
-      cardStyle: {
-        type: "select",
-
-        options: [
-          { label: "Modern", value: "modern" },
-
-          { label: "Minimal", value: "minimal" },
-
-          { label: "Glassmorphism", value: "glassmorphism" },
-
-          { label: "Gradient", value: "gradient" },
-
-          { label: "Shadow", value: "shadow" },
-        ],
-      },
-
-      backgroundPattern: {
-        type: "select",
-
-        options: [
-          { label: "None", value: "none" },
-
-          { label: "Dots", value: "dots" },
-
-          { label: "Lines", value: "lines" },
-
-          { label: "Gradient", value: "gradient" },
-
-          { label: "Geometric", value: "geometric" },
-        ],
-      },
-
-      spacing: {
-        type: "select",
-
-        options: [
-          { label: "Compact", value: "compact" },
-
-          { label: "Normal", value: "normal" },
-
-          { label: "Generous", value: "generous" },
-        ],
-      },
-
-      accentColor: {
-        type: "custom",
-
-        label: "Accent Color",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Accent Color"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      responseTime: {
-        type: "custom",
-
-        label: "Response Time",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Response Time"
-            value={value}
-            onChange={onChange}
-            placeholder="e.g., Within 24 hours"
-          />
-        ),
-      },
-
-      mapEmbed: {
-        type: "custom",
-
-        label: "Map Embed URL",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Map Embed URL"
-            value={value}
-            onChange={onChange}
-            placeholder="Google Maps embed URL"
-          />
-        ),
-      },
-
-      hoverEffects: {
-        type: "custom",
-
-        label: "Hover Effects",
-
-        render: ({ value, onChange }) => (
-          <ToggleField
-            value={!!value}
-            onChange={onChange}
-            label="Enable Hover Effects"
-          />
-        ),
-      },
-
-      borderRadius: {
-        type: "custom",
-
-        label: "Border Radius (px)",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Border Radius (px)"
-            value={value}
-            onChange={onChange}
-            placeholder="e.g., 8"
-          />
-        ),
-      },
-
-      contentCentered: {
-        type: "custom",
-
-        label: "Content Centered",
-
-        render: ({ value, onChange }) => (
-          <ToggleField
-            value={!!value}
-            onChange={onChange}
-            label="Center Content"
-          />
-        ),
-      },
-
-      image: {
-        type: "object",
-
-        label: "Image",
-
-        objectFields: {
-          url: imageUploadField,
-
-          mode: {
-            type: "custom",
-
-            label: "Mode",
-
-            render: ({ value, onChange }) => (
-              <AlignField
-                value={value}
-                onChange={onChange}
-                label="Mode"
-                options={[
-                  {
-                    value: "inline",
-                    icon: <ImageIcon size={15} />,
-                    title: "Inline",
-                  },
-
-                  {
-                    value: "bg",
-                    icon: <Layers size={15} />,
-                    title: "Background",
-                  },
-                ]}
-              />
-            ),
-          },
-        },
-      },
-
-      overlayOpacity: {
-        type: "custom",
-
-        label: "Overlay Opacity",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Overlay Opacity (0-1)"
-            value={value}
-            onChange={onChange}
-            min={0}
-            max={1}
-            step={0.1}
-            placeholder="e.g., 0.7"
-          />
-        ),
-      },
-
-      labelName: {
-        type: "custom",
-
-        label: "Name Field Label",
-
-        visible: ({ props }) => !!props?.showForm,
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Name Field Label"
-            value={value ?? ""}
-            onChange={onChange}
-            placeholder="e.g., Name"
-          />
-        ),
-      },
-
-      labelEmail: {
-        type: "custom",
-
-        label: "Email Field Label",
-
-        visible: ({ props }) => !!props?.showForm,
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Email Field Label"
-            value={value ?? ""}
-            onChange={onChange}
-            placeholder="e.g., Email"
-          />
-        ),
-      },
-
-      labelSubject: {
-        type: "custom",
-
-        label: "Subject Field Label",
-
-        visible: ({ props }) => !!props?.showForm,
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Subject Field Label"
-            value={value ?? ""}
-            onChange={onChange}
-            placeholder="e.g., Subject"
-          />
-        ),
-      },
-
-      labelMessage: {
-        type: "custom",
-
-        label: "Message Field Label",
-
-        visible: ({ props }) => !!props?.showForm,
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Message Field Label"
-            value={value ?? ""}
-            onChange={onChange}
-            placeholder="e.g., Message"
-          />
-        ),
-      },
-    },
-
-    defaultProps: {
-      title: "Get In Touch",
-
-      subtitle: "Contact Us",
-
-      description:
-        "Have a project in mind? We'd love to hear from you. Send us a message and we'll get back to you as soon as possible.",
-
-      email: "hello@example.com",
-
-      phone: "+1 (555) 123-4567",
-
-      address: "123 Main Street, Suite 100\nNew York, NY 10001",
-
-      showForm: true,
-
-      buttonLabel: "Send Message",
-
-      backgroundColor: "#f8fafc",
-
-      padding: 80,
-
-      layoutStyle: "split",
-
-      cardStyle: "modern",
-
-      accentColor: "#0158ad",
-
-      backgroundPattern: "none",
-
-      responseTime: "Within 24 hours",
-
-      mapEmbed: "",
-
-      hoverEffects: true,
-
-      borderRadius: 8,
-
-      spacing: "normal",
-
-      contentCentered: false,
-
-      image: { url: "", mode: "inline", position: "right" },
-
-      overlayOpacity: 0.7,
-
-      labelName: "Name",
-
-      labelEmail: "Email",
-
-      labelSubject: "Subject",
-
-      labelMessage: "Message",
-    },
-
-    render: ({
-      title,
-      subtitle,
-      description,
-      email,
-      phone,
-      address,
-      showForm,
-      buttonLabel,
-      backgroundColor,
-      padding,
-      layoutStyle,
-      cardStyle,
-      accentColor,
-      backgroundPattern,
-      responseTime,
-      mapEmbed,
-      hoverEffects,
-      borderRadius,
-      spacing,
-      contentCentered,
-      image,
-      overlayOpacity,
-      labelName,
-      labelEmail,
-      labelSubject,
-      labelMessage,
-    }) => {
-      // Calculate spacing values
-
-      const spacingValues = {
-        compact: { gap: 24, padding: 60 },
-
-        normal: { gap: 48, padding: 80 },
-
-        generous: { gap: 64, padding: 100 },
-      };
-
-      const currentSpacing = spacingValues[spacing] || spacingValues.normal;
-
-      // Background pattern styles
-
-      const getBackgroundPattern = () => {
-        if (!backgroundPattern || backgroundPattern === "none") return {};
-
-        switch (backgroundPattern) {
-          case "dots":
-            return {
-              backgroundImage:
-                "radial-gradient(circle, #e5e7eb 1px, transparent 1px)",
-              backgroundSize: "20px 20px",
-            };
-
-          case "lines":
-            return {
-              backgroundImage:
-                "linear-gradient(90deg, #e5e7eb 1px, transparent 1px)",
-              backgroundSize: "40px 100%",
-            };
-
-          case "gradient":
-            return {
-              backgroundImage: `linear-gradient(135deg, ${backgroundColor} 0%, ${accentColor || "var(--primary-color)"}20 100%)`,
-            };
-
-          case "geometric":
-            return {
-              backgroundImage:
-                "linear-gradient(45deg, #f3f4f6 25%, transparent 25%, transparent 75%, #f3f4f6 75%, #f3f4f6), linear-gradient(45deg, #f3f4f6 25%, transparent 25%, transparent 75%, #f3f4f6 75%, #f3f4f6)",
-              backgroundSize: "20px 20px",
-              backgroundPosition: "0 0, 10px 10px",
-            };
-
-          default:
-            return {};
-        }
-      };
-
-      // Card style classes
-
-      const getCardStyle = () => {
-        switch (cardStyle) {
-          case "glassmorphism":
-            return {
-              background: "rgba(255, 255, 255, 0.7)",
-              backdropFilter: "blur(10px)",
-              border: "1px solid rgba(255, 255, 255, 0.3)",
-            };
-
-          case "gradient":
-            return {
-              background: `linear-gradient(135deg, ${backgroundColor} 0%, ${accentColor || "var(--primary-color)"}15 100%)`,
-            };
-
-          case "shadow":
-            return { boxShadow: "0 10px 40px rgba(0, 0, 0, 0.1)" };
-
-          case "minimal":
-            return { border: "1px solid #e5e7eb" };
-
-          case "modern":
-
-          default:
-            return { boxShadow: "0 4px 6px rgba(0, 0, 0, 0.05)" };
-        }
-      };
-
-      // Get image styles based on mode
-
-      const getImageStyles = () => {
-        if (!image?.url) return {};
-
-        if (image?.mode === "bg") {
-          return {
-            backgroundImage: `url(${image.url})`,
-
-            backgroundSize: "cover",
-
-            backgroundPosition: "center",
-
-            position: "relative" as const,
-          };
-        }
-
-        return {};
-      };
-
-      const getImageOverlay = () => {
-        if (image?.mode === "bg" && image?.url) {
-          const opacity = overlayOpacity ?? 0.7;
-
-          const alpha = Math.round(opacity * 255)
-            .toString(16)
-            .padStart(2, "0");
-
-          return {
-            position: "absolute" as const,
-
-            inset: 0,
-
-            backgroundColor: `${backgroundColor}${alpha}`,
-
-            zIndex: 0,
-          };
-        }
-
-        return null;
-      };
-
-      return (
-        <section
-          style={{
-            backgroundColor: image?.mode === "bg" ? undefined : backgroundColor,
-            padding: `${currentSpacing.padding}px 0`,
-            ...getBackgroundPattern(),
-            ...getImageStyles(),
-          }}
-        >
-          {getImageOverlay() && <div style={getImageOverlay()} />}
-
-          <div
-            style={{
-              maxWidth: 1200,
-              margin: "0 auto",
-              padding: "0 24px",
-              position: "relative",
-              zIndex: 1,
-            }}
-          >
-            {image?.url && image?.mode === "inline" && (
-              <img
-                src={image.url}
-                alt="Contact"
-                style={{
-                  width: "100%",
-                  height: 300,
-                  objectFit: "cover",
-                  borderRadius: borderRadius || 12,
-                  marginBottom: 32,
-                }}
-              />
-            )}
-
-            <div
-              style={{
-                textAlign: contentCentered ? "center" : "left",
-                marginBottom: 48,
-                marginLeft: contentCentered ? "auto" : 0,
-                marginRight: contentCentered ? "auto" : 0,
-              }}
-            >
-              {subtitle && (
-                <p
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 600,
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                    color: accentColor || "var(--primary-color)",
-                    marginBottom: 8,
-                  }}
-                >
-                  {subtitle}
-                </p>
-              )}
-
-              {title && (
-                <h2
-                  style={{
-                    fontSize: "var(--h2-size, 2rem)",
-                    fontWeight: "var(--heading-weight, 700)",
-                    fontFamily: "var(--heading-font)",
-                    color: accentColor || "var(--primary-color)",
-                    marginBottom: 16,
-                    lineHeight: "var(--heading-line-height, 1.2)",
-                    textAlign: contentCentered ? "center" : "left",
-                  }}
-                >
-                  {title}
-                </h2>
-              )}
-
-              {description && (
-                <p
-                  style={{
-                    maxWidth: contentCentered ? 560 : "none",
-                    margin: contentCentered ? "0 auto" : "0",
-                    color: "var(--text-color)",
-                    opacity: 0.75,
-                    lineHeight: "var(--line-height, 1.7)",
-                    textAlign: contentCentered ? "center" : "left",
-                  }}
-                >
-                  {description}
-                </p>
-              )}
-            </div>
-
-            <div
-              className={showForm ? "pb-grid-2col" : undefined}
-              style={{
-                display: "grid",
-                gridTemplateColumns: showForm ? "1fr 1.5fr" : "1fr",
-                gap: currentSpacing.gap,
-                alignItems: "start",
-              }}
-            >
-              {/* Contact Info */}
-
-              <div
-                style={{
-                  ...getCardStyle(),
-                  borderRadius: borderRadius || 8,
-                  padding: 32,
-                  transition: hoverEffects
-                    ? "transform 0.3s ease, box-shadow 0.3s ease"
-                    : "none",
-                  ...(hoverEffects
-                    ? {
-                        ":hover": {
-                          transform: "translateY(-4px)",
-                          boxShadow: "0 12px 24px rgba(0, 0, 0, 0.15)",
-                        },
-                      }
-                    : {}),
-                }}
-              >
-                <h3
-                  style={{
-                    fontSize: "1.25rem",
-                    fontWeight: 600,
-                    color: accentColor || "var(--primary-color)",
-                    marginBottom: 24,
-                    fontFamily: "var(--heading-font)",
-                  }}
-                >
-                  Contact Information
-                </h3>
-
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 20 }}
-                >
-                  {responseTime && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "12px 16px",
-                        backgroundColor: `${accentColor || "var(--primary-color)"}10`,
-                        borderRadius: 8,
-                        marginBottom: 8,
-                      }}
-                    >
-                      <span style={{ fontSize: 16 }}>⏱️</span>
-
-                      <span
-                        style={{
-                          fontSize: 14,
-                          fontWeight: 600,
-                          color: accentColor || "var(--primary-color)",
-                        }}
-                      >
-                        {responseTime}
-                      </span>
-                    </div>
-                  )}
-
-                  {email && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 16,
-                        transition: hoverEffects
-                          ? "transform 0.2s ease"
-                          : "none",
-                        ...(hoverEffects
-                          ? { ":hover": { transform: "translateX(4px)" } }
-                          : {}),
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: borderRadius || 10,
-                          backgroundColor:
-                            accentColor || "var(--primary-color)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          color: "#fff",
-                          fontSize: 18,
-                        }}
-                      >
-                        ✉️
-                      </div>
-
-                      <div>
-                        <p
-                          style={{
-                            fontWeight: 600,
-                            color: accentColor || "var(--primary-color)",
-                            marginBottom: 2,
-                          }}
-                        >
-                          Email
-                        </p>
-
-                        <a
-                          href={`mailto:${email}`}
-                          style={{
-                            color: "var(--text-color)",
-                            textDecoration: "none",
-                            fontSize: 15,
-                            opacity: 0.8,
-                          }}
-                        >
-                          {email}
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
-                  {phone && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 16,
-                        transition: hoverEffects
-                          ? "transform 0.2s ease"
-                          : "none",
-                        ...(hoverEffects
-                          ? { ":hover": { transform: "translateX(4px)" } }
-                          : {}),
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: borderRadius || 10,
-                          backgroundColor:
-                            accentColor || "var(--primary-color)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          color: "#fff",
-                          fontSize: 18,
-                        }}
-                      >
-                        📞
-                      </div>
-
-                      <div>
-                        <p
-                          style={{
-                            fontWeight: 600,
-                            color: accentColor || "var(--primary-color)",
-                            marginBottom: 2,
-                          }}
-                        >
-                          Phone
-                        </p>
-
-                        <a
-                          href={`tel:${phone}`}
-                          style={{
-                            color: "var(--text-color)",
-                            textDecoration: "none",
-                            fontSize: 15,
-                            opacity: 0.8,
-                          }}
-                        >
-                          {phone}
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
-                  {address && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 16,
-                        transition: hoverEffects
-                          ? "transform 0.2s ease"
-                          : "none",
-                        ...(hoverEffects
-                          ? { ":hover": { transform: "translateX(4px)" } }
-                          : {}),
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: borderRadius || 10,
-                          backgroundColor:
-                            accentColor || "var(--primary-color)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          color: "#fff",
-                          fontSize: 18,
-                        }}
-                      >
-                        📍
-                      </div>
-
-                      <div>
-                        <p
-                          style={{
-                            fontWeight: 600,
-                            color: accentColor || "var(--primary-color)",
-                            marginBottom: 2,
-                          }}
-                        >
-                          Address
-                        </p>
-
-                        <p
-                          style={{
-                            color: "var(--text-color)",
-                            fontSize: 15,
-                            opacity: 0.8,
-                            whiteSpace: "pre-line",
-                          }}
-                        >
-                          {address}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {mapEmbed && (
-                    <div
-                      style={{
-                        marginTop: 16,
-                        borderRadius: borderRadius || 8,
-                        overflow: "hidden",
-                        border: `2px solid ${accentColor || "var(--primary-color)"}`,
-                      }}
-                    >
-                      <iframe
-                        src={mapEmbed}
-                        style={{ width: "100%", height: 250, border: "none" }}
-                        allowFullScreen
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Contact Form */}
-
-              {showForm && (
-                <form
-                  style={{
-                    ...getCardStyle(),
-                    borderRadius: borderRadius || 8,
-                    padding: 32,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 16,
-                    transition: hoverEffects
-                      ? "transform 0.3s ease, box-shadow 0.3s ease"
-                      : "none",
-                    ...(hoverEffects
-                      ? {
-                          ":hover": {
-                            transform: "translateY(-4px)",
-                            boxShadow: "0 12px 24px rgba(0, 0, 0, 0.15)",
-                          },
-                        }
-                      : {}),
-                  }}
-                  onSubmit={(e) => e.preventDefault()}
-                >
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 16,
-                    }}
-                  >
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: accentColor || "var(--primary-color)",
-                          marginBottom: 6,
-                        }}
-                      >
-                        {labelName || "Name"}
-                      </label>
-
-                      <input
-                        type="text"
-                        placeholder="Your name"
-                        style={{
-                          width: "100%",
-                          padding: "12px 16px",
-                          border: "2px solid #e5e7eb",
-                          borderRadius: borderRadius || 8,
-                          fontSize: 14,
-                          outline: "none",
-                          boxSizing: "border-box",
-                          transition: "all 0.3s ease",
-                          cursor: "pointer",
-                          ...(hoverEffects
-                            ? {
-                                ":hover": {
-                                  borderColor:
-                                    accentColor || "var(--primary-color)",
-                                  boxShadow: `0 0 0 3px ${accentColor || "var(--primary-color)"}20`,
-                                  transform: "translateY(-1px)",
-                                },
-                              }
-                            : {}),
-                        }}
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: accentColor || "var(--primary-color)",
-                          marginBottom: 6,
-                        }}
-                      >
-                        {labelEmail || "Email"}
-                      </label>
-
-                      <input
-                        type="email"
-                        placeholder="your@email.com"
-                        style={{
-                          width: "100%",
-                          padding: "12px 16px",
-                          border: "2px solid #e5e7eb",
-                          borderRadius: borderRadius || 8,
-                          fontSize: 14,
-                          outline: "none",
-                          boxSizing: "border-box",
-                          transition: "all 0.3s ease",
-                          cursor: "pointer",
-                          ...(hoverEffects
-                            ? {
-                                ":hover": {
-                                  borderColor:
-                                    accentColor || "var(--primary-color)",
-                                  boxShadow: `0 0 0 3px ${accentColor || "var(--primary-color)"}20`,
-                                  transform: "translateY(-1px)",
-                                },
-                              }
-                            : {}),
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: accentColor || "var(--primary-color)",
-                        marginBottom: 6,
-                      }}
-                    >
-                      {labelSubject || "Subject"}
-                    </label>
-
-                    <input
-                      type="text"
-                      placeholder="Project enquiry"
-                      style={{
-                        width: "100%",
-                        padding: "12px 16px",
-                        border: "2px solid #e5e7eb",
-                        borderRadius: borderRadius || 8,
-                        fontSize: 14,
-                        outline: "none",
-                        boxSizing: "border-box",
-                        transition: "all 0.3s ease",
-                        cursor: "pointer",
-                        ...(hoverEffects
-                          ? {
-                              ":hover": {
-                                borderColor:
-                                  accentColor || "var(--primary-color)",
-                                boxShadow: `0 0 0 3px ${accentColor || "var(--primary-color)"}20`,
-                                transform: "translateY(-1px)",
-                              },
-                            }
-                          : {}),
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: accentColor || "var(--primary-color)",
-                        marginBottom: 6,
-                      }}
-                    >
-                      {labelMessage || "Message"}
-                    </label>
-
-                    <textarea
-                      placeholder="Tell us about your project..."
-                      rows={5}
-                      style={{
-                        width: "100%",
-                        padding: "12px 16px",
-                        border: "2px solid #e5e7eb",
-                        borderRadius: borderRadius || 8,
-                        fontSize: 14,
-                        outline: "none",
-                        resize: "vertical",
-                        boxSizing: "border-box",
-                        transition: "all 0.3s ease",
-                        cursor: "pointer",
-                        ...(hoverEffects
-                          ? {
-                              ":hover": {
-                                borderColor:
-                                  accentColor || "var(--primary-color)",
-                                boxShadow: `0 0 0 3px ${accentColor || "var(--primary-color)"}20`,
-                                transform: "translateY(-1px)",
-                              },
-                            }
-                          : {}),
-                      }}
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="pb-btn"
-                    style={{
-                      backgroundColor: accentColor || "var(--primary-color)",
-                      color: "#fff",
-                      border: "none",
-                      padding: "14px 36px",
-                      borderRadius: borderRadius || 8,
-                      fontWeight: 600,
-                      fontSize: 16,
-                      cursor: "pointer",
-                      alignSelf: "flex-start",
-                      transition: "all 0.3s ease",
-                      ...(hoverEffects
-                        ? {
-                            ":hover": {
-                              transform: "translateY(-2px)",
-                              boxShadow: `0 8px 20px ${accentColor || "var(--primary-color)"}40`,
-                            },
-                          }
-                        : {}),
-                    }}
-                  >
-                    {buttonLabel}
-                  </button>
-                </form>
-              )}
-            </div>
-          </div>
-        </section>
-      );
-    },
-  },
-
-  // ─── Photo Collage (Simple) ──────────────────────────────────────────────
+  // ─── Photo Collage ───────────────────────────────────────────────────────
 
   PhotoCollage: {
     label: "Photo Collage",
     fields: {
-      layout: {
+      _tabs: {
         type: "custom",
-
-        label: "Layout Style",
-
-        render: ({ value, onChange }) => {
-          const layouts = [
-            {
-              id: "mixed",
-              name: "Mixed Sizes",
-              desc: "Varied heights and widths",
-            },
-
-            { id: "hero", name: "Hero Left", desc: "Big left + small right" },
-          ];
+        label: "",
+        render: ({ value: _v, onChange: _onChange }: any) => {
+          const { selectedItem, appState, dispatch } = usePuck();
+          const props = selectedItem?.props ?? {};
+          const set = (key: string, val: any) => {
+            if (!selectedItem) return;
+            const state = appState.data;
+            let destinationZone = "root:default-zone";
+            let destinationIndex = 0;
+            const zones: Record<string, any[]> = { "root:default-zone": state.content, ...(state.zones ?? {}) };
+            for (const [zone, items] of Object.entries(zones)) {
+              const idx = (items as any[]).findIndex((it: any) => it.props?.id === selectedItem.props?.id);
+              if (idx !== -1) {
+                destinationZone = zone;
+                destinationIndex = idx;
+                break;
+              }
+            }
+            dispatch({
+              type: "replace",
+              destinationZone,
+              destinationIndex,
+              data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } },
+            });
+          };
+          const [photoOpenIdx, setPhotoOpenIdx] = useState<number | null>(null);
+          const [photoConfirmIdx, setPhotoConfirmIdx] = useState<number | null>(null);
 
           return (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 8,
-              }}
-            >
-              {layouts.map((l) => (
-                <button
-                  key={l.id}
-                  onClick={() => onChange(l.id)}
-                  style={{
-                    padding: "10px",
+            <BlockTabBar blockKey="PhotoCollage">
+              {(tab: any) => (
+                <>
+                  {tab === "content" && (
+                    <>
+                      <TabSection title="Layout" />
+                      <InlineSelect
+                        label="Layout Type"
+                        value={props.layout ?? "mixed"}
+                        onChange={(v: any) => set("layout", v)}
+                        options={[
+                          { value: "mixed",    label: "Mixed Sizes" },
+                          { value: "grid",     label: "Grid"        },
+                          { value: "brick",    label: "Brick"       },
+                          { value: "carousel", label: "Carousel"    },
+                        ]}
+                      />
+                      <TabSection title="Photos" />
+                      {(() => {
+                        const imgs: any[] = (props.images as any[]) ?? [];
+                        const openIdx = photoOpenIdx;
+                        const confirmIdx = photoConfirmIdx;
+                        const updateImage = (i: number, key: string, val: any) => {
+                          const cur = [...(((selectedItem?.props as any)?.images as any[]) ?? [])];
+                          cur[i] = { ...cur[i], [key]: val };
+                          set("images", cur);
+                        };
+                        const deleteImage = (i: number) => {
+                          const cur = (((selectedItem?.props as any)?.images as any[]) ?? []);
+                          set("images", cur.filter((_: any, idx: number) => idx !== i));
+                          setPhotoConfirmIdx(null);
+                          setPhotoOpenIdx(null);
+                        };
+                        return (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            {imgs.map((img: any, i: number) => {
+                              const open = openIdx === i;
+                              const confirm = confirmIdx === i;
+                              return (
+                                <div key={i} style={{ border: "1px solid var(--p-color-border, #e1e3e5)", borderRadius: 8, background: "var(--p-color-bg-surface, #fff)", overflow: "hidden" }}>
+                                  {/* Header row */}
+                                  <div
+                                    onClick={() => { if (!confirm) setPhotoOpenIdx(open ? null : i); }}
+                                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", cursor: confirm ? "default" : "pointer", userSelect: "none", background: open ? "var(--p-color-bg-surface-secondary, #f6f6f7)" : "transparent", borderBottom: (open || confirm) ? "1px solid var(--p-color-border, #e1e3e5)" : "none" }}
+                                  >
+                                    <div style={{ width: 36, height: 36, borderRadius: 5, overflow: "hidden", background: "var(--p-color-bg-surface-secondary, #f3f4f6)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--p-color-border, #e1e3e5)" }}>
+                                      {img.url
+                                        ? <img src={img.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                                        : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--p-color-icon-subdued, #8c9196)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                                      }
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--p-color-text, #202223)", lineHeight: 1.3 }}>Photo {i + 1}</div>
+                                      <div style={{ fontSize: 11, color: "var(--p-color-text-subdued, #6d7175)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 1 }}>
+                                        {img.alt || (img.url ? "No alt text" : "No image selected")}
+                                      </div>
+                                    </div>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--p-color-icon-subdued, #8c9196)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: "transform 0.2s", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>
+                                      <path d="m6 9 6 6 6-6"/>
+                                    </svg>
+                                    <button
+                                      onClick={(e: any) => { e.stopPropagation(); setPhotoConfirmIdx(i); setPhotoOpenIdx(null); }}
+                                      title="Remove photo"
+                                      style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 5, border: "1px solid var(--p-color-border, #e1e3e5)", background: "var(--p-color-bg-surface, #fff)", color: "var(--p-color-text-critical, #d72c0d)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                                    >
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="3 6 5 6 21 6"/>
+                                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                        <path d="M10 11v6"/><path d="M14 11v6"/>
+                                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                                      </svg>
+                                    </button>
+                                  </div>
+                                  {/* Delete confirmation */}
+                                  {confirm && (
+                                    <div style={{ padding: "12px 12px 14px", background: "#fff8f8", display: "flex", flexDirection: "column", gap: 10 }}>
+                                      <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                                        <div style={{ width: 28, height: 28, borderRadius: 6, background: "#fee2e2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "#d72c0d" }}>
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                                        </div>
+                                        <div>
+                                          <div style={{ fontSize: 12, fontWeight: 600, color: "#202223", marginBottom: 2 }}>Remove Photo {i + 1}?</div>
+                                          <div style={{ fontSize: 11, color: "#6d7175", lineHeight: 1.5 }}>This photo will be removed from the collage. This action cannot be undone.</div>
+                                        </div>
+                                      </div>
+                                      <div style={{ display: "flex", gap: 6 }}>
+                                        <button
+                                          onClick={(e: any) => { e.stopPropagation(); setPhotoConfirmIdx(null); }}
+                                          style={{ flex: 1, padding: "6px 0", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid var(--p-color-border, #e1e3e5)", background: "var(--p-color-bg-surface, #fff)", color: "var(--p-color-text, #202223)", cursor: "pointer" }}
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          onClick={(e: any) => { e.stopPropagation(); deleteImage(i); }}
+                                          style={{ flex: 1, padding: "6px 0", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "none", background: "#d72c0d", color: "#fff", cursor: "pointer" }}
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {/* Expanded fields */}
+                                  {open && !confirm && (
+                                    <div style={{ padding: "10px 10px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
+                                      <ImageField label="Photo" value={img.url ?? ""} onChange={(v: any) => updateImage(i, "url", v)} />
+                                      <StackedTextField label="Alt Text" value={img.alt ?? ""} onChange={(v: any) => updateImage(i, "alt", v)} placeholder="Describe the image…" />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            <button
+                              onClick={() => { const cur = (((selectedItem?.props as any)?.images as any[]) ?? []); set("images", [...cur, { url: "", alt: "" }]); setPhotoOpenIdx(cur.length); }}
+                              style={{ marginTop: 2, width: "100%", padding: "8px 0", border: "1.5px dashed var(--p-color-border-interactive, #0158ad)", borderRadius: 8, color: "var(--p-color-text-interactive, #0158ad)", background: "transparent", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                              Add Photo
+                            </button>
+                          </div>
+                        );
+                      })()}
+                    </>
+                  )}
 
-                    border: `2px solid ${value === l.id ? "#0158ad" : "#e5e7eb"}`,
+                  {tab === "style" && (
+                    <>
+                      <TabSection title="Spacing" />
+                      <SliderNumberField
+                        label="Gap Between Photos (px)"
+                        value={props.gap ?? 8}
+                        onChange={(v: any) => set("gap", v)}
+                        min={0}
+                        max={40}
+                        step={2}
+                        unit="px"
+                      />
+                      <SliderNumberField
+                        label="Border Radius (px)"
+                        value={props.borderRadius ?? 0}
+                        onChange={(v: any) => set("borderRadius", v)}
+                        min={0}
+                        max={20}
+                        step={1}
+                        unit="px"
+                      />
+                      <TabSection title="Image Styling" />
+                      <InlineSelect
+                        label="Object Fit"
+                        value={props.objectFit ?? "cover"}
+                        onChange={(v: any) => set("objectFit", v)}
+                        options={[
+                          { value: "cover",   label: "Cover"   },
+                          { value: "contain", label: "Contain" },
+                          { value: "fill",    label: "Fill"    },
+                        ]}
+                      />
+                      <InlineSelect
+                        label="Aspect Ratio"
+                        value={props.aspectRatio ?? "1:1"}
+                        onChange={(v: any) => set("aspectRatio", v)}
+                        options={[
+                          { value: "1:1",  label: "1:1"  },
+                          { value: "4:3",  label: "4:3"  },
+                          { value: "16:9", label: "16:9" },
+                          { value: "3:2",  label: "3:2"  },
+                        ]}
+                      />
+                      <TabSection title="Effects" />
+                      <InlineSelect
+                        label="Hover Effect"
+                        value={props.hoverEffect ?? "none"}
+                        onChange={(v: any) => set("hoverEffect", v)}
+                        options={[
+                          { value: "none",   label: "None"   },
+                          { value: "zoom",   label: "Zoom"   },
+                          { value: "darken", label: "Darken" },
+                        ]}
+                      />
+                      <ToggleField
+                        label="Box Shadow"
+                        value={!!props.boxShadow}
+                        onChange={(v: any) => set("boxShadow", v)}
+                      />
+                      {props.boxShadow && (
+                        <InlineSelect
+                          label="Shadow Strength"
+                          value={props.shadowStrength ?? "subtle"}
+                          onChange={(v: any) => set("shadowStrength", v)}
+                          options={[
+                            { value: "subtle", label: "Subtle" },
+                            { value: "medium", label: "Medium" },
+                            { value: "strong", label: "Strong" },
+                          ]}
+                        />
+                      )}
+                    </>
+                  )}
 
-                    borderRadius: 6,
-
-                    background: value === l.id ? "#eff6ff" : "#fff",
-
-                    cursor: "pointer",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: value === l.id ? "#0158ad" : "#374151",
-                    }}
-                  >
-                    {l.name}
-                  </div>
-
-                  <div style={{ fontSize: 10, color: "#6b7280" }}>{l.desc}</div>
-                </button>
-              ))}
-            </div>
+                  {tab === "advanced" && (
+                    <>
+                      <TabSection title="Responsive" />
+                      <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v: any) => set("hideDesktop", v)} />
+                      <ToggleField label="Hide on Tablet"  value={!!props.hideTablet}  onChange={(v: any) => set("hideTablet", v)}  />
+                      <ToggleField label="Hide on Mobile"  value={!!props.hideMobile}  onChange={(v: any) => set("hideMobile", v)}  />
+                    </>
+                  )}
+                </>
+              )}
+            </BlockTabBar>
           );
         },
-      },
-
-      images: {
-        type: "array",
-
-        label: "Photos",
-
-        getItemSummary: (item, i) =>
-          item?.alt ? item.alt : `Photo ${(i ?? 0) + 1}`,
-
-        arrayFields: {
-          url: imageUploadField,
-
-          alt: {
-            type: "custom",
-
-            label: "Alt Text",
-
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Alt Text"
-                value={value ?? ""}
-                onChange={onChange}
-                placeholder="Describe the image..."
-              />
-            ),
-          },
-        },
-      },
-
-      gap: {
-        type: "custom",
-
-        label: "Gap (px)",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Gap (px)"
-            value={value ?? 8}
-            onChange={onChange}
-            placeholder="e.g., 8"
-            min={0}
-            max={60}
-          />
-        ),
-      },
-
-      padding: {
-        type: "custom",
-
-        label: "Section Padding (px)",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Section Padding (px)"
-            value={value ?? 40}
-            onChange={onChange}
-            placeholder="e.g., 40"
-            min={0}
-            max={200}
-          />
-        ),
-      },
-
-      borderRadius: {
-        type: "custom",
-
-        label: "Corner Radius (px)",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Corner Radius (px)"
-            value={value ?? 8}
-            onChange={onChange}
-            placeholder="e.g., 8"
-            min={0}
-            max={40}
-          />
-        ),
-      },
-
-      backgroundColor: {
-        type: "custom",
-
-        label: "Background Color",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Background Color"
-            value={value ?? "#ffffff"}
-            onChange={onChange}
-          />
-        ),
       },
     },
 
     defaultProps: {
       layout: "mixed",
-
       images: [
-        { url: "https://picsum.photos/seed/collage1/800/600", alt: "Nature landscape" },
-        { url: "https://picsum.photos/seed/collage2/800/600", alt: "City architecture" },
-        { url: "https://picsum.photos/seed/collage3/800/600", alt: "Abstract texture" },
-        { url: "https://picsum.photos/seed/collage4/800/600", alt: "Portrait" },
-        { url: "https://picsum.photos/seed/collage5/800/600", alt: "Travel scenery" },
-        { url: "https://picsum.photos/seed/collage6/800/600", alt: "Food & drink" },
-        { url: "https://picsum.photos/seed/collage7/800/600", alt: "Interior design" },
-        { url: "https://picsum.photos/seed/collage8/800/600", alt: "Fashion" },
-        { url: "https://picsum.photos/seed/collage9/800/600", alt: "Technology" },
-        { url: "https://picsum.photos/seed/collage10/800/600", alt: "Wildlife" },
+        { url: "", alt: "Photo 1" },
+        { url: "", alt: "Photo 2" },
+        { url: "", alt: "Photo 3" },
       ],
-
       gap: 8,
-
-      padding: 40,
-
-      borderRadius: 8,
-
-      backgroundColor: "#ffffff",
+      borderRadius: 0,
+      objectFit: "cover",
+      aspectRatio: "1:1",
+      hoverEffect: "none",
+      boxShadow: false,
+      shadowStrength: "subtle",
+      hideDesktop: false,
+      hideTablet: false,
+      hideMobile: false,
     },
 
-    render: ({
-      layout,
-      images,
-      gap,
-      padding,
-      borderRadius,
-      backgroundColor,
-    }) => {
-      const validImages = images.filter((img) => img.url);
+    render: ({ layout, images, gap, borderRadius, objectFit, aspectRatio, hoverEffect, boxShadow, shadowStrength, hideDesktop, hideTablet, hideMobile }: any) => {
+      const imgs = ((images as any[]) ?? []).filter((img: any) => img.url);
+      const gapPx = `${gap ?? 8}px`;
+      const br = `${borderRadius ?? 0}px`;
+      const fit = objectFit ?? "cover";
+      const shadow = !boxShadow
+        ? "none"
+        : shadowStrength === "strong"
+          ? "0 8px 24px rgba(0,0,0,0.3)"
+          : shadowStrength === "medium"
+            ? "0 4px 12px rgba(0,0,0,0.2)"
+            : "0 2px 6px rgba(0,0,0,0.12)";
+      const hideClasses = [
+        hideDesktop ? "puck-hide-desktop" : "",
+        hideTablet  ? "puck-hide-tablet"  : "",
+        hideMobile  ? "puck-hide-mobile"  : "",
+      ].filter(Boolean).join(" ");
 
-      // Grid templates for different layouts - spans define how each cell is sized
+      const arMap: Record<string, string> = { "1:1": "1/1", "4:3": "4/3", "16:9": "16/9", "3:2": "3/2" };
+      const ar = arMap[aspectRatio as string] ?? "1/1";
 
-      const templates = {
-        mixed: {
-          style: {
-            display: "grid",
-
-            gridTemplateColumns: "repeat(4, 1fr)",
-
-            gridTemplateRows: "200px 150px 200px",
-
-            gap: `${gap}px`,
-          },
-
-          spans: [
-            { gridColumn: "span 2", gridRow: "span 2" }, // big
-
-            {},
-            {},
-
-            {},
-            { gridColumn: "span 2" }, // wide
-
-            {},
-            {},
-
-            { gridColumn: "span 2" }, // wide
-
-            {},
-          ],
-        },
-
-        hero: {
-          style: {
-            display: "grid",
-
-            gridTemplateColumns: "2fr 1fr 1fr",
-
-            gridTemplateRows: "repeat(3, 160px)",
-
-            gap: `${gap}px`,
-          },
-
-          spans: [
-            { gridRow: "span 3" }, // hero tall
-
-            {},
-            {},
-            {},
-            {},
-            {},
-            {},
-          ],
-        },
+      const getHoverStyle = (hovered: boolean): Record<string, string> => {
+        if (!hovered) return {};
+        if (hoverEffect === "zoom")   return { transform: "scale(1.05)" };
+        if (hoverEffect === "darken") return { filter: "brightness(0.75)" };
+        return {};
       };
 
-      const config = templates[layout] || templates.mixed;
-
-      // Only render images that have URLs (no placeholders)
-
-      const imageCount = Math.min(validImages.length, config.spans.length);
-
-      return (
-        <section style={{ backgroundColor, padding: `${padding}px 24px` }}>
-          <div className="pb-collage" style={{ maxWidth: 1200, margin: "0 auto", ...config.style }}>
-            {validImages.slice(0, imageCount).map((img, i) => (
-              <div
-                key={i}
-                style={{
-                  borderRadius,
-
-                  overflow: "hidden",
-
-                  ...(config.spans[i] || {}),
-                }}
-              >
-                <img
-                  src={img.url}
-                  alt={img.alt || `Photo ${i + 1}`}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    display: "block",
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        </section>
-      );
-    },
-  },
-
-  // ─── Testimonial Section ─────────────────────────────────────────────────
-
-  TestimonialSection: {
-    label: "Testimonials",
-    fields: {
-      title: {
-        type: "custom",
-
-        label: "Title",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Title"
-            value={value}
-            onChange={onChange}
-            placeholder="Enter title..."
-          />
-        ),
-      },
-
-      subtitle: {
-        type: "custom",
-
-        label: "Subtitle",
-
-        render: ({ value, onChange }) => (
-          <StackedTextField
-            label="Subtitle"
-            value={value}
-            onChange={onChange}
-            placeholder="Enter subtitle..."
-          />
-        ),
-      },
-
-      columns: {
-        type: "custom",
-
-        label: "Columns",
-
-        render: ({ value, onChange }) => (
-          <ColumnsField
-            value={value}
-            onChange={onChange}
-            label="Columns"
-            options={[{ value: 1 }, { value: 2 }, { value: 3 }]}
-          />
-        ),
-      },
-
-      testimonials: {
-        type: "array",
-
-        label: "Testimonials",
-
-        getItemSummary: (item) => item.author || "Testimonial",
-
-        arrayFields: {
-          quote: {
-            type: "custom",
-
-            label: "Quote",
-
-            render: ({ value, onChange }) => (
-              <StackedTextareaField
-                label="Quote"
-                value={value}
-                onChange={onChange}
-                placeholder="Enter testimonial quote..."
-                rows={3}
-              />
-            ),
-          },
-
-          author: {
-            type: "custom",
-
-            label: "Author Name",
-
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Author Name"
-                value={value}
-                onChange={onChange}
-                placeholder="e.g., John Smith"
-              />
-            ),
-          },
-
-          role: {
-            type: "custom",
-
-            label: "Role / Company",
-
-            render: ({ value, onChange }) => (
-              <StackedTextField
-                label="Role / Company"
-                value={value}
-                onChange={onChange}
-                placeholder="e.g., CEO, Company Inc."
-              />
-            ),
-          },
-
-          avatar: imageUploadField,
-
-          rating: {
-            type: "custom",
-
-            label: "Rating (1–5)",
-
-            render: ({ value, onChange }) => (
-              <StackedNumberField
-                label="Rating (1–5)"
-                value={value}
-                onChange={onChange}
-                min={1}
-                max={5}
-                placeholder="1-5"
-              />
-            ),
-          },
-        },
-      },
-
-      backgroundColor: {
-        type: "custom",
-
-        label: "Background Color",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Background Color"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      padding: {
-        type: "custom",
-
-        label: "Padding (px)",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Padding (px)"
-            value={value}
-            onChange={onChange}
-            placeholder="e.g., 80"
-          />
-        ),
-      },
-
-      layoutStyle: {
-        type: "custom",
-
-        label: "Layout Style",
-
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value}
-            onChange={onChange}
-            label="Layout Style"
-            options={[
-              {
-                value: "standard",
-                icon: <LayoutGrid size={15} />,
-                title: "Standard",
-              },
-
-              {
-                value: "avatar-top",
-                icon: <ImageIcon size={15} />,
-                title: "Avatar Top",
-              },
-
-              {
-                value: "centered",
-                icon: <AlignCenter size={15} />,
-                title: "Centered",
-              },
-
-              { value: "minimal", icon: <Minus size={15} />, title: "Minimal" },
-            ]}
-          />
-        ),
-      },
-
-      cardStyle: {
-        type: "custom",
-
-        label: "Card Style",
-
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value}
-            onChange={onChange}
-            label="Card Style"
-            options={[
-              {
-                value: "bordered",
-                icon: <Square size={15} />,
-                title: "Bordered",
-              },
-
-              { value: "shadow", icon: <Layers size={15} />, title: "Shadow" },
-
-              { value: "minimal", icon: <Minus size={15} />, title: "Minimal" },
-
-              { value: "glass", icon: <Sparkles size={15} />, title: "Glass" },
-            ]}
-          />
-        ),
-      },
-
-      avatarSize: {
-        type: "custom",
-
-        label: "Avatar Size",
-
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value}
-            onChange={onChange}
-            label="Avatar Size"
-            options={[
-              { value: "small", icon: <Circle size={12} />, title: "Small" },
-
-              { value: "medium", icon: <Circle size={15} />, title: "Medium" },
-
-              { value: "large", icon: <Circle size={18} />, title: "Large" },
-            ]}
-          />
-        ),
-      },
-
-      showQuotes: {
-        type: "custom",
-
-        label: "Show Quote Marks",
-
-        render: ({ value, onChange }) => (
-          <ToggleField
-            label="Show Quote Marks"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      contentAlign: {
-        type: "custom",
-
-        label: "Content Alignment",
-
-        render: ({ value, onChange }) => (
-          <AlignField
-            value={value}
-            onChange={onChange}
-            label="Content Align"
-            options={[
-              { value: "left", icon: <AlignLeft size={15} />, title: "Left" },
-
-              {
-                value: "center",
-                icon: <AlignCenter size={15} />,
-                title: "Center",
-              },
-
-              {
-                value: "right",
-                icon: <AlignRight size={15} />,
-                title: "Right",
-              },
-            ]}
-          />
-        ),
-      },
-
-      cardBackgroundColor: {
-        type: "custom",
-
-        label: "Card Background",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Card Background"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      accentColor: {
-        type: "custom",
-
-        label: "Accent Color",
-
-        render: ({ value, onChange }) => (
-          <ColorPickerField
-            label="Accent Color"
-            value={value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      sliderEnabled: {
-        type: "custom",
-
-        label: "Slider Mode",
-
-        render: ({ value, onChange }) => (
-          <ToggleField
-            label="Enable Slider"
-            value={!!value}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      autoplay: {
-        type: "custom",
-
-        label: "Autoplay",
-
-        render: ({ value, onChange }) => (
-          <ToggleField
-            label="Autoplay"
-            value={value !== false}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      interval: {
-        type: "custom",
-
-        label: "Autoplay Interval (ms)",
-
-        render: ({ value, onChange }) => (
-          <StackedNumberField
-            label="Interval (ms)"
-            value={value ?? 5000}
-            onChange={onChange}
-            min={1000}
-            max={15000}
-            step={500}
-            placeholder="5000"
-          />
-        ),
-      },
-
-      showArrows: {
-        type: "custom",
-
-        label: "Show Arrows",
-
-        render: ({ value, onChange }) => (
-          <ToggleField
-            label="Show Arrows"
-            value={value !== false}
-            onChange={onChange}
-          />
-        ),
-      },
-
-      showDots: {
-        type: "custom",
-
-        label: "Show Dots",
-
-        render: ({ value, onChange }) => (
-          <ToggleField
-            label="Show Dots"
-            value={value !== false}
-            onChange={onChange}
-          />
-        ),
-      },
-    },
-
-    defaultProps: {
-      title: "What Our Clients Say",
-
-      subtitle: "Testimonials",
-
-      columns: 3,
-
-      layoutStyle: "standard",
-
-      cardStyle: "bordered",
-
-      avatarSize: "medium",
-
-      showQuotes: true,
-
-      contentAlign: "left",
-
-      testimonials: [
-        {
-          quote:
-            "Working with this team was an absolute pleasure. They delivered beyond our expectations and on time!",
-          author: "Sarah Johnson",
-          role: "CEO, TechStart",
-          avatar: "",
-          rating: 5,
-        },
-
-        {
-          quote:
-            "The website they built for us increased our conversions by 40%. Incredible work and great communication!",
-          author: "Michael Chen",
-          role: "Founder, GrowthCo",
-          avatar: "",
-          rating: 5,
-        },
-
-        {
-          quote:
-            "Professional, creative, and highly skilled. I wouldn't hesitate to recommend them to anyone!",
-          author: "Emily Rodriguez",
-          role: "Marketing Director, StyleBrand",
-          avatar: "",
-          rating: 5,
-        },
-      ],
-
-      backgroundColor: "#ffffff",
-
-      padding: 80,
-
-      sliderEnabled: false,
-
-      autoplay: true,
-
-      interval: 5000,
-
-      showArrows: true,
-
-      showDots: true,
-    },
-
-    render: ({
-      title,
-      subtitle,
-      columns,
-      testimonials,
-      backgroundColor,
-      padding,
-      layoutStyle,
-      cardStyle,
-      avatarSize,
-      showQuotes,
-      contentAlign,
-      cardBackgroundColor,
-      accentColor,
-      sliderEnabled,
-      autoplay,
-      interval,
-      showArrows,
-      showDots,
-    }) => {
-      const [activeSlide, setActiveSlide] = useState(0);
-
-      const total = (testimonials || []).length;
-
-      useEffect(() => {
-        if (!sliderEnabled || !autoplay || total < 2) return;
-
-        const t = setInterval(
-          () => setActiveSlide((p) => (p + 1) % total),
-          interval || 5000,
-        );
-
-        return () => clearInterval(t);
-      }, [sliderEnabled, autoplay, interval, total]);
-
-      const prevSlide = () => setActiveSlide((p) => (p - 1 + total) % total);
-
-      const nextSlide = () => setActiveSlide((p) => (p + 1) % total);
-
-      // Avatar size mapping
-
-      const avatarSizes = { small: 36, medium: 44, large: 56 };
-
-      const avSize = avatarSizes[avatarSize] || 44;
-
-      // Helper to get flex alignment from contentAlign
-
-      const getFlexAlign = (align: string) => {
-        switch (align) {
-          case "center":
-            return "center";
-
-          case "right":
-            return "flex-end";
-
-          case "left":
-
-          default:
-            return "flex-start";
-        }
-      };
-
-      // Card style configurations
-
-      const getCardStyles = () => {
-        const base = { borderRadius: 12, padding: 28 };
-
-        const bg =
-          cardBackgroundColor ||
-          (cardStyle === "glass"
-            ? "rgba(255,255,255,0.7)"
-            : layoutStyle === "minimal"
-              ? "transparent"
-              : "#fafafa");
-
-        switch (cardStyle) {
-          case "shadow":
-            return {
-              ...base,
-              backgroundColor: bg,
-              boxShadow: "0 10px 40px rgba(0,0,0,0.1)",
-            };
-
-          case "glass":
-            return {
-              ...base,
-              backgroundColor: bg,
-              backdropFilter: "blur(10px)",
-              border: "1px solid rgba(255,255,255,0.3)",
-            };
-
-          case "minimal":
-            return { ...base, backgroundColor: bg, border: "none" };
-
-          case "bordered":
-
-          default:
-            return {
-              ...base,
-              backgroundColor: bg,
-              border: "1px solid #e5e7eb",
-            };
-        }
-      };
-
-      // Star rating color
-
-      const starColor = accentColor || "#f59e0b";
-
-      // Quote marks
-
-      const quoteMark = showQuotes ? "" : "";
-
-      const headerBlock = (
-        <div style={{ textAlign: "center", marginBottom: 48 }}>
-          {subtitle && (
-            <p
-              style={{
-                fontSize: 14,
-                fontWeight: 600,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: accentColor || "var(--primary-color)",
-                marginBottom: 8,
-              }}
-            >
-              {subtitle}
-            </p>
-          )}
-
-          {title && (
-            <h2
-              style={{
-                fontSize: "var(--h2-size, 2rem)",
-                fontWeight: "var(--heading-weight, 700)",
-                fontFamily: "var(--heading-font)",
-                color: accentColor || "var(--primary-color)",
-                lineHeight: "var(--heading-line-height, 1.2)",
-              }}
-            >
-              {title}
-            </h2>
-          )}
-        </div>
-      );
-
-      if (sliderEnabled && testimonials.length > 0) {
-        const t = testimonials[activeSlide];
-
-        const avSize = { small: 36, medium: 52, large: 72 }[avatarSize] || 52;
-
-        const bg =
-          cardBackgroundColor ||
-          (cardStyle === "glass" ? "rgba(255,255,255,0.75)" : "#fafafa");
-
-        const cardSt = (() => {
-          const base = { borderRadius: 16, padding: 40 };
-
-          switch (cardStyle) {
-            case "shadow":
-              return {
-                ...base,
-                backgroundColor: bg,
-                boxShadow: "0 20px 60px rgba(0,0,0,0.12)",
-              };
-
-            case "glass":
-              return {
-                ...base,
-                backgroundColor: bg,
-                backdropFilter: "blur(12px)",
-                border: "1px solid rgba(255,255,255,0.35)",
-              };
-
-            case "minimal":
-              return {
-                ...base,
-                backgroundColor: "transparent",
-                border: "none",
-              };
-
-            default:
-              return {
-                ...base,
-                backgroundColor: bg,
-                border: "1px solid #e5e7eb",
-              };
-          }
-        })();
-
+      const ImgCell = ({ img, i, cellStyle, fitOverride }: { img: any; i: number; cellStyle: any; fitOverride?: string }) => {
+        const [hovered, setHovered] = useState(false);
         return (
-          <>
-            <section style={{ backgroundColor, padding: `${padding}px 0` }}>
-              <div
-                style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}
-              >
-                {headerBlock}
+          <div
+            key={i}
+            className="pb-collage-item"
+            style={{ overflow: "hidden", borderRadius: br, boxShadow: shadow, ...cellStyle }}
+          >
+            <img
+              src={img.url}
+              alt={img.alt || `Photo ${i + 1}`}
+              onMouseEnter={() => setHovered(true)}
+              onMouseLeave={() => setHovered(false)}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: (fitOverride ?? fit) as any,
+                display: "block",
+                transition: "transform 0.3s ease, filter 0.3s ease",
+                ...getHoverStyle(hovered),
+              }}
+            />
+          </div>
+        );
+      };
 
-                <div style={{ position: "relative" }}>
-                  {/* Slide track */}
-
-                  <div style={{ overflow: "hidden", borderRadius: 16 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        transform: `translateX(-${activeSlide * 100}%)`,
-                        transition: "transform 500ms cubic-bezier(0.4,0,0.2,1)",
-                      }}
-                    >
-                      {testimonials.map((t, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            minWidth: "100%",
-                            padding: "0 4px",
-                            boxSizing: "border-box",
-                          }}
-                        >
-                          <div
-                            style={{
-                              ...cardSt,
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              textAlign: "center",
-                              maxWidth: 720,
-                              margin: "0 auto",
-                              gap: 20,
-                            }}
-                          >
-                            {t.rating && (
-                              <div
-                                style={{
-                                  display: "flex",
-                                  gap: 4,
-                                  color: accentColor || "#f59e0b",
-                                  fontSize: 22,
-                                }}
-                              >
-                                {Array.from({ length: 5 }, (_, j) => (
-                                  <span
-                                    key={j}
-                                    style={{ opacity: j < t.rating ? 1 : 0.2 }}
-                                  >
-                                    ★
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-
-                            <p
-                              style={{
-                                fontSize: "var(--base-font-size, 1.1rem)",
-                                lineHeight: "var(--line-height, 1.75)",
-                                color: "var(--text-color)",
-                                fontStyle: "italic",
-                                maxWidth: 640,
-                              }}
-                            >
-                              {showQuotes && (
-                                <span
-                                  style={{
-                                    color:
-                                      accentColor || "var(--primary-color)",
-                                    fontSize: "1.6em",
-                                    marginRight: 4,
-                                  }}
-                                >
-                                  "
-                                </span>
-                              )}
-
-                              {t.quote}
-
-                              {showQuotes && (
-                                <span
-                                  style={{
-                                    color:
-                                      accentColor || "var(--primary-color)",
-                                    fontSize: "1.6em",
-                                    marginLeft: 4,
-                                  }}
-                                >
-                                  "
-                                </span>
-                              )}
-                            </p>
-
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                gap: 10,
-                                paddingTop: 8,
-                              }}
-                            >
-                              {t.avatar ? (
-                                <img
-                                  src={t.avatar}
-                                  alt={t.author}
-                                  style={{
-                                    width: avSize,
-                                    height: avSize,
-                                    borderRadius: "50%",
-                                    objectFit: "cover",
-                                    border: `3px solid ${accentColor || "var(--primary-color)"}`,
-                                  }}
-                                />
-                              ) : (
-                                <div
-                                  style={{
-                                    width: avSize,
-                                    height: avSize,
-                                    borderRadius: "50%",
-                                    background:
-                                      accentColor || "var(--primary-color)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    color: "#fff",
-                                    fontWeight: 700,
-                                    fontSize: avSize * 0.38,
-                                    border: `3px solid ${accentColor || "var(--primary-color)"}`,
-                                  }}
-                                >
-                                  {t.author?.charAt(0) || "?"}
-                                </div>
-                              )}
-
-                              <div>
-                                <p
-                                  style={{
-                                    fontWeight: 700,
-                                    color:
-                                      accentColor || "var(--primary-color)",
-                                    fontSize: 15,
-                                    marginBottom: 2,
-                                  }}
-                                >
-                                  {t.author}
-                                </p>
-
-                                {t.role && (
-                                  <p
-                                    style={{
-                                      fontSize: 13,
-                                      color: "var(--text-color)",
-                                      opacity: 0.65,
-                                    }}
-                                  >
-                                    {t.role}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Arrows */}
-
-                  {showArrows && total > 1 && (
-                    <>
-                      <button
-                        onClick={prevSlide}
-                        className="no-global-style"
-                        style={{
-                          position: "absolute",
-                          left: -20,
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          width: 40,
-                          height: 40,
-                          borderRadius: "50%",
-                          border: "none",
-                          background: accentColor || "var(--primary-color)",
-                          color: "#fff",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                          zIndex: 10,
-                        }}
-                      >
-                        ‹
-                      </button>
-
-                      <button
-                        onClick={nextSlide}
-                        className="no-global-style"
-                        style={{
-                          position: "absolute",
-                          right: -20,
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          width: 40,
-                          height: 40,
-                          borderRadius: "50%",
-                          border: "none",
-                          background: accentColor || "var(--primary-color)",
-                          color: "#fff",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                          zIndex: 10,
-                        }}
-                      >
-                        ›
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {/* Dots */}
-
-                {showDots && total > 1 && (
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "center",
-                      gap: 8,
-                      marginTop: 28,
-                    }}
-                  >
-                    {testimonials.map((_, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setActiveSlide(i)}
-                        className="no-global-style"
-                        style={{
-                          width: i === activeSlide ? 28 : 10,
-                          height: 10,
-                          borderRadius: 5,
-                          border: "none",
-                          background:
-                            i === activeSlide
-                              ? accentColor || "var(--primary-color)"
-                              : "#d1d5db",
-                          cursor: "pointer",
-                          transition: "all 300ms",
-                          padding: 0,
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </section>
-          </>
+      if (!imgs.length) {
+        return (
+          <div className={hideClasses || undefined} style={{ background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 200, borderRadius: br, color: "#6b7280", fontSize: 14 }}>
+            Add photos in the Content tab
+          </div>
         );
       }
 
-      return (
-        <>
-          <section style={{ backgroundColor, padding: `${padding}px 0` }}>
-            <div
-              style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}
-            >
-              {headerBlock}
+      // ── GRID: uniform cells forced to the chosen aspect ratio ──
+      if (layout === "grid") {
+        return (
+          <div className={hideClasses || undefined} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: gapPx }}>
+            {imgs.map((img: any, i: number) => (
+              <ImgCell key={i} img={img} i={i} cellStyle={{ aspectRatio: ar }} />
+            ))}
+          </div>
+        );
+      }
 
-              <div
-                className="pb-grid-ncol"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: `repeat(${columns}, 1fr)`,
-                  gap: 24,
-                }}
-              >
-                {testimonials.map((t, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      ...getCardStyles(),
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 16,
-                      textAlign: contentAlign,
-                    }}
-                  >
-                    {/* Avatar Top Layout */}
-
-                    {layoutStyle === "avatar-top" && (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: getFlexAlign(contentAlign),
-                          gap: 12,
-                          marginBottom: 8,
-                        }}
-                      >
-                        {t.avatar ? (
-                          <img
-                            src={t.avatar}
-                            alt={t.author}
-                            style={{
-                              width: avSize,
-                              height: avSize,
-                              borderRadius: "50%",
-                              objectFit: "cover",
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: avSize,
-                              height: avSize,
-                              borderRadius: "50%",
-                              backgroundColor:
-                                accentColor || "var(--primary-color)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "#fff",
-                              fontWeight: 700,
-                              fontSize: avSize * 0.4,
-                            }}
-                          >
-                            {t.author?.charAt(0) || "?"}
-                          </div>
-                        )}
-
-                        <div style={{ textAlign: contentAlign }}>
-                          <p
-                            style={{
-                              fontWeight: 600,
-                              color: accentColor || "var(--primary-color)",
-                              fontSize: 14,
-                              marginBottom: 2,
-                            }}
-                          >
-                            {t.author}
-                          </p>
-
-                          {t.role && (
-                            <p
-                              style={{
-                                fontSize: 12,
-                                color: "var(--text-color)",
-                                opacity: 0.65,
-                              }}
-                            >
-                              {t.role}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Rating - shown for all layouts except positioned differently for centered */}
-
-                    {t.rating && (
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 2,
-                          color: starColor,
-                          justifyContent: getFlexAlign(contentAlign),
-                        }}
-                      >
-                        {Array.from({ length: 5 }, (_, j) => (
-                          <span
-                            key={j}
-                            style={{
-                              opacity: j < t.rating ? 1 : 0.25,
-                              fontSize: layoutStyle === "centered" ? 18 : 14,
-                            }}
-                          >
-                            ★
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Quote */}
-
-                    <p
-                      style={{
-                        fontSize: "var(--base-font-size, 0.95rem)",
-                        lineHeight: "var(--line-height, 1.7)",
-                        color: "var(--text-color)",
-                        fontStyle:
-                          layoutStyle === "minimal" ? "normal" : "italic",
-                        flex: 1,
-                      }}
-                    >
-                      {showQuotes && (
-                        <span
-                          style={{
-                            color: accentColor || "var(--primary-color)",
-                            fontSize: "1.5em",
-                            marginRight: 4,
-                          }}
-                        >
-                          "
-                        </span>
-                      )}
-
-                      {t.quote}
-
-                      {showQuotes && (
-                        <span
-                          style={{
-                            color: accentColor || "var(--primary-color)",
-                            fontSize: "1.5em",
-                            marginLeft: 4,
-                          }}
-                        >
-                          "
-                        </span>
-                      )}
-                    </p>
-
-                    {/* Standard & Minimal Layout - Author at bottom */}
-
-                    {(layoutStyle === "standard" ||
-                      layoutStyle === "minimal") && (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 12,
-                          paddingTop: 12,
-                          borderTop:
-                            cardStyle === "minimal"
-                              ? "none"
-                              : "1px solid #e5e7eb",
-                          justifyContent: getFlexAlign(contentAlign),
-                          flexDirection:
-                            contentAlign === "right" ? "row-reverse" : "row",
-                        }}
-                      >
-                        {t.avatar ? (
-                          <img
-                            src={t.avatar}
-                            alt={t.author}
-                            style={{
-                              width: avSize,
-                              height: avSize,
-                              borderRadius: "50%",
-                              objectFit: "cover",
-                              flexShrink: 0,
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: avSize,
-                              height: avSize,
-                              borderRadius: "50%",
-                              backgroundColor:
-                                accentColor || "var(--primary-color)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "#fff",
-                              fontWeight: 700,
-                              fontSize: avSize * 0.4,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {t.author?.charAt(0) || "?"}
-                          </div>
-                        )}
-
-                        <div style={{ textAlign: "left" }}>
-                          <p
-                            style={{
-                              fontWeight: 600,
-                              color: accentColor || "var(--primary-color)",
-                              fontSize: 14,
-                              marginBottom: 2,
-                            }}
-                          >
-                            {t.author}
-                          </p>
-
-                          {t.role && (
-                            <p
-                              style={{
-                                fontSize: 12,
-                                color: "var(--text-color)",
-                                opacity: 0.65,
-                              }}
-                            >
-                              {t.role}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Centered Layout - Author centered */}
-
-                    {layoutStyle === "centered" && (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: 8,
-                          paddingTop: 12,
-                        }}
-                      >
-                        {t.avatar ? (
-                          <img
-                            src={t.avatar}
-                            alt={t.author}
-                            style={{
-                              width: avSize,
-                              height: avSize,
-                              borderRadius: "50%",
-                              objectFit: "cover",
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: avSize,
-                              height: avSize,
-                              borderRadius: "50%",
-                              backgroundColor:
-                                accentColor || "var(--primary-color)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "#fff",
-                              fontWeight: 700,
-                              fontSize: avSize * 0.4,
-                            }}
-                          >
-                            {t.author?.charAt(0) || "?"}
-                          </div>
-                        )}
-
-                        <div style={{ textAlign: "center" }}>
-                          <p
-                            style={{
-                              fontWeight: 600,
-                              color: accentColor || "var(--primary-color)",
-                              fontSize: 14,
-                            }}
-                          >
-                            {t.author}
-                          </p>
-
-                          {t.role && (
-                            <p
-                              style={{
-                                fontSize: 12,
-                                color: "var(--text-color)",
-                                opacity: 0.65,
-                              }}
-                            >
-                              {t.role}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+      // ── BRICK: staggered brick wall — EVERY tile is identical in width & height.
+      //    Full rows hold N bricks; offset rows hold N-1 bricks flanked by a half
+      //    brick at each end, so every row is exactly the container width (no
+      //    overflow) and the seams stagger like real brickwork. Aspect ratio
+      //    controls tile proportions. ──
+      if (layout === "brick") {
+        const FULL = 3;     // bricks in a full row
+        const brickW = `calc((100% - ${(FULL - 1)} * ${gapPx}) / ${FULL})`;
+        const halfW = `calc((${brickW} - ${gapPx}) / 2)`;
+        const rows: { items: any[]; offset: boolean }[] = [];
+        let bi = 0;
+        let rowNo = 0;
+        while (bi < imgs.length) {
+          const offset = rowNo % 2 === 1;
+          const count = offset ? FULL - 1 : FULL;
+          rows.push({ items: imgs.slice(bi, bi + count), offset });
+          bi += count;
+          rowNo += 1;
+        }
+        let imgIdx = 0;
+        return (
+          <div className={hideClasses || undefined} style={{ display: "flex", flexDirection: "column", gap: gapPx, overflow: "hidden" }}>
+            {rows.map(({ items, offset }: { items: any[]; offset: boolean }, rIdx: number) => (
+              <div key={rIdx} style={{ display: "flex", gap: gapPx }}>
+                {offset && <div style={{ flex: `0 0 ${halfW}` }} />}
+                {items.map((img: any, cIdx: number) => (
+                  <ImgCell key={cIdx} img={img} i={imgIdx++} cellStyle={{ flex: `0 0 ${brickW}`, aspectRatio: ar }} fitOverride="cover" />
                 ))}
+                {offset && <div style={{ flex: `0 0 ${halfW}` }} />}
               </div>
-            </div>
-          </section>
-        </>
+            ))}
+          </div>
+        );
+      }
+
+      // ── CAROUSEL: horizontal scrolling strip; each photo a fixed-width slide. ──
+      if (layout === "carousel") {
+        return (
+          <div
+            className={hideClasses || undefined}
+            style={{ display: "flex", gap: gapPx, overflowX: "auto", paddingBottom: 6, scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}
+          >
+            {imgs.map((img: any, i: number) => (
+              <ImgCell
+                key={i}
+                img={img}
+                i={i}
+                cellStyle={{ flex: "0 0 auto", width: "min(70%, 360px)", aspectRatio: ar, scrollSnapAlign: "start" }}
+              />
+            ))}
+          </div>
+        );
+      }
+
+      // mixed (default): first image spans 2×2, all cells use aspect ratio
+      return (
+        <div className={hideClasses || undefined} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: gapPx }}>
+          {imgs.map((img: any, i: number) => {
+            const cellStyle = i === 0
+              ? { gridColumn: "span 2", gridRow: "span 2" }
+              : { aspectRatio: ar };
+            return <ImgCell key={i} img={img} i={i} cellStyle={cellStyle} />;
+          })}
+        </div>
       );
     },
   },
@@ -11901,31 +5096,58 @@ export const previewConfig: Config<Props, RootProps> = {
 
 // ─── Image Component ──────────────────────────────────────────────────────
 
-function ImageLinkUrlField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+const URL_PATTERN = /^(https?:\/\/|mailto:|tel:|#|\/)/;
+
+function LinkUrlField({ value, onChange, label = "Link URL" }: { value: string; onChange: (v: string) => void; label?: string }) {
   const [draft, setDraft] = useState(value);
   const [touched, setTouched] = useState(false);
   useEffect(() => { setDraft(value); }, [value]);
-  const isValid = !draft || draft.startsWith("http://") || draft.startsWith("https://");
-  const error = touched && !isValid ? "Must start with http:// or https://" : null;
+
+  const isValid = !draft || URL_PATTERN.test(draft);
+  const error = touched && draft && !isValid
+    ? 'URL must start with https://, http://, mailto:, tel:, / or #'
+    : null;
+
+  const commit = (raw: string) => {
+    const v = raw.trim();
+    setTouched(true);
+    if (v && !URL_PATTERN.test(v)) {
+      // invalid — keep draft as-is for the user to correct, don't save
+      setDraft(v);
+    } else {
+      setDraft(v);
+      onChange(v);
+    }
+  };
+
   return (
-    <StackedField label="Link URL">
-      <input
-        type="text"
-        value={draft}
-        placeholder="https://..."
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => { setTouched(true); if (!draft || isValid) onChange(draft); }}
-        style={{
-          width: "100%", padding: "5px 8px", fontSize: 12,
-          border: `1px solid ${error ? "#d72c0d" : "var(--p-color-border)"}`,
-          borderRadius: "var(--p-border-radius-100, 4px)",
-          outline: "none", boxSizing: "border-box",
-          background: "var(--p-color-bg-surface)", color: "var(--p-color-text)",
-        }}
-      />
-      {error && <div style={{ color: "#d72c0d", fontSize: 11, marginTop: 3 }}>{error}</div>}
+    <StackedField label={label}>
+      <>
+        <input
+          type="url"
+          value={draft}
+          placeholder="https://..."
+          onChange={(e) => { setDraft(e.target.value); setTouched(false); }}
+          onBlur={(e) => commit(e.target.value)}
+          style={{
+            width: "100%", padding: "5px 8px", fontSize: 12,
+            border: `1px solid ${error ? "#d72c0d" : "var(--p-color-border)"}`,
+            borderRadius: "var(--p-border-radius-100, 4px)",
+            outline: "none", boxSizing: "border-box",
+            background: "var(--p-color-bg-surface)", color: "var(--p-color-text)",
+          }}
+        />
+        {error && <div style={{ color: "#d72c0d", fontSize: 11, marginTop: 3 }}>{error}</div>}
+        {!error && draft && (
+          <div style={{ fontSize: 11, color: "var(--p-color-text-secondary)", marginTop: 3, wordBreak: "break-all" }}>{draft}</div>
+        )}
+      </>
     </StackedField>
   );
+}
+
+function ImageLinkUrlField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return <LinkUrlField value={value} onChange={onChange} />;
 }
 
 const ImageComponent = {
@@ -12011,7 +5233,7 @@ const ImageComponent = {
                     />
                     {isCustomH && (
                       <>
-                        <StackedNumberField label="Height (px)" value={props.imgHeight ?? 300} onChange={(v) => set("imgHeight", v)} min={10} max={2000} step={1} />
+                        <SliderNumberField label="Height (px)" value={props.imgHeight ?? 300} onChange={(v) => set("imgHeight", v)} min={10} max={2000} step={10} unit="px" />
                         <InlineSelect
                           label="Object Fit"
                           value={props.objectFit ?? "cover"}
@@ -12039,14 +5261,14 @@ const ImageComponent = {
                     />
                     {borderStyleVal !== "none" && (
                       <>
-                        <StackedNumberField label="Border Width (px)" value={props.borderWidth ?? 1} onChange={(v) => set("borderWidth", v)} min={1} max={20} step={1} />
+                        <SliderNumberField label="Border Width (px)" value={props.borderWidth ?? 1} onChange={(v) => set("borderWidth", v)} min={1} max={20} step={1} unit="px" />
                         <ColorPickerField label="Border Color" value={props.borderColor ?? ""} onChange={(v) => set("borderColor", v)} />
-                        <StackedNumberField label="Border Radius (px)" value={props.borderRadius ?? 0} onChange={(v) => set("borderRadius", v)} min={0} max={200} step={1} />
+                        <SliderNumberField label="Border Radius (px)" value={props.borderRadius ?? 0} onChange={(v) => set("borderRadius", v)} min={0} max={200} step={1} unit="px" />
                       </>
                     )}
 
                     <TabSection title="Effects" />
-                    <StackedNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1} />
+                    <SliderNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1} unit="%" />
                     <InlineSelect
                       label="Hover Effect"
                       value={hoverEffectVal}
@@ -12060,10 +5282,10 @@ const ImageComponent = {
                       ]}
                     />
                     {hoverEffectVal === "blur" && (
-                      <StackedNumberField label="CSS Blur (px)" value={props.cssBlur ?? 4} onChange={(v) => set("cssBlur", v)} min={1} max={20} step={1} />
+                      <SliderNumberField label="CSS Blur (px)" value={props.cssBlur ?? 4} onChange={(v) => set("cssBlur", v)} min={1} max={20} step={1} unit="px" />
                     )}
                     {hoverEffectVal === "brightness" && (
-                      <StackedNumberField label="CSS Brightness (%)" value={props.cssBrightness ?? 130} onChange={(v) => set("cssBrightness", v)} min={50} max={200} step={5} />
+                      <SliderNumberField label="CSS Brightness (%)" value={props.cssBrightness ?? 130} onChange={(v) => set("cssBrightness", v)} min={50} max={200} step={5} unit="%" />
                     )}
 
                     {hasCaption && (
@@ -12089,7 +5311,7 @@ const ImageComponent = {
                           ]}
                         />
                         <ColorPickerField label="Caption Color" value={props.captionColor ?? ""} onChange={(v) => set("captionColor", v)} />
-                        <StackedNumberField label="Caption Font Size (px)" value={props.captionFontSize ?? 13} onChange={(v) => set("captionFontSize", v)} min={10} max={32} step={1} />
+                        <SliderNumberField label="Caption Font Size (px)" value={props.captionFontSize ?? 13} onChange={(v) => set("captionFontSize", v)} min={10} max={32} step={1} unit="px" />
                         {captionPosVal === "overlay" && (
                           <ColorPickerField label="Caption Background" value={props.captionBackground ?? ""} onChange={(v) => set("captionBackground", v)} />
                         )}
@@ -12346,7 +5568,7 @@ const ImageComponent = {
     return (
       <div
         id={imgId}
-        className={[`puck-img-wrap-outer`, entranceAnim && entranceAnim !== "none" ? "pb-img-animate" : "", hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
+        className={[`puck-img-wrap-outer`, entranceAnim && entranceAnim !== "none" ? "pb-img-animate" : "", cssClass].filter(Boolean).join(" ") || undefined}
         style={{
           paddingTop: advPadding?.top ?? 0, paddingRight: advPadding?.right ?? 0,
           paddingBottom: advPadding?.bottom ?? 0, paddingLeft: advPadding?.left ?? 0,
@@ -12413,33 +5635,9 @@ const SpaceComponent = {
                 {/* ── CONTENT TAB ── */}
                 {tab === "content" && (
                   <>
-                    <NumberUnitField
-                      label="Height Desktop"
-                      value={props.heightDesktop ?? 32}
-                      unit={props.heightDesktopUnit ?? "px"}
-                      onValueChange={(v) => set("heightDesktop", v)}
-                      onUnitChange={(u) => set("heightDesktopUnit", u)}
-                      units={["px", "vh", "rem"]}
-                      min={0} max={9999} step={1}
-                    />
-                    <NumberUnitField
-                      label="Height Tablet"
-                      value={props.heightTablet ?? 0}
-                      unit={props.heightTabletUnit ?? "px"}
-                      onValueChange={(v) => set("heightTablet", v)}
-                      onUnitChange={(u) => set("heightTabletUnit", u)}
-                      units={["px", "vh", "rem"]}
-                      min={0} max={9999} step={1}
-                    />
-                    <NumberUnitField
-                      label="Height Mobile"
-                      value={props.heightMobile ?? 0}
-                      unit={props.heightMobileUnit ?? "px"}
-                      onValueChange={(v) => set("heightMobile", v)}
-                      onUnitChange={(u) => set("heightMobileUnit", u)}
-                      units={["px", "vh", "rem"]}
-                      min={0} max={9999} step={1}
-                    />
+                    <SliderNumberField label="Height Desktop (px)" value={props.heightDesktop ?? 32} onChange={(v) => set("heightDesktop", v)} min={0} max={500} step={4} unit="PX" />
+                    <SliderNumberField label="Height Tablet (px)"  value={props.heightTablet  ?? 0}  onChange={(v) => set("heightTablet", v)}  min={0} max={500} step={4} unit="PX" />
+                    <SliderNumberField label="Height Mobile (px)"  value={props.heightMobile  ?? 0}  onChange={(v) => set("heightMobile", v)}  min={0} max={500} step={4} unit="PX" />
                   </>
                 )}
 
@@ -12484,20 +5682,27 @@ const SpaceComponent = {
     zIndex: null,
   },
 
-  render: ({ heightDesktop, heightDesktopUnit, heightTablet, heightTabletUnit, heightMobile, heightMobileUnit, backgroundColor, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex }: any) => {
+  render: ({ id, heightDesktop, heightDesktopUnit, heightTablet, heightTabletUnit, heightMobile, heightMobileUnit, backgroundColor, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex }: any) => {
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
-    const hD = `${heightDesktop || 32}${heightDesktopUnit || "px"}`;
-    const hT = heightTablet ? `${heightTablet}${heightTabletUnit || "px"}` : hD;
-    const hM = heightMobile ? `${heightMobile}${heightMobileUnit || "px"}` : hT;
+    const toCssLen = (val: any, unit: any, fallback: string): string => {
+      if (val == null || val === "") return fallback;
+      const s = String(val);
+      if (/[a-z%]+$/i.test(s)) return s; // already has a unit
+      return `${s}${unit || "px"}`;
+    };
+    const hD = toCssLen(heightDesktop, heightDesktopUnit, "32px");
+    const hT = toCssLen(heightTablet,  heightTabletUnit,  hD);
+    const hM = toCssLen(heightMobile,  heightMobileUnit,  hT);
+    const uid = `sp-${id || "x"}`;
     const responsiveCss = `
-      .spacer-${cssId || "default"} { height: ${hD}; }
-      @media (max-width: 1024px) { .spacer-${cssId || "default"} { height: ${hT}; } }
-      @media (max-width: 640px) { .spacer-${cssId || "default"} { height: ${hM}; } }
+      .${uid} { height: ${hD}; }
+      @media (max-width: 1024px) { .${uid} { height: ${hT}; } }
+      @media (max-width: 640px) { .${uid} { height: ${hM}; } }
     `;
     return (
       <div
         id={cssId || undefined}
-        className={[`spacer-${cssId || "default"}`, hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
+        className={[uid, cssClass].filter(Boolean).join(" ") || undefined}
         style={{ backgroundColor: backgroundColor || "transparent", zIndex: zIndex ?? undefined }}
       >
         <style>{responsiveCss}</style>
@@ -12517,17 +5722,26 @@ const ButtonComponent = {
       render: ({ value: _v, onChange: _onChange }: any) => {
         const { selectedItem, appState, dispatch } = usePuck();
         const props = selectedItem?.props ?? {};
-        const set = (key: string, val: any) => {
-          if (!selectedItem) return;
+        const getZoneInfo = () => {
           const state = appState.data;
           let destinationZone = "root:default-zone";
           let destinationIndex = 0;
           const zones: Record<string, any[]> = { "root:default-zone": state.content, ...(state.zones ?? {}) };
           for (const [zone, items] of Object.entries(zones)) {
-            const idx = (items as any[]).findIndex((it: any) => it.props?.id === selectedItem.props?.id);
+            const idx = (items as any[]).findIndex((it: any) => it.props?.id === selectedItem?.props?.id);
             if (idx !== -1) { destinationZone = zone; destinationIndex = idx; break; }
           }
+          return { destinationZone, destinationIndex };
+        };
+        const set = (key: string, val: any) => {
+          if (!selectedItem) return;
+          const { destinationZone, destinationIndex } = getZoneInfo();
           dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } });
+        };
+        const setMany = (patch: Record<string, any>) => {
+          if (!selectedItem) return;
+          const { destinationZone, destinationIndex } = getZoneInfo();
+          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), ...patch } } });
         };
 
         const bgType = props.advBgType ?? "none";
@@ -12540,28 +5754,47 @@ const ButtonComponent = {
                 {tab === "content" && (
                   <>
                     <StackedTextField label="Label" value={props.label ?? "Click Me"} onChange={(v) => set("label", v)} placeholder="Button label..." />
-                    <StackedTextField label="Link URL" value={props.linkUrl ?? ""} onChange={(v) => set("linkUrl", v)} placeholder="https://..." />
-                    <StackedTextField label="Icon (emoji or SVG)" value={props.icon ?? ""} onChange={(v) => set("icon", v)} placeholder="e.g. 🚀 or leave blank" />
+                    <LinkUrlField value={props.linkUrl ?? ""} onChange={(v) => set("linkUrl", v)} />
                     <InlineSelect
-                      label="Icon Position"
-                      value={props.iconPosition ?? "before"}
-                      onChange={(v) => set("iconPosition", v)}
+                      label="Icon Type"
+                      value={props.iconType ?? "none"}
+                      onChange={(v) => setMany({ iconType: v, icon: "" })}
                       options={[
-                        { value: "before", label: "Before Label" },
-                        { value: "after", label: "After Label" },
+                        { value: "none", label: "None" },
+                        { value: "emoji", label: "Emoji" },
+                        { value: "svg", label: "SVG" },
+                        { value: "image", label: "Upload" },
                       ]}
                     />
+                    {props.iconType !== "none" && (
+                      props.iconType === "emoji" ? (
+                        <StackedTextField label="Icon (emoji)" value={props.icon ?? ""} onChange={(v) => set("icon", v)} placeholder="e.g. 🚀" />
+                      ) : props.iconType === "image" ? (
+                        <ImageField label="Icon Image" value={props.icon ?? ""} onChange={(v) => set("icon", v)} />
+                      ) : (
+                        <StackedField label="Icon (SVG code)">
+                          <textarea
+                            value={props.icon ?? ""}
+                            onChange={(e) => set("icon", e.target.value)}
+                            placeholder="<svg>...</svg>"
+                            style={{ width: "100%", height: 60, padding: "5px 8px", border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-100, 4px)", fontSize: 12, fontFamily: "monospace", boxSizing: "border-box", outline: "none", resize: "vertical", background: "var(--p-color-bg-surface)", color: "var(--p-color-text)" }}
+                          />
+                        </StackedField>
+                      )
+                    )}
                     <ToggleField label="Full Width" value={!!props.fullWidth} onChange={(v) => set("fullWidth", v)} />
-                    <AlignField
-                      label="Alignment"
-                      value={props.alignment ?? "left"}
-                      onChange={(v) => set("alignment", v)}
-                      options={[
-                        { value: "left",   icon: <AlignLeft   size={15} />, title: "Left"   },
-                        { value: "center", icon: <AlignCenter size={15} />, title: "Center" },
-                        { value: "right",  icon: <AlignRight  size={15} />, title: "Right"  },
-                      ]}
-                    />
+                    {!props.fullWidth && (
+                      <AlignField
+                        label="Alignment"
+                        value={props.alignment ?? "left"}
+                        onChange={(v) => set("alignment", v)}
+                        options={[
+                          { value: "left",   icon: <AlignLeft   size={15} />, title: "Left"   },
+                          { value: "center", icon: <AlignCenter size={15} />, title: "Center" },
+                          { value: "right",  icon: <AlignRight  size={15} />, title: "Right"  },
+                        ]}
+                      />
+                    )}
                   </>
                 )}
 
@@ -12572,38 +5805,73 @@ const ButtonComponent = {
                     <InlineSelect
                       label="Font Family"
                       value={props.fontFamily ?? "inherit"}
-                      onChange={(v) => set("fontFamily", v)}
+                      onChange={(v) => { set("fontFamily", v); loadGoogleFont(v); }}
                       options={[
-                        { value: "inherit", label: "Theme Default" },
-                        { value: "serif", label: "Serif" },
-                        { value: "sans-serif", label: "Sans-serif" },
-                        { value: "monospace", label: "Monospace" },
-                        { value: "Arial, sans-serif", label: "Arial" },
-                        { value: "'Helvetica Neue', sans-serif", label: "Helvetica" },
+                        { value: "inherit",                       label: "Theme Default" },
+                        { value: "Arial, Helvetica, sans-serif",   label: "Arial" },
+                        { value: "Georgia, serif",                 label: "Georgia" },
+                        { value: "'Courier New', monospace",       label: "Courier New" },
+                        { value: "Impact, sans-serif",             label: "Impact" },
+                        { value: "Inter, sans-serif",              label: "Inter" },
+                        { value: "Poppins, sans-serif",            label: "Poppins" },
+                        { value: "'Roboto Serif', serif",          label: "Roboto Serif" },
+                        { value: "'New York', 'New York Small', 'Times New Roman', serif", label: "New York" },
+                        { value: "'Open Sans', sans-serif",        label: "Open Sans" },
                       ]}
                     />
-                    <StackedNumberField label="Font Size (px)" value={props.fontSize ?? null} onChange={(v) => set("fontSize", v)} placeholder="e.g. 16" min={8} max={64} step={1} />
+                    <SliderNumberField label="Font Size (px)" value={props.fontSize ?? 16} onChange={(v) => set("fontSize", v)} min={8} max={64} step={1} unit="px" />
                     <InlineSelect
                       label="Font Weight"
-                      value={String(props.fontWeight ?? "600")}
+                      value={String(props.fontWeight ?? "400")}
                       onChange={(v) => set("fontWeight", v)}
                       options={[
                         { value: "400", label: "Normal" },
                         { value: "600", label: "Semi Bold" },
-                        { value: "700", label: "Bold" },
+                        { value: "900", label: "Bold" },
                       ]}
                     />
                     <InlineSelect
                       label="Text Transform"
-                      value={props.textTransform ?? "none"}
+                      value={props.textTransform ?? "capitalize"}
                       onChange={(v) => set("textTransform", v)}
                       options={[
-                        { value: "none", label: "None" },
+                        { value: "capitalize", label: "Capitalize" },
                         { value: "uppercase", label: "Uppercase" },
                         { value: "lowercase", label: "Lowercase" },
                       ]}
                     />
-                    <StackedNumberField label="Letter Spacing (px)" value={props.letterSpacing ?? null} onChange={(v) => set("letterSpacing", v)} placeholder="e.g. 0.5" min={-5} max={20} step={0.5} />
+                    <SliderNumberField label="Letter Spacing (px)" value={props.letterSpacing ?? 0} onChange={(v) => set("letterSpacing", v)} min={-5} max={20} step={0.5} unit="px" />
+
+                    {props.iconType !== "none" && (
+                      <>
+                        <TabSection title="Icon" />
+                        <InlineSelect
+                          label="Icon Position"
+                          value={props.iconPosition ?? "before"}
+                          onChange={(v) => set("iconPosition", v)}
+                          options={[
+                            { value: "before", label: "Before Label" },
+                            { value: "after", label: "After Label" },
+                          ]}
+                        />
+                        {props.iconType === "emoji" && (
+                          <SliderNumberField label="Icon Size (px)" value={props.iconSize ?? 20} onChange={(v) => set("iconSize", v)} min={10} max={80} step={1} unit="px" />
+                        )}
+                        {(props.iconType === "svg" || props.iconType === "image") && (
+                          <>
+                            <SliderNumberField label="Icon Width (px)" value={props.iconWidth ?? 20} onChange={(v) => set("iconWidth", v)} min={10} max={100} step={1} unit="px" />
+                            <SliderNumberField label="Icon Height (px)" value={props.iconHeight ?? 20} onChange={(v) => set("iconHeight", v)} min={10} max={100} step={1} unit="px" />
+                          </>
+                        )}
+                        {props.iconType === "svg" && (
+                          <>
+                            <ColorPickerField label="Icon Color" value={props.iconColor ?? ""} onChange={(v) => set("iconColor", v)} />
+                            <ColorPickerField label="Icon Hover Color" value={props.iconHoverColor ?? ""} onChange={(v) => set("iconHoverColor", v)} />
+                          </>
+                        )}
+                        <SliderNumberField label="Icon Gap (px)" value={props.iconGap ?? 8} onChange={(v) => set("iconGap", v)} min={0} max={40} step={1} unit="px" />
+                      </>
+                    )}
 
                     <TabSection title="Normal State" />
                     <ColorPickerField label="Text Color" value={props.textColor ?? ""} onChange={(v) => set("textColor", v)} />
@@ -12621,11 +5889,11 @@ const ButtonComponent = {
                     />
                     {props.borderStyle && props.borderStyle !== "none" && (
                       <>
-                        <StackedNumberField label="Border Width (px)" value={props.borderWidth ?? 2} onChange={(v) => set("borderWidth", v)} min={1} max={10} step={1} />
+                        <SliderNumberField label="Border Width (px)" value={props.borderWidth ?? 2} onChange={(v) => set("borderWidth", v)} min={1} max={10} step={1} unit="px" />
                         <ColorPickerField label="Border Color" value={props.borderColor ?? ""} onChange={(v) => set("borderColor", v)} />
                       </>
                     )}
-                    <StackedTextField label="Border Radius" value={props.borderRadius ?? "var(--button-border-radius, 6px)"} onChange={(v) => set("borderRadius", v)} placeholder="e.g. 6px or 50%" />
+                    <SliderNumberField label="Border Radius (px)" value={typeof props.borderRadius === "number" ? props.borderRadius : 6} onChange={(v) => set("borderRadius", v)} min={0} max={100} step={1} unit="PX" />
 
                     <TabSection title="Hover State" />
                     <ColorPickerField label="Text Hover Color" value={props.hoverTextColor ?? ""} onChange={(v) => set("hoverTextColor", v)} />
@@ -12641,6 +5909,29 @@ const ButtonComponent = {
                         { value: "pulse", label: "Pulse" },
                       ]}
                     />
+
+                    <TabSection title="Entrance Animation" />
+                    <InlineSelect
+                      label="Animation"
+                      value={props.entranceAnimation ?? "none"}
+                      onChange={(v) => set("entranceAnimation", v)}
+                      options={[
+                        { value: "none",        label: "None" },
+                        { value: "fadeIn",       label: "Fade In" },
+                        { value: "fadeInUp",     label: "Fade In Up" },
+                        { value: "fadeInDown",   label: "Fade In Down" },
+                        { value: "slideInLeft",  label: "Slide In Left" },
+                        { value: "slideInRight", label: "Slide In Right" },
+                        { value: "zoomIn",       label: "Zoom In" },
+                        { value: "bounce",       label: "Bounce" },
+                      ]}
+                    />
+                    {(props.entranceAnimation && props.entranceAnimation !== "none") && (
+                      <>
+                        <SliderNumberField label="Duration (ms)" value={props.animDuration ?? 600} onChange={(v) => set("animDuration", v)} min={100} max={2000} step={50} unit="MS" />
+                        <SliderNumberField label="Delay (ms)" value={props.animDelay ?? 0} onChange={(v) => set("animDelay", v)} min={0} max={3000} step={50} unit="MS" />
+                      </>
+                    )}
 
                     <TabSection title="Sizing" />
                     <InlineSelect
@@ -12687,7 +5978,7 @@ const ButtonComponent = {
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
 
-                    <StackedNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1} />
+                    <SliderNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1} unit="%" />
                   </>
                 )}
               </>
@@ -12702,25 +5993,35 @@ const ButtonComponent = {
     label: "Click Me",
     linkUrl: "",
     linkTarget: "_blank",
+    iconType: "none",
     icon: "",
     iconPosition: "before",
+    iconSize: 20,
+    iconWidth: 20,
+    iconHeight: 20,
+    iconColor: "",
+    iconHoverColor: "",
+    iconGap: 8,
     fullWidth: false,
     alignment: "left",
     fontFamily: "inherit",
     fontSize: null,
-    fontWeight: "600",
-    textTransform: "none",
+    fontWeight: "400",
+    textTransform: "capitalize",
     letterSpacing: null,
     textColor: "#ffffff",
     bgColor: "var(--primary-color, #0158ad)",
     borderStyle: "none",
     borderWidth: 2,
     borderColor: "",
-    borderRadius: "var(--button-border-radius, 6px)",
+    borderRadius: 6,
     hoverTextColor: "",
     hoverBgColor: "",
     hoverBorderColor: "",
     hoverAnimation: "none",
+    entranceAnimation: "none",
+    animDuration: 600,
+    animDelay: 0,
     sizePreset: "medium",
     customPadding: { top: 12, right: 24, bottom: 12, left: 24 },
     advBgType: "none",
@@ -12740,8 +6041,15 @@ const ButtonComponent = {
     label,
     linkUrl,
     linkTarget,
+    iconType,
     icon,
     iconPosition,
+    iconSize,
+    iconWidth,
+    iconHeight,
+    iconColor,
+    iconHoverColor,
+    iconGap,
     fullWidth,
     alignment,
     fontFamily,
@@ -12759,6 +6067,9 @@ const ButtonComponent = {
     hoverBgColor,
     hoverBorderColor,
     hoverAnimation,
+    entranceAnimation,
+    animDuration,
+    animDelay,
     sizePreset,
     customPadding,
     advBgType,
@@ -12772,8 +6083,8 @@ const ButtonComponent = {
     customCss,
     zIndex,
     opacity,
-  }) => {
-    const sizeMap = {
+  }: any) => {
+    const sizeMap: Record<string, React.CSSProperties> = {
       small:  { paddingTop: 8,  paddingRight: 16, paddingBottom: 8,  paddingLeft: 16 },
       medium: { paddingTop: 12, paddingRight: 24, paddingBottom: 12, paddingLeft: 24 },
       large:  { paddingTop: 16, paddingRight: 32, paddingBottom: 16, paddingLeft: 32 },
@@ -12782,8 +6093,29 @@ const ButtonComponent = {
 
     const padding = sizeMap[sizePreset ?? "medium"] ?? sizeMap.medium;
 
+    // Numeric borderRadius → px string; string passthrough for legacy values
+    const borderRadiusValue = typeof borderRadius === "number" ? `${borderRadius}px` : (borderRadius || "6px");
+
+    const btnClass = `puck-btn-${cssId || "b"}`;
+
+    // Entrance animation keyframes
+    const entranceFromMap: Record<string, string> = {
+      fadeIn:       "opacity:0",
+      fadeInUp:     "opacity:0;transform:translateY(20px)",
+      fadeInDown:   "opacity:0;transform:translateY(-20px)",
+      slideInLeft:  "opacity:0;transform:translateX(-30px)",
+      slideInRight: "opacity:0;transform:translateX(30px)",
+      zoomIn:       "opacity:0;transform:scale(0.85)",
+      bounce:       "opacity:0;transform:translateY(-20px)",
+    };
+    const anim = entranceAnimation && entranceAnimation !== "none" ? entranceAnimation : null;
+    const animCss = anim && entranceFromMap[anim] ? `
+      @keyframes puck-btn-${anim} { from{${entranceFromMap[anim]}} to{opacity:1;transform:none} }
+      .${btnClass}-wrap { animation: puck-btn-${anim} ${animDuration ?? 600}ms ease ${animDelay ?? 0}ms both; }
+    ` : "";
+
     const hoverCss = `
-      .puck-btn-${cssId || "default"}:hover {
+      .${btnClass}:hover {
         ${hoverTextColor ? `color: ${hoverTextColor} !important;` : ""}
         ${hoverBgColor ? `background: ${hoverBgColor} !important;` : ""}
         ${hoverBorderColor ? `border-color: ${hoverBorderColor} !important;` : ""}
@@ -12791,54 +6123,80 @@ const ButtonComponent = {
         ${hoverAnimation === "shrink" ? "transform: scale(0.96);" : ""}
         ${hoverAnimation === "pulse" ? "animation: puck-pulse 0.6s ease;" : ""}
       }
-      .puck-btn-${cssId || "default"} { transition: all 0.2s ease; }
+      ${iconType === "svg" && iconHoverColor ? `.${btnClass}:hover svg { color: ${iconHoverColor} !important; fill: ${iconHoverColor} !important; }` : ""}
+      .${btnClass} { transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, opacity 0.2s ease; }
       @keyframes puck-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
     `;
 
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
     const wrapBg = advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {};
 
+    const showIcon = iconType !== "none" && icon;
+    const iconEl = showIcon && (
+      iconType === "emoji" ? (
+        <span style={{ fontSize: iconSize ?? 20, lineHeight: 1 }}>{icon}</span>
+      ) : iconType === "image" ? (
+        <img src={icon} alt="" style={{ width: iconWidth ?? 20, height: iconHeight ?? 20, objectFit: "contain", display: "block", flexShrink: 0 }} />
+      ) : icon && icon.trimStart().startsWith("<svg") ? (
+        <span
+          style={{ display: "inline-flex", alignItems: "center", width: iconWidth ?? 20, height: iconHeight ?? 20, flexShrink: 0, color: iconColor || "currentColor", fill: iconColor || "currentColor" }}
+          dangerouslySetInnerHTML={{ __html: icon.replace(/<svg\b/, `<svg style="width:${iconWidth ?? 20}px;height:${iconHeight ?? 20}px;color:${iconColor || "currentColor"};fill:${iconColor || "currentColor"}"`) }}
+        />
+      ) : (
+        <svg
+          width={iconWidth ?? 20}
+          height={iconHeight ?? 20}
+          viewBox="0 0 24 24"
+          dangerouslySetInnerHTML={{ __html: icon }}
+          style={{ color: iconColor || "currentColor", fill: "currentColor" }}
+        />
+      )
+    );
+
     const btnEl = (
       <button
-        className={`puck-btn-${cssId || "default"}`}
+        className={btnClass}
         style={{
           display: fullWidth ? "flex" : "inline-flex",
           width: fullWidth ? "100%" : undefined,
           alignItems: "center",
           justifyContent: "center",
-          gap: icon ? 8 : 0,
+          gap: showIcon ? (iconGap ?? 8) : 0,
           ...padding,
           fontFamily: fontFamily && fontFamily !== "inherit" ? fontFamily : "var(--font-family)",
           fontSize: fontSize ? `${fontSize}px` : undefined,
-          fontWeight: fontWeight ?? "600",
-          textTransform: (textTransform ?? "none") as any,
+          fontWeight: fontWeight ?? "400",
+          textTransform: (textTransform ?? "capitalize") as any,
           letterSpacing: letterSpacing != null ? `${letterSpacing}px` : undefined,
           color: textColor || "#fff",
           background: bgColor || "var(--primary-color, #0158ad)",
           border: borderStyle !== "none" ? `${borderWidth ?? 2}px ${borderStyle} ${borderColor || "transparent"}` : "none",
-          borderRadius: borderRadius || "6px",
+          borderRadius: borderRadiusValue,
           cursor: "pointer",
           opacity: opacity != null ? opacity / 100 : 1,
           textDecoration: "none",
         }}
       >
-        {icon && iconPosition === "before" && <span>{icon}</span>}
+        {showIcon && iconPosition === "before" && iconEl}
         {label || "Button"}
-        {icon && iconPosition === "after" && <span>{icon}</span>}
+        {showIcon && iconPosition === "after" && iconEl}
       </button>
     );
 
     return (
       <div
         id={cssId || undefined}
-        className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
-        style={{ textAlign: alignment as any, zIndex: zIndex ?? undefined, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, ...wrapBg }}
+        className={[cssClass].filter(Boolean).join(" ") || undefined}
+        style={{ textAlign: !fullWidth ? (alignment as any) : undefined, zIndex: zIndex ?? undefined, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, ...wrapBg }}
       >
-        <style>{hoverCss}{customCss ? `#${cssId || "btn-block"} { ${customCss} }` : ""}</style>
-        {linkUrl
-          ? <a href={linkUrl} target={linkTarget ?? "_blank"} rel="noopener noreferrer" style={{ textDecoration: "none", display: fullWidth ? "block" : "inline-block" }}>{btnEl}</a>
-          : btnEl
-        }
+        <style>{animCss}{hoverCss}{customCss ? `.${btnClass} { ${customCss} }` : ""}</style>
+        {/* key on anim+duration+delay forces remount → replays animation in editor when settings change */}
+        <div className={`${btnClass}-wrap`} key={`${anim}-${animDuration}-${animDelay}`} style={{ display: fullWidth ? "block" : "inline-block" }}>
+          {linkUrl
+            ? <a href={linkUrl} target={linkTarget ?? "_blank"} rel="noopener noreferrer" style={{ textDecoration: "none", display: fullWidth ? "block" : "inline-block" }}>{btnEl}</a>
+            : btnEl
+          }
+        </div>
       </div>
     );
   },
@@ -12892,25 +6250,6 @@ const DividerComponent = {
                         { value: "shadow", label: "Shadow" },
                       ]}
                     />
-                    <NumberUnitField
-                      label="Width"
-                      value={props.lineWidthVal ?? 100}
-                      unit={props.lineWidthUnit ?? "%"}
-                      onValueChange={(v) => set("lineWidthVal", v)}
-                      onUnitChange={(u) => set("lineWidthUnit", u)}
-                      units={["%", "px", "vw"]}
-                      min={0} max={9999} step={1}
-                    />
-                    <AlignField
-                      label="Alignment"
-                      value={props.alignment ?? "center"}
-                      onChange={(v) => set("alignment", v)}
-                      options={[
-                        { value: "left",   icon: <AlignLeft   size={15} />, title: "Left"   },
-                        { value: "center", icon: <AlignCenter size={15} />, title: "Center" },
-                        { value: "right",  icon: <AlignRight  size={15} />, title: "Right"  },
-                      ]}
-                    />
                     <ToggleField label="Add Icon / Text" value={hasElement} onChange={(v) => set("showElement", v)} />
                     {hasElement && (
                       <>
@@ -12923,7 +6262,7 @@ const DividerComponent = {
                             { value: "text", label: "Text" },
                           ]}
                         />
-                        {props.elementType === "text" || !props.elementType
+                        {props.elementType === "text"
                           ? <StackedTextField label="Text" value={props.elementText ?? ""} onChange={(v) => set("elementText", v)} placeholder="OR" />
                           : <StackedTextField label="Icon (emoji or char)" value={props.elementIcon ?? "✦"} onChange={(v) => set("elementIcon", v)} placeholder="e.g. ✦ ★ •" />
                         }
@@ -12937,6 +6276,25 @@ const DividerComponent = {
                             { value: "right", label: "Right" },
                           ]}
                         />
+                        <SliderUnitField
+                          label="Width"
+                          value={props.lineWidthVal ?? 100}
+                          unit={props.lineWidthUnit ?? "%"}
+                          onValueChange={(v) => set("lineWidthVal", v)}
+                          onUnitChange={(u) => set("lineWidthUnit", u)}
+                          units={["%", "px", "vw"]}
+                          step={1}
+                        />
+                        <AlignField
+                          label="Alignment"
+                          value={props.alignment ?? "center"}
+                          onChange={(v) => set("alignment", v)}
+                          options={[
+                            { value: "left",   icon: <AlignLeft   size={15} />, title: "Left"   },
+                            { value: "center", icon: <AlignCenter size={15} />, title: "Center" },
+                            { value: "right",  icon: <AlignRight  size={15} />, title: "Right"  },
+                          ]}
+                        />
                       </>
                     )}
                   </>
@@ -12946,18 +6304,26 @@ const DividerComponent = {
                 {tab === "style" && (
                   <>
                     <TabSection title="Line" />
-                    <StackedNumberField label="Thickness (px)" value={props.thickness ?? 1} onChange={(v) => set("thickness", v)} min={1} max={20} step={1} />
-                    <ColorPickerField label="Color" value={props.lineColor ?? ""} onChange={(v) => set("lineColor", v)} />
-                    <StackedNumberField label="Gap (px)" value={props.gap ?? 16} onChange={(v) => set("gap", v)} min={0} max={120} step={1} />
+                    <SliderNumberField label="Thickness (px)" value={props.thickness ?? 1} onChange={(v) => set("thickness", v)} min={1} max={20} step={1} unit="px" />
+                    {(props.lineStyle ?? "solid") !== "gradient" && (
+                      <ColorPickerField label="Color" value={props.lineColor ?? ""} onChange={(v) => set("lineColor", v)} />
+                    )}
+                    {(props.lineStyle ?? "solid") === "gradient" && (
+                      <>
+                        <ColorPickerField label="Start Color" value={props.gradientStart ?? "#e5e7eb"} onChange={(v) => set("gradientStart", v)} />
+                        <ColorPickerField label="End Color"   value={props.gradientEnd   ?? "#e5e7eb"} onChange={(v) => set("gradientEnd", v)} />
+                      </>
+                    )}
+                    <SliderNumberField label="Gap (px)" value={props.gap ?? 16} onChange={(v) => set("gap", v)} min={0} max={120} step={1} unit="px" />
 
                     {hasElement && (
                       <>
                         <TabSection title="Icon / Text Style" />
-                        <StackedNumberField label="Icon Size (px)" value={props.iconSize ?? 20} onChange={(v) => set("iconSize", v)} min={10} max={80} step={1} />
+                        <SliderNumberField label="Icon Size (px)" value={props.iconSize ?? 20} onChange={(v) => set("iconSize", v)} min={10} max={80} step={1} unit="px" />
                         <ColorPickerField label="Icon Color" value={props.iconColor ?? ""} onChange={(v) => set("iconColor", v)} />
                         <ColorPickerField label="Text Color" value={props.elementTextColor ?? ""} onChange={(v) => set("elementTextColor", v)} />
-                        <StackedNumberField label="Text Font Size (px)" value={props.elementFontSize ?? 14} onChange={(v) => set("elementFontSize", v)} min={10} max={48} step={1} />
-                        <StackedNumberField label="Spacing from Line (px)" value={props.elementSpacing ?? 12} onChange={(v) => set("elementSpacing", v)} min={0} max={60} step={1} />
+                        <SliderNumberField label="Text Font Size (px)" value={props.elementFontSize ?? 14} onChange={(v) => set("elementFontSize", v)} min={10} max={48} step={1} unit="px" />
+                        <SliderNumberField label="Spacing from Line (px)" value={props.elementSpacing ?? 12} onChange={(v) => set("elementSpacing", v)} min={0} max={60} step={1} unit="px" />
                       </>
                     )}
                   </>
@@ -12996,6 +6362,8 @@ const DividerComponent = {
     elementPosition: "center",
     thickness: 1,
     lineColor: "",
+    gradientStart: "#e5e7eb",
+    gradientEnd: "#e5e7eb",
     gap: 16,
     iconSize: 20,
     iconColor: "",
@@ -13023,6 +6391,8 @@ const DividerComponent = {
     elementPosition,
     thickness,
     lineColor,
+    gradientStart,
+    gradientEnd,
     gap,
     iconSize,
     iconColor,
@@ -13036,54 +6406,64 @@ const DividerComponent = {
     cssId,
     cssClass,
     zIndex,
-  }) => {
+  }: any) => {
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
     const color = lineColor || "#e5e7eb";
-    const th = thickness || 1;
+    const th = Number(thickness) || 1;
+
     const lineEl = (style: React.CSSProperties) => {
       if (lineStyle === "gradient") {
-        return <div style={{ flex: 1, height: th, background: `linear-gradient(90deg, transparent, ${color} 30%, ${color} 70%, transparent)`, alignSelf: "center", ...style }} />;
+        const c1 = gradientStart || "#e5e7eb";
+        const c2 = gradientEnd   || "#e5e7eb";
+        return <div style={{ flex: 1, height: th, background: `linear-gradient(90deg, ${c1}, ${c2})`, alignSelf: "center", ...style }} />;
       }
       if (lineStyle === "shadow") {
         return <div style={{ flex: 1, height: th * 4, background: `radial-gradient(ellipse at 50% 0%, ${color} 0%, transparent 70%)`, alignSelf: "center", ...style }} />;
       }
       if (lineStyle === "wave") {
-        const h = Math.max(th * 4, 8);
+        const h = Math.max(th * 6, 12);
+        const mid = h / 2;
         return (
-          <div style={{ flex: 1, height: h, overflow: "hidden", alignSelf: "center", ...style }}>
-            <svg width="100%" height={h} preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M0,4 C15,0 15,8 30,4 S45,0 60,4 S75,8 90,4 S105,0 120,4 S135,8 150,4 S165,0 180,4 S195,8 210,4 S225,0 240,4 S255,8 270,4 S285,0 300,4 S315,8 330,4 S345,0 360,4 S375,8 390,4 S405,0 420,4 S435,8 450,4 S465,0 480,4 S495,8 510,4 S525,0 540,4 S555,8 570,4 S585,0 600,4" fill="none" stroke={color} strokeWidth={th} vectorEffect="non-scaling-stroke" />
+          <div style={{ flex: 1, height: h, overflow: "visible", alignSelf: "center", ...style }}>
+            <svg width="100%" height={h} viewBox={`0 0 600 ${h}`} preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+              <path d={`M0,${mid} C15,${mid - mid * 0.8} 15,${mid + mid * 0.8} 30,${mid} S45,${mid - mid * 0.8} 60,${mid} S75,${mid + mid * 0.8} 90,${mid} S105,${mid - mid * 0.8} 120,${mid} S135,${mid + mid * 0.8} 150,${mid} S165,${mid - mid * 0.8} 180,${mid} S195,${mid + mid * 0.8} 210,${mid} S225,${mid - mid * 0.8} 240,${mid} S255,${mid + mid * 0.8} 270,${mid} S285,${mid - mid * 0.8} 300,${mid} S315,${mid + mid * 0.8} 330,${mid} S345,${mid - mid * 0.8} 360,${mid} S375,${mid + mid * 0.8} 390,${mid} S405,${mid - mid * 0.8} 420,${mid} S435,${mid + mid * 0.8} 450,${mid} S465,${mid - mid * 0.8} 480,${mid} S495,${mid + mid * 0.8} 510,${mid} S525,${mid - mid * 0.8} 540,${mid} S555,${mid + mid * 0.8} 570,${mid} S585,${mid - mid * 0.8} 600,${mid}`} fill="none" stroke={color} strokeWidth={th} vectorEffect="non-scaling-stroke" />
             </svg>
           </div>
         );
       }
       if (lineStyle === "zigzag") {
-        const h = Math.max(th * 4, 8);
+        const h = Math.max(th * 6, 12);
+        const pts = Array.from({ length: 61 }, (_, i) => `${i * 10},${i % 2 === 0 ? h : 0}`).join(" ");
         return (
-          <div style={{ flex: 1, height: h, overflow: "hidden", alignSelf: "center", ...style }}>
-            <svg width="100%" height={h} preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-              <polyline points="0,8 10,0 20,8 30,0 40,8 50,0 60,8 70,0 80,8 90,0 100,8 110,0 120,8 130,0 140,8 150,0 160,8 170,0 180,8 190,0 200,8 210,0 220,8 230,0 240,8 250,0 260,8 270,0 280,8 290,0 300,8 310,0 320,8 330,0 340,8 350,0 360,8 370,0 380,8 390,0 400,8 410,0 420,8 430,0 440,8 450,0 460,8 470,0 480,8 490,0 500,8 510,0 520,8 530,0 540,8 550,0 560,8 570,0 580,8 590,0 600,8" fill="none" stroke={color} strokeWidth={th} vectorEffect="non-scaling-stroke" />
+          <div style={{ flex: 1, height: h, overflow: "visible", alignSelf: "center", ...style }}>
+            <svg width="100%" height={h} viewBox={`0 0 600 ${h}`} preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+              <polyline points={pts} fill="none" stroke={color} strokeWidth={th} vectorEffect="non-scaling-stroke" />
             </svg>
           </div>
         );
       }
-      return <div style={{ flex: 1, borderTop: `${th}px ${lineStyle || "solid"} ${color}`, ...style }} />;
+      return <div style={{ flex: 1, borderTop: `${th}px ${lineStyle || "solid"} ${color}`, alignSelf: "center", ...style }} />;
     };
 
-    const elementContent = showElement
+    const iconVal = (elementIcon as string) || "";
+    const hasIconContent = elementType !== "text" ? !!iconVal.trim() : true;
+    const elementContent = showElement && hasIconContent
       ? (
         <div style={{ display: "flex", alignItems: "center", flexShrink: 0, padding: `0 ${elementSpacing ?? 12}px` }}>
           {elementType === "text"
             ? <span style={{ fontSize: elementFontSize || 14, color: elementTextColor || color, whiteSpace: "nowrap" }}>{elementText || "OR"}</span>
-            : <span style={{ fontSize: iconSize || 20, color: iconColor || color, lineHeight: 1 }}>{elementIcon || "✦"}</span>
+            : <span style={{ fontSize: iconSize || 20, color: iconColor || color, lineHeight: 1 }}>{iconVal}</span>
           }
         </div>
       )
       : null;
 
     const lineWidthCss = `${lineWidthVal ?? 100}${lineWidthUnit ?? "%"}`;
-    const innerAlign = elementPosition === "left" ? "flex-start" : elementPosition === "right" ? "flex-end" : "center";
-    const lineWrap = showElement
+    const outerJustify = showElement
+      ? (alignment === "right" ? "flex-end" : alignment === "left" ? "flex-start" : "center")
+      : "center";
+
+    const lineWrap = showElement && elementContent
       ? (
         <div style={{ display: "flex", alignItems: "center", width: lineWidthCss }}>
           {elementPosition === "center" || elementPosition === "right" ? lineEl({}) : null}
@@ -13096,14 +6476,14 @@ const DividerComponent = {
     return (
       <div
         id={cssId || undefined}
-        className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
+        className={[cssClass].filter(Boolean).join(" ") || undefined}
         style={{
           paddingTop: gap ?? 16,
           paddingBottom: gap ?? 16,
           marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0,
           marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0,
           display: "flex",
-          justifyContent: alignment === "right" ? "flex-end" : alignment === "left" ? "flex-start" : "center",
+          justifyContent: outerJustify,
           zIndex: zIndex ?? undefined,
         }}
       >
@@ -13264,11 +6644,8 @@ const VideoComponent = {
                     ) : (
                       <StackedTextField label="Video URL" value={props.videoUrl ?? ""} onChange={(v) => set("videoUrl", v)} placeholder="https://..." />
                     )}
-                    <StackedNumberField label="Start Time (sec)" value={props.startTime ?? 0} onChange={(v) => set("startTime", v)} min={0} max={9999} step={1} />
-                    <StackedNumberField label="End Time (sec)" value={props.endTime ?? null} onChange={(v) => set("endTime", v)} min={0} max={9999} step={1} />
                     <ToggleField label="Autoplay" value={!!props.autoplay} onChange={(v) => set("autoplay", v)} />
                     <ToggleField label="Loop" value={!!props.loop} onChange={(v) => set("loop", v)} />
-                    <ToggleField label="Mute" value={!!props.mute} onChange={(v) => set("mute", v)} />
                     <InlineSelect
                       label="Controls"
                       value={props.controls ?? "show"}
@@ -13279,7 +6656,6 @@ const VideoComponent = {
                       ]}
                     />
                     <ToggleField label="Play Inline" value={props.playInline !== false} onChange={(v) => set("playInline", v)} />
-                    <StackedTextField label="Thumbnail URL" value={props.thumbnailUrl ?? ""} onChange={(v) => set("thumbnailUrl", v)} placeholder="https://..." />
                   </>
                 )}
 
@@ -13323,15 +6699,15 @@ const VideoComponent = {
                     />
                     {props.playBtnStyle === "custom" && (
                       <>
-                        <StackedNumberField label="Play Icon Size (px)" value={props.playIconSize ?? 64} onChange={(v) => set("playIconSize", v)} min={20} max={200} step={4} />
+                        <SliderNumberField label="Play Icon Size (px)" value={props.playIconSize ?? 64} onChange={(v) => set("playIconSize", v)} min={20} max={200} step={4} unit="px" />
                         <ColorPickerField label="Play Icon Color" value={props.playIconColor ?? "#fff"} onChange={(v) => set("playIconColor", v)} />
                         <ColorPickerField label="Play Button Background" value={props.playBtnBg ?? "rgba(0,0,0,0.5)"} onChange={(v) => set("playBtnBg", v)} />
-                        <StackedNumberField label="Play Button Border Radius (px)" value={props.playBtnRadius ?? 50} onChange={(v) => set("playBtnRadius", v)} min={0} max={200} step={1} />
+                        <SliderNumberField label="Play Button Border Radius (px)" value={props.playBtnRadius ?? 50} onChange={(v) => set("playBtnRadius", v)} min={0} max={200} step={1} unit="px" />
                       </>
                     )}
 
                     <TabSection title="Border" />
-                    <StackedNumberField label="Border Radius (px)" value={props.borderRadius ?? 0} onChange={(v) => set("borderRadius", v)} min={0} max={100} step={1} />
+                    <SliderNumberField label="Border Radius (px)" value={props.borderRadius ?? 0} onChange={(v) => set("borderRadius", v)} min={0} max={100} step={1} unit="px" />
                   </>
                 )}
 
@@ -13360,14 +6736,10 @@ const VideoComponent = {
   defaultProps: {
     sourceType: "youtube",
     videoUrl: "",
-    startTime: 0,
-    endTime: null,
     autoplay: false,
     loop: false,
-    mute: false,
     controls: "show",
     playInline: true,
-    thumbnailUrl: "",
     aspectRatio: "16:9",
     videoWidthVal: 100,
     videoWidthUnit: "%",
@@ -13391,14 +6763,10 @@ const VideoComponent = {
   render: ({
     sourceType,
     videoUrl,
-    startTime,
-    endTime,
     autoplay,
     loop,
-    mute,
     controls,
     playInline,
-    thumbnailUrl,
     aspectRatio,
     videoWidthVal,
     videoWidthUnit,
@@ -13433,10 +6801,8 @@ const VideoComponent = {
         const params = new URLSearchParams();
         if (autoplay || forcePlay) params.set("autoplay", "1");
         if (loop) { params.set("loop", "1"); params.set("playlist", id); }
-        if (mute) params.set("mute", "1");
+        params.set("mute", "1"); // always muted
         if (controls === "hide") params.set("controls", "0");
-        if (startTime != null && startTime > 0) params.set("start", String(startTime));
-        if (endTime != null && endTime > 0) params.set("end", String(endTime));
         return `https://www.youtube.com/embed/${id}?${params.toString()}`;
       }
       if (sourceType === "vimeo") {
@@ -13445,9 +6811,8 @@ const VideoComponent = {
         const params = new URLSearchParams();
         if (autoplay || forcePlay) params.set("autoplay", "1");
         if (loop) params.set("loop", "1");
-        if (mute) params.set("muted", "1");
+        params.set("muted", "1"); // always muted
         if (controls === "hide") params.set("controls", "0");
-        if (startTime != null && startTime > 0) params.set("#t", String(startTime));
         return `https://player.vimeo.com/video/${id}?${params.toString()}`;
       }
       return videoUrl;
@@ -13470,7 +6835,7 @@ const VideoComponent = {
       backgroundColor: "#000",
     };
 
-    if (!videoUrl && !thumbnailUrl) return (
+    if (!videoUrl) return (
       <div style={{ padding: 24, border: "2px dashed #e5e7eb", borderRadius: 8, color: "#9ca3af", fontSize: 14, textAlign: "center" }}>
         No video URL set. Use the property panel to add a video.
       </div>
@@ -13486,17 +6851,14 @@ const VideoComponent = {
       </div>
     );
 
-    // In editor: show thumbnail as static preview (no click-to-play needed in canvas)
-    const showStaticThumb = !!thumbnailUrl && !playing;
-
-    const videoEl = playing || (!thumbnailUrl && videoUrl) ? (
+    const videoEl = videoUrl ? (
       isNative ? (
         <video
           key={videoUrl}
           src={videoUrl}
           autoPlay={playing || autoplay}
           loop={loop}
-          muted={mute}
+          muted
           controls={controls !== "hide"}
           playsInline={playInline !== false}
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
@@ -13511,20 +6873,12 @@ const VideoComponent = {
       )
     ) : null;
 
-    const thumbnailOverlay = showStaticThumb ? (
-      <div
-        style={{ position: "absolute", inset: 0, cursor: videoUrl ? "pointer" : "default", zIndex: 2 }}
-        onClick={() => { if (videoUrl) setPlaying(true); }}
-      >
-        <img src={thumbnailUrl} alt="Video thumbnail" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        {videoUrl && !autoplay && playOverlayBtn}
-      </div>
-    ) : null;
+    void playOverlayBtn; void setPlaying;
 
     return (
       <div
         id={cssId || undefined}
-        className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
+        className={[cssClass].filter(Boolean).join(" ") || undefined}
         style={{
           paddingTop: advPadding?.top ?? 0, paddingRight: advPadding?.right ?? 0,
           paddingBottom: advPadding?.bottom ?? 0, paddingLeft: advPadding?.left ?? 0,
@@ -13535,7 +6889,6 @@ const VideoComponent = {
       >
         <div style={containerStyle}>
           {videoEl}
-          {thumbnailOverlay}
         </div>
       </div>
     );
@@ -13634,7 +6987,7 @@ const SocialIconsComponent = {
                           <ToggleField label={p.label} value={enabled.includes(p.key)} onChange={(v) => set("enabled", v ? [...enabled, p.key] : enabled.filter(k => k !== p.key))} />
                         </div>
                         {enabled.includes(p.key) && (
-                          <StackedTextField label={`${p.label} URL`} value={urls[p.key] ?? ""} onChange={(v) => set("urls", { ...urls, [p.key]: v })} placeholder="https://..." />
+                          <LinkUrlField label={`${p.label} URL`} value={urls[p.key] ?? ""} onChange={(v) => set("urls", { ...urls, [p.key]: v })} />
                         )}
                       </div>
                     ))}
@@ -13645,20 +6998,20 @@ const SocialIconsComponent = {
                   <>
                     <TabSection title="Icons" />
                     <InlineSelect label="Icon Style" value={props.iconStyle ?? "filled"} onChange={(v) => set("iconStyle", v)} options={[{ value: "filled", label: "Filled" }, { value: "outlined", label: "Outlined" }, { value: "minimal", label: "Minimal" }, { value: "branded", label: "Branded" }]} />
-                    <StackedNumberField label="Icon Size (px)" value={props.iconSize ?? 24} onChange={(v) => set("iconSize", v)} min={10} max={80} step={1} />
+                    <SliderNumberField label="Icon Size (px)" value={props.iconSize ?? 24} onChange={(v) => set("iconSize", v)} min={10} max={80} step={1} unit="px" />
                     <ColorPickerField label="Icon Color" value={props.iconColor ?? ""} onChange={(v) => set("iconColor", v)} />
                     <ColorPickerField label="Icon Hover Color" value={props.iconHoverColor ?? ""} onChange={(v) => set("iconHoverColor", v)} />
-                    <StackedNumberField label="Spacing Between (px)" value={props.iconSpacing ?? 12} onChange={(v) => set("iconSpacing", v)} min={0} max={80} step={1} />
+                    <SliderNumberField label="Spacing Between (px)" value={props.iconSpacing ?? 12} onChange={(v) => set("iconSpacing", v)} min={0} max={80} step={1} unit="px" />
                     <TabSection title="Background" />
                     <ColorPickerField label="Background Color" value={props.iconBgColor ?? ""} onChange={(v) => set("iconBgColor", v)} />
                     <ColorPickerField label="Hover Background" value={props.iconHoverBg ?? ""} onChange={(v) => set("iconHoverBg", v)} />
                     <InlineSelect label="Background Shape" value={props.bgShape ?? "none"} onChange={(v) => set("bgShape", v)} options={[{ value: "none", label: "None" }, { value: "circle", label: "Circle" }, { value: "square", label: "Square" }, { value: "rounded", label: "Rounded" }]} />
-                    <StackedNumberField label="Background Size (px)" value={props.bgSize ?? 40} onChange={(v) => set("bgSize", v)} min={16} max={120} step={1} />
+                    <SliderNumberField label="Background Size (px)" value={props.bgSize ?? 40} onChange={(v) => set("bgSize", v)} min={16} max={120} step={1} unit="px" />
                     <TabSection title="Border" />
                     <InlineSelect label="Border Style" value={props.borderStyle ?? "none"} onChange={(v) => set("borderStyle", v)} options={[{ value: "none", label: "None" }, { value: "solid", label: "Solid" }]} />
                     {props.borderStyle === "solid" && (
                       <>
-                        <StackedNumberField label="Border Width (px)" value={props.borderWidth ?? 1} onChange={(v) => set("borderWidth", v)} min={1} max={10} step={1} />
+                        <SliderNumberField label="Border Width (px)" value={props.borderWidth ?? 1} onChange={(v) => set("borderWidth", v)} min={1} max={10} step={1} unit="px" />
                         <ColorPickerField label="Border Color" value={props.borderColor ?? ""} onChange={(v) => set("borderColor", v)} />
                         <StackedTextField label="Border Radius" value={props.borderRadius ?? "0px"} onChange={(v) => set("borderRadius", v)} placeholder="e.g. 50% or 8px" />
                       </>
@@ -13711,7 +7064,7 @@ const SocialIconsComponent = {
     const hoverCss = (iconHoverColor || iconHoverBg) ? `#${id} a:hover .puck-si { ${iconHoverColor ? `color: ${iconHoverColor} !important;` : ""} ${iconHoverBg ? `background: ${iconHoverBg} !important;` : ""} transition: all 0.2s; } #${id} a .puck-si { transition: all 0.2s; }` : "";
     const platforms = SOCIAL_PLATFORMS.filter(p => (enabled ?? []).includes(p.key));
     return (
-      <div id={id} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ paddingTop: advPadding?.top ?? 8, paddingRight: advPadding?.right ?? 0, paddingBottom: advPadding?.bottom ?? 8, paddingLeft: advPadding?.left ?? 0, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
+      <div id={id} className={[cssClass].filter(Boolean).join(" ") || undefined} style={{ paddingTop: advPadding?.top ?? 8, paddingRight: advPadding?.right ?? 0, paddingBottom: advPadding?.bottom ?? 8, paddingLeft: advPadding?.left ?? 0, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
         {hoverCss && <style>{hoverCss}</style>}
         <div style={{ display: "flex", gap: spacing, flexWrap: "wrap", justifyContent: alignment === "center" ? "center" : alignment === "right" ? "flex-end" : "flex-start" }}>
           {platforms.map(p => {
@@ -13892,7 +7245,7 @@ const ShareButtonsComponent = {
       }
     };
     return (
-      <div id={id} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ paddingTop: advPadding?.top ?? 8, paddingRight: advPadding?.right ?? 0, paddingBottom: advPadding?.bottom ?? 8, paddingLeft: advPadding?.left ?? 0, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
+      <div id={id} className={[cssClass].filter(Boolean).join(" ") || undefined} style={{ paddingTop: advPadding?.top ?? 8, paddingRight: advPadding?.right ?? 0, paddingBottom: advPadding?.bottom ?? 8, paddingLeft: advPadding?.left ?? 0, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
         {hoverCss && <style>{hoverCss}</style>}
         <div style={{ display: "flex", gap: spacing || "8px", flexWrap: "wrap", justifyContent: alignment === "center" ? "center" : alignment === "right" ? "flex-end" : "flex-start" }}>
           {platforms.map(p => {
@@ -13943,7 +7296,7 @@ const StarRatingComponent = {
               <>
                 {tab === "content" && (
                   <>
-                    <StackedNumberField label="Rating Value (0–5)" value={props.ratingValue ?? 4} onChange={(v) => set("ratingValue", v)} min={0} max={5} step={0.5} />
+                    <SliderNumberField label="Rating Value (0–5)" value={props.ratingValue ?? 4} onChange={(v) => set("ratingValue", v)} min={0} max={5} step={0.5} unit="" />
                     <ToggleField label="Show Number" value={props.showNumber !== false} onChange={(v) => set("showNumber", v)} />
                     <InlineSelect label="Number Position" value={props.numberPosition ?? "after"} onChange={(v) => set("numberPosition", v)} options={[{ value: "before", label: "Before Stars" }, { value: "after", label: "After Stars" }]} />
                     <StackedNumberField label="Review Count" value={props.reviewCount ?? 0} onChange={(v) => set("reviewCount", v)} min={0} step={1} />
@@ -14022,7 +7375,7 @@ const StarRatingComponent = {
       </span>
     );
     return (
-      <div id={cssId || undefined} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ textAlign: alignment as any, paddingTop: advPadding?.top ?? 8, paddingRight: advPadding?.right ?? 0, paddingBottom: advPadding?.bottom ?? 8, paddingLeft: advPadding?.left ?? 0, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
+      <div id={cssId || undefined} className={[cssClass].filter(Boolean).join(" ") || undefined} style={{ textAlign: alignment as any, paddingTop: advPadding?.top ?? 8, paddingRight: advPadding?.right ?? 0, paddingBottom: advPadding?.bottom ?? 8, paddingLeft: advPadding?.left ?? 0, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: starGap || "4px", flexWrap: "wrap", justifyContent: alignment === "center" ? "center" : alignment === "right" ? "flex-end" : "flex-start" }}>
           {numberPosition === "before" && numEl}
           {stars}
@@ -14067,7 +7420,7 @@ const ProgressBarComponent = {
                 {tab === "content" && (
                   <>
                     <StackedTextField label="Label" value={props.label ?? ""} onChange={(v) => set("label", v)} placeholder="Skill or metric..." />
-                    <StackedNumberField label="Value (0–100)" value={props.value ?? 75} onChange={(v) => set("value", Math.min(100, Math.max(0, v)))} min={0} max={100} step={1} />
+                    <SliderNumberField label="Value (0–100)" value={props.value ?? 75} onChange={(v) => set("value", Math.min(100, Math.max(0, v)))} min={0} max={100} step={1} unit="%" />
                     <ToggleField label="Show Percentage" value={showPct} onChange={(v) => set("showPercentage", v)} />
                   </>
                 )}
@@ -14083,16 +7436,16 @@ const ProgressBarComponent = {
                         <ColorPickerField label="Fill Color" value={props.fillColor ?? "#0158ad"} onChange={(v) => set("fillColor", v)} />
                         {fillStyle === "gradient" && <ColorPickerField label="Gradient End Color" value={props.gradientEnd ?? "#60a5fa"} onChange={(v) => set("gradientEnd", v)} />}
                         <ColorPickerField label="Background Color" value={props.trackColor ?? "#e5e7eb"} onChange={(v) => set("trackColor", v)} />
-                        <StackedNumberField label="Height (px)" value={props.lineHeight ?? 12} onChange={(v) => set("lineHeight", v)} min={4} max={60} step={1} />
-                        <StackedNumberField label="Border Radius (px)" value={props.lineRadius ?? 6} onChange={(v) => set("lineRadius", v)} min={0} max={50} step={1} />
+                        <SliderNumberField label="Height (px)" value={props.lineHeight ?? 12} onChange={(v) => set("lineHeight", v)} min={4} max={60} step={1} unit="px" />
+                        <SliderNumberField label="Border Radius (px)" value={props.lineRadius ?? 6} onChange={(v) => set("lineRadius", v)} min={0} max={50} step={1} unit="px" />
                       </>
                     )}
 
                     {pbType === "circle" && (
                       <>
                         <TabSection title="Circle" />
-                        <StackedNumberField label="Size (px)" value={props.circleSize ?? 120} onChange={(v) => set("circleSize", v)} min={40} max={300} step={4} />
-                        <StackedNumberField label="Ring Thickness (px)" value={props.ringThickness ?? 10} onChange={(v) => set("ringThickness", v)} min={2} max={40} step={1} />
+                        <SliderNumberField label="Size (px)" value={props.circleSize ?? 120} onChange={(v) => set("circleSize", v)} min={40} max={300} step={4} unit="px" />
+                        <SliderNumberField label="Ring Thickness (px)" value={props.ringThickness ?? 10} onChange={(v) => set("ringThickness", v)} min={2} max={40} step={1} unit="px" />
                         <ColorPickerField label="Fill Color" value={props.fillColor ?? "#0158ad"} onChange={(v) => set("fillColor", v)} />
                         <ColorPickerField label="Background Color" value={props.trackColor ?? "#e5e7eb"} onChange={(v) => set("trackColor", v)} />
                         <ToggleField label="Show Label Inside" value={props.showLabelInside !== false} onChange={(v) => set("showLabelInside", v)} />
@@ -14102,8 +7455,8 @@ const ProgressBarComponent = {
                     {pbType === "step" && (
                       <>
                         <TabSection title="Steps" />
-                        <StackedNumberField label="Total Steps" value={props.totalSteps ?? 5} onChange={(v) => set("totalSteps", Math.max(1, v))} min={1} max={20} step={1} />
-                        <StackedNumberField label="Active Step" value={props.activeStep ?? 3} onChange={(v) => set("activeStep", v)} min={0} max={props.totalSteps ?? 5} step={1} />
+                        <SliderNumberField label="Total Steps" value={props.totalSteps ?? 5} onChange={(v) => set("totalSteps", Math.max(1, v))} min={1} max={20} step={1} unit="" />
+                        <SliderNumberField label="Active Step" value={props.activeStep ?? 3} onChange={(v) => set("activeStep", v)} min={0} max={props.totalSteps ?? 5} step={1} unit="" />
                         <ColorPickerField label="Active Color" value={props.fillColor ?? "#0158ad"} onChange={(v) => set("fillColor", v)} />
                         <ColorPickerField label="Inactive Color" value={props.trackColor ?? "#e5e7eb"} onChange={(v) => set("trackColor", v)} />
                         <ToggleField label="Show Step Numbers" value={!!props.showStepNumbers} onChange={(v) => set("showStepNumbers", v)} />
@@ -14116,7 +7469,7 @@ const ProgressBarComponent = {
                         {rows.map((row, i) => (
                           <div key={i} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "8px 8px 4px", marginBottom: 6 }}>
                             <StackedTextField label={`Row ${i + 1} Label`} value={row.label} onChange={(v) => { const next = rows.map((r, j) => j === i ? { ...r, label: v } : r); set("multiRows", next); }} placeholder="Label..." />
-                            <StackedNumberField label={`Row ${i + 1} Value`} value={row.value} onChange={(v) => { const next = rows.map((r, j) => j === i ? { ...r, value: Math.min(100, Math.max(0, v)) } : r); set("multiRows", next); }} min={0} max={100} step={1} />
+                            <SliderNumberField label={`Row ${i + 1} Value`} value={row.value} onChange={(v) => { const next = rows.map((r, j) => j === i ? { ...r, value: Math.min(100, Math.max(0, v)) } : r); set("multiRows", next); }} min={0} max={100} step={1} unit="%" />
                             {rows.length > 1 && (
                               <button onClick={() => set("multiRows", rows.filter((_, j) => j !== i))} style={{ fontSize: 11, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: "2px 0" }}>Remove row</button>
                             )}
@@ -14128,16 +7481,16 @@ const ProgressBarComponent = {
                         <ColorPickerField label="Fill Color" value={props.fillColor ?? "#0158ad"} onChange={(v) => set("fillColor", v)} />
                         {fillStyle === "gradient" && <ColorPickerField label="Gradient End Color" value={props.gradientEnd ?? "#60a5fa"} onChange={(v) => set("gradientEnd", v)} />}
                         <ColorPickerField label="Background Color" value={props.trackColor ?? "#e5e7eb"} onChange={(v) => set("trackColor", v)} />
-                        <StackedNumberField label="Height (px)" value={props.lineHeight ?? 12} onChange={(v) => set("lineHeight", v)} min={4} max={60} step={1} />
-                        <StackedNumberField label="Border Radius (px)" value={props.lineRadius ?? 6} onChange={(v) => set("lineRadius", v)} min={0} max={50} step={1} />
+                        <SliderNumberField label="Height (px)" value={props.lineHeight ?? 12} onChange={(v) => set("lineHeight", v)} min={4} max={60} step={1} unit="px" />
+                        <SliderNumberField label="Border Radius (px)" value={props.lineRadius ?? 6} onChange={(v) => set("lineRadius", v)} min={0} max={50} step={1} unit="px" />
                       </>
                     )}
 
                     {pbType === "circlecard" && (
                       <>
                         <TabSection title="Circle Card" />
-                        <StackedNumberField label="Size (px)" value={props.circleSize ?? 120} onChange={(v) => set("circleSize", v)} min={40} max={300} step={4} />
-                        <StackedNumberField label="Ring Thickness (px)" value={props.ringThickness ?? 10} onChange={(v) => set("ringThickness", v)} min={2} max={40} step={1} />
+                        <SliderNumberField label="Size (px)" value={props.circleSize ?? 120} onChange={(v) => set("circleSize", v)} min={40} max={300} step={4} unit="px" />
+                        <SliderNumberField label="Ring Thickness (px)" value={props.ringThickness ?? 10} onChange={(v) => set("ringThickness", v)} min={2} max={40} step={1} unit="px" />
                         <ColorPickerField label="Fill Color" value={props.fillColor ?? "#0158ad"} onChange={(v) => set("fillColor", v)} />
                         <ColorPickerField label="Card Background Color" value={props.cardBg ?? "#ffffff"} onChange={(v) => set("cardBg", v)} />
                         <ToggleField label="Show Label Below" value={props.showLabelBelow !== false} onChange={(v) => set("showLabelBelow", v)} />
@@ -14145,11 +7498,11 @@ const ProgressBarComponent = {
                     )}
 
                     <TabSection title="Common" />
-                    <StackedNumberField label="Label Font Size (px)" value={props.labelFontSize ?? 14} onChange={(v) => set("labelFontSize", v)} min={8} max={48} step={1} />
+                    <SliderNumberField label="Label Font Size (px)" value={props.labelFontSize ?? 14} onChange={(v) => set("labelFontSize", v)} min={8} max={48} step={1} unit="px" />
                     <ColorPickerField label="Label Color" value={props.labelColor ?? ""} onChange={(v) => set("labelColor", v)} />
                     {showPct && (
                       <>
-                        <StackedNumberField label="Percentage Font Size (px)" value={props.pctFontSize ?? 13} onChange={(v) => set("pctFontSize", v)} min={8} max={48} step={1} />
+                        <SliderNumberField label="Percentage Font Size (px)" value={props.pctFontSize ?? 13} onChange={(v) => set("pctFontSize", v)} min={8} max={48} step={1} unit="px" />
                         <ColorPickerField label="Percentage Color" value={props.pctColor ?? ""} onChange={(v) => set("pctColor", v)} />
                       </>
                     )}
@@ -14260,7 +7613,7 @@ const ProgressBarComponent = {
     const type = pbType ?? "line";
 
     return (
-      <div ref={ref} id={cssId || undefined} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={wrapStyle}>
+      <div ref={ref} id={cssId || undefined} className={[cssClass].filter(Boolean).join(" ") || undefined} style={wrapStyle}>
 
         {type === "line" && renderLine(label ?? "", pct, displayed)}
 
@@ -14371,14 +7724,14 @@ const AlertComponent = {
                       </>
                     )}
                     <TabSection title="Typography" />
-                    <StackedNumberField label="Title Font Size (px)" value={props.titleFontSize ?? 16} onChange={(v) => set("titleFontSize", v)} min={8} max={72} step={1} />
+                    <SliderNumberField label="Title Font Size (px)" value={props.titleFontSize ?? 16} onChange={(v) => set("titleFontSize", v)} min={8} max={72} step={1} unit="px" />
                     <InlineSelect label="Title Font Weight" value={props.titleFontWeight ?? "700"} onChange={(v) => set("titleFontWeight", v)} options={[{ value: "400", label: "Normal" }, { value: "700", label: "Bold" }]} />
-                    <StackedNumberField label="Message Font Size (px)" value={props.msgFontSize ?? 14} onChange={(v) => set("msgFontSize", v)} min={8} max={48} step={1} />
-                    <StackedNumberField label="Line Height" value={props.lineHeight ?? 15} onChange={(v) => set("lineHeight", v)} min={10} max={30} step={1} />
+                    <SliderNumberField label="Message Font Size (px)" value={props.msgFontSize ?? 14} onChange={(v) => set("msgFontSize", v)} min={8} max={48} step={1} unit="px" />
+                    <SliderNumberField label="Line Height" value={props.lineHeight ?? 15} onChange={(v) => set("lineHeight", v)} min={10} max={30} step={1} unit="" />
                     <TabSection title="Border" />
                     <InlineSelect label="Border Style" value={props.borderStyle ?? "solid"} onChange={(v) => set("borderStyle", v)} options={[{ value: "none", label: "None" }, { value: "solid", label: "Solid" }, { value: "left-only", label: "Left Only" }]} />
-                    <StackedNumberField label="Border Width (px)" value={props.borderWidth ?? 1} onChange={(v) => set("borderWidth", v)} min={1} max={10} step={1} />
-                    <StackedNumberField label="Border Radius (px)" value={props.borderRadius ?? 8} onChange={(v) => set("borderRadius", v)} min={0} max={50} step={1} />
+                    <SliderNumberField label="Border Width (px)" value={props.borderWidth ?? 1} onChange={(v) => set("borderWidth", v)} min={1} max={10} step={1} unit="px" />
+                    <SliderNumberField label="Border Radius (px)" value={props.borderRadius ?? 8} onChange={(v) => set("borderRadius", v)} min={0} max={50} step={1} unit="px" />
                   </>
                 )}
                 {tab === "advanced" && (
@@ -14436,7 +7789,7 @@ const AlertComponent = {
       ? { border: `${borderWidth || 1}px solid ${resolvedBorder}` }
       : {};
     return (
-      <div id={cssId || undefined} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ paddingTop: advPadding?.top ?? 16, paddingRight: advPadding?.right ?? 16, paddingBottom: advPadding?.bottom ?? 16, paddingLeft: advPadding?.left ?? 16, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, backgroundColor: resolvedBg, color: resolvedText, borderRadius: borderRadius ?? 8, zIndex: zIndex ?? undefined, position: "relative", lineHeight: lh, ...borderCss, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
+      <div id={cssId || undefined} className={[cssClass].filter(Boolean).join(" ") || undefined} style={{ paddingTop: advPadding?.top ?? 16, paddingRight: advPadding?.right ?? 16, paddingBottom: advPadding?.bottom ?? 16, paddingLeft: advPadding?.left ?? 16, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, backgroundColor: resolvedBg, color: resolvedText, borderRadius: borderRadius ?? 8, zIndex: zIndex ?? undefined, position: "relative", lineHeight: lh, ...borderCss, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
           {showIcon && (isImgIcon
             ? <img src={customIcon} alt="icon" style={{ width: "1.5rem", height: "1.5rem", objectFit: "contain", flexShrink: 0 }} />
@@ -14492,7 +7845,7 @@ const BlockQuoteComponent = {
                 {tab === "style" && (
                   <>
                     <TabSection title="Quote Text" />
-                    <InlineSelect label="Font Family" value={props.quoteFontFamily ?? "inherit"} onChange={(v) => set("quoteFontFamily", v)} options={[{ value: "inherit", label: "Theme Default" }, { value: "Georgia", label: "Georgia" }, { value: "serif", label: "Serif" }, { value: "sans-serif", label: "Sans-serif" }]} />
+                    <InlineSelect label="Font Family" value={props.quoteFontFamily ?? "inherit"} onChange={(v) => { set("quoteFontFamily", v); loadGoogleFont(v); }} options={[{ value: "inherit", label: "Theme Default" }, { value: "Arial, Helvetica, sans-serif", label: "Arial" }, { value: "Georgia, serif", label: "Georgia" }, { value: "'Courier New', monospace", label: "Courier New" }, { value: "Impact, sans-serif", label: "Impact" }, { value: "Inter, sans-serif", label: "Inter" }, { value: "Poppins, sans-serif", label: "Poppins" }, { value: "'Roboto Serif', serif", label: "Roboto Serif" }, { value: "'New York', 'New York Small', 'Times New Roman', serif", label: "New York" }, { value: "'Open Sans', sans-serif", label: "Open Sans" }]} />
                     <StackedTextField label="Font Size" value={props.quoteFontSize ?? "1.25rem"} onChange={(v) => set("quoteFontSize", v)} placeholder="e.g. 1.25rem or 20px" />
                     <InlineSelect label="Font Style" value={props.quoteFontStyle ?? "italic"} onChange={(v) => set("quoteFontStyle", v)} options={[{ value: "normal", label: "Normal" }, { value: "italic", label: "Italic" }]} />
                     <ColorPickerField label="Text Color" value={props.quoteTextColor ?? ""} onChange={(v) => set("quoteTextColor", v)} />
@@ -14512,7 +7865,7 @@ const BlockQuoteComponent = {
                     <TabSection title="Border" />
                     <InlineSelect label="Border Style" value={props.borderType ?? "left"} onChange={(v) => set("borderType", v)} options={[{ value: "none", label: "None" }, { value: "left", label: "Left Border" }, { value: "top", label: "Top Border" }, { value: "box", label: "Box" }]} />
                     <ColorPickerField label="Border Color" value={props.borderColor ?? ""} onChange={(v) => set("borderColor", v)} />
-                    <StackedNumberField label="Border Width (px)" value={props.borderWidth ?? 4} onChange={(v) => set("borderWidth", v)} min={1} max={20} step={1} />
+                    <SliderNumberField label="Border Width (px)" value={props.borderWidth ?? 4} onChange={(v) => set("borderWidth", v)} min={1} max={20} step={1} unit="px" />
                     <TabSection title="Background" />
                     <ColorPickerField label="Background Color" value={props.bgColor ?? ""} onChange={(v) => set("bgColor", v)} />
                     <TabSection title="Alignment" />
@@ -14571,7 +7924,7 @@ const BlockQuoteComponent = {
       </svg>
     );
     return (
-      <div id={cssId || undefined} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ textAlign: alignment as any, paddingTop: advPadding?.top ?? 24, paddingRight: advPadding?.right ?? 24, paddingBottom: advPadding?.bottom ?? 24, paddingLeft: advPadding?.left ?? 24, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, borderTopLeftRadius: advBorderRadius?.top ?? 0, borderTopRightRadius: advBorderRadius?.right ?? 0, borderBottomRightRadius: advBorderRadius?.bottom ?? 0, borderBottomLeftRadius: advBorderRadius?.left ?? 0, ...(advBorderStyle && advBorderStyle !== "none" ? { borderStyle: advBorderStyle, borderTopWidth: advBorderWidth?.top ?? 0, borderRightWidth: advBorderWidth?.right ?? 0, borderBottomWidth: advBorderWidth?.bottom ?? 0, borderLeftWidth: advBorderWidth?.left ?? 0, borderColor: advBorderColor || "currentColor" } : {}), ...wrapBg }}>
+      <div id={cssId || undefined} className={[cssClass].filter(Boolean).join(" ") || undefined} style={{ textAlign: alignment as any, paddingTop: advPadding?.top ?? 24, paddingRight: advPadding?.right ?? 24, paddingBottom: advPadding?.bottom ?? 24, paddingLeft: advPadding?.left ?? 24, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, borderTopLeftRadius: advBorderRadius?.top ?? 0, borderTopRightRadius: advBorderRadius?.right ?? 0, borderBottomRightRadius: advBorderRadius?.bottom ?? 0, borderBottomLeftRadius: advBorderRadius?.left ?? 0, ...(advBorderStyle && advBorderStyle !== "none" ? { borderStyle: advBorderStyle, borderTopWidth: advBorderWidth?.top ?? 0, borderRightWidth: advBorderWidth?.right ?? 0, borderBottomWidth: advBorderWidth?.bottom ?? 0, borderLeftWidth: advBorderWidth?.left ?? 0, borderColor: advBorderColor || "currentColor" } : {}), ...wrapBg }}>
         <blockquote style={{ margin: 0, position: "relative", backgroundColor: bgColor || "transparent", padding: bgColor ? 24 : 0, borderRadius: bgColor ? 8 : 0, ...borderMap[borderType ?? "left"] }}>
           {showQuoteIcon && iconPosition === "top-left" && <div style={{ marginBottom: 8 }}>{quoteIconSvg}</div>}
           {showQuoteIcon && iconPosition === "top-right" && <div style={{ textAlign: "right", marginBottom: 8 }}>{quoteIconSvg}</div>}
@@ -14591,144 +7944,6 @@ const BlockQuoteComponent = {
   },
 };
 
-// ─── Icons Component ─────────────────────────────────────────────────────────
-
-const IconsComponent = {
-  label: "Icon",
-  fields: {
-    _tabs: {
-      type: "custom",
-      label: "",
-      render: ({ value: _v, onChange: _onChange }: any) => {
-        const { selectedItem, appState, dispatch } = usePuck();
-        const props = selectedItem?.props ?? {};
-        const set = (key: string, val: any) => {
-          if (!selectedItem) return;
-          const state = appState.data;
-          let destinationZone = "root:default-zone", destinationIndex = 0;
-          const zones: Record<string, any[]> = { "root:default-zone": state.content, ...(state.zones ?? {}) };
-          for (const [zone, items] of Object.entries(zones)) {
-            const idx = (items as any[]).findIndex((it: any) => it.props?.id === selectedItem.props?.id);
-            if (idx !== -1) { destinationZone = zone; destinationIndex = idx; break; }
-          }
-          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } });
-        };
-        const bgType = props.advBgType ?? "none";
-        return (
-          <BlockTabBar blockKey="Icons">
-            {(tab) => (
-              <>
-                {tab === "content" && (
-                  <>
-                    <InlineSelect label="Icon Type" value={props.iconType ?? "emoji"} onChange={(v) => set("iconType", v)} options={[{ value: "emoji", label: "Emoji / Text" }, { value: "image", label: "Image Upload" }]} />
-                    {(props.iconType ?? "emoji") === "emoji" ? (
-                      <StackedTextField label="Icon (emoji or text)" value={props.icon ?? "★"} onChange={(v) => set("icon", v)} placeholder="e.g. ★ ♥ 🚀" />
-                    ) : (
-                      <ImageField label="Icon Image" value={props.iconImage ?? ""} onChange={(v) => set("iconImage", v)} />
-                    )}
-                    <StackedTextField label="Link URL" value={props.linkUrl ?? ""} onChange={(v) => set("linkUrl", v)} placeholder="https://..." />
-                    <InlineSelect label="Link Target" value={props.linkTarget ?? "_self"} onChange={(v) => set("linkTarget", v)} options={[{ value: "_self", label: "Same Tab" }, { value: "_blank", label: "New Tab" }]} />
-                    <StackedTextField label="Tooltip Text" value={props.tooltip ?? ""} onChange={(v) => set("tooltip", v)} placeholder="Hover tooltip..." />
-                  </>
-                )}
-                {tab === "style" && (
-                  <>
-                    <TabSection title="Icon" />
-                    <StackedTextField label="Size" value={props.iconSize ?? "48px"} onChange={(v) => set("iconSize", v)} placeholder="e.g. 48px or 3rem" />
-                    <ColorPickerField label="Color" value={props.iconColor ?? ""} onChange={(v) => set("iconColor", v)} />
-                    <ColorPickerField label="Hover Color" value={props.hoverColor ?? ""} onChange={(v) => set("hoverColor", v)} />
-                    <InlineSelect label="Rotate" value={String(props.rotate ?? "0")} onChange={(v) => set("rotate", v)} options={[{ value: "0", label: "0°" }, { value: "90", label: "90°" }, { value: "180", label: "180°" }, { value: "270", label: "270°" }]} />
-                    <TabSection title="Background" />
-                    <InlineSelect label="Background Type" value={props.bgType ?? "none"} onChange={(v) => set("bgType", v)} options={[{ value: "none", label: "None" }, { value: "color", label: "Color" }, { value: "gradient", label: "Gradient" }]} />
-                    {props.bgType === "color" && <ColorPickerField label="Background Color" value={props.bgColor ?? ""} onChange={(v) => set("bgColor", v)} />}
-                    {props.bgType === "gradient" && (
-                      <>
-                        <ColorPickerField label="Gradient Color 1" value={props.bgGrad1 ?? ""} onChange={(v) => set("bgGrad1", v)} />
-                        <ColorPickerField label="Gradient Color 2" value={props.bgGrad2 ?? ""} onChange={(v) => set("bgGrad2", v)} />
-                      </>
-                    )}
-                    <InlineSelect label="Background Shape" value={props.bgShape ?? "none"} onChange={(v) => set("bgShape", v)} options={[{ value: "none", label: "None" }, { value: "circle", label: "Circle" }, { value: "square", label: "Square" }, { value: "rounded", label: "Rounded" }]} />
-                    <StackedTextField label="Background Size" value={props.bgSize ?? "80px"} onChange={(v) => set("bgSize", v)} placeholder="e.g. 80px" />
-                    <ColorPickerField label="Hover Background" value={props.hoverBg ?? ""} onChange={(v) => set("hoverBg", v)} />
-                    <TabSection title="Border" />
-                    <InlineSelect label="Border Style" value={props.borderStyle ?? "none"} onChange={(v) => set("borderStyle", v)} options={[{ value: "none", label: "None" }, { value: "solid", label: "Solid" }, { value: "dashed", label: "Dashed" }]} />
-                    {props.borderStyle !== "none" && (
-                      <>
-                        <StackedNumberField label="Border Width (px)" value={props.borderWidth ?? 2} onChange={(v) => set("borderWidth", v)} min={1} max={10} step={1} />
-                        <ColorPickerField label="Border Color" value={props.borderColor ?? ""} onChange={(v) => set("borderColor", v)} />
-                      </>
-                    )}
-                    <StackedTextField label="Border Radius" value={props.borderRadius ?? "0px"} onChange={(v) => set("borderRadius", v)} placeholder="e.g. 8px or 50%" />
-                    <TabSection title="Alignment" />
-                    <AlignField label="Alignment" value={props.alignment ?? "left"} onChange={(v) => set("alignment", v)} options={[{ value: "left", icon: <AlignLeft size={15} />, title: "Left" }, { value: "center", icon: <AlignCenter size={15} />, title: "Center" }, { value: "right", icon: <AlignRight size={15} />, title: "Right" }]} />
-                  </>
-                )}
-                {tab === "advanced" && (
-                  <>
-                    <TabSection title="Spacing" />
-                    <FourSideField label="Margin (px)" value={props.advMargin} onChange={(v) => set("advMargin", v)} />
-                    <FourSideField label="Padding (px)" value={props.advPadding ?? { top: 8, right: 8, bottom: 8, left: 8 }} onChange={(v) => set("advPadding", v)} />
-                    <TabSection title="Background" />
-                    <InlineSelect label="Type" value={bgType} onChange={(v) => set("advBgType", v)} options={[{ value: "none", label: "None" }, { value: "color", label: "Color" }]} />
-                    {bgType === "color" && <ColorPickerField label="Color" value={props.advBgColor ?? ""} onChange={(v) => set("advBgColor", v)} />}
-                    <TabSection title="Responsive" />
-                    <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
-                    <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
-                    <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
-                    <StackedNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1} />
-                  </>
-                )}
-              </>
-            )}
-          </BlockTabBar>
-        );
-      },
-    },
-  },
-  defaultProps: {
-    iconType: "emoji", icon: "★", iconImage: "", linkUrl: "", linkTarget: "_self", tooltip: "",
-    iconSize: "48px", iconColor: "", hoverColor: "", rotate: "0",
-    bgType: "none", bgColor: "", bgGrad1: "", bgGrad2: "", bgShape: "none", bgSize: "80px", hoverBg: "",
-    borderStyle: "none", borderWidth: 2, borderColor: "", borderRadius: "0px",
-    alignment: "left",
-    advBgType: "none", advBgColor: "", advMargin: { top: 0, right: 0, bottom: 0, left: 0 }, advPadding: { top: 8, right: 8, bottom: 8, left: 8 },
-    hideDesktop: false, hideTablet: false, hideMobile: false, cssId: "", cssClass: "", zIndex: null, opacity: 100,
-  },
-  render: ({ iconType, icon, iconImage, linkUrl, linkTarget, tooltip, iconSize, iconColor, hoverColor, rotate, bgType, bgColor, bgGrad1, bgGrad2, bgShape, bgSize, hoverBg, borderStyle, borderWidth, borderColor, borderRadius, alignment, advBgType, advBgColor, advMargin, advPadding, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex, opacity }) => {
-    const id = cssId || `icon-${Math.random().toString(36).slice(2, 7)}`;
-    const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
-    const bg = bgType === "color" ? bgColor : bgType === "gradient" && bgGrad1 && bgGrad2 ? `linear-gradient(135deg,${bgGrad1},${bgGrad2})` : undefined;
-    const shapeRadius = bgShape === "circle" ? "50%" : bgShape === "rounded" ? "12px" : bgShape === "square" ? "0px" : undefined;
-    const hoverCss = (hoverColor || hoverBg) ? `#${id}:hover .puck-icon-inner { ${hoverColor ? `color: ${hoverColor};` : ""} ${hoverBg ? `background: ${hoverBg};` : ""} transition: all 0.2s ease; }` : "";
-    const wrapBg = advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {};
-    const isImage = (iconType ?? "emoji") === "image" && iconImage;
-    const innerStyle: React.CSSProperties = {
-      display: "inline-flex", alignItems: "center", justifyContent: "center",
-      width: bg || shapeRadius ? bgSize || "80px" : (isImage ? iconSize || "48px" : undefined),
-      height: bg || shapeRadius ? bgSize || "80px" : (isImage ? iconSize || "48px" : undefined),
-      background: bg || undefined,
-      borderRadius: shapeRadius || (borderStyle !== "none" ? borderRadius : undefined),
-      border: borderStyle !== "none" ? `${borderWidth ?? 2}px ${borderStyle} ${borderColor || "currentColor"}` : undefined,
-      fontSize: iconSize || "48px",
-      color: iconColor || "var(--primary-color)",
-      transform: rotate && rotate !== "0" ? `rotate(${rotate}deg)` : undefined,
-      opacity: opacity != null ? opacity / 100 : 1,
-      cursor: linkUrl ? "pointer" : undefined,
-      overflow: isImage ? "hidden" : undefined,
-    };
-    const iconContent = isImage
-      ? <img src={iconImage} alt={tooltip || "icon"} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
-      : (icon || "★");
-    const inner = <span className="puck-icon-inner" style={innerStyle} title={tooltip || undefined}>{iconContent}</span>;
-    return (
-      <div id={id} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ textAlign: alignment as any, paddingTop: advPadding?.top ?? 8, paddingRight: advPadding?.right ?? 8, paddingBottom: advPadding?.bottom ?? 8, paddingLeft: advPadding?.left ?? 8, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, ...wrapBg }}>
-        {hoverCss && <style>{hoverCss}</style>}
-        {linkUrl ? <a href={linkUrl} target={linkTarget ?? "_self"} rel={linkTarget === "_blank" ? "noopener noreferrer" : undefined} style={{ textDecoration: "none", color: "inherit", display: "inline-block" }}>{inner}</a> : inner}
-      </div>
-    );
-  },
-};
-
 // ─── Layout Block ─────────────────────────────────────────────────────────────
 
 // ─── Slider with number input (used by Container block) ──────────────────────
@@ -14740,7 +7955,7 @@ function SliderNumberField({
   min = 0,
   max = 100,
   step = 1,
-  unit = "PX",
+  unit = "px",
 }: {
   label: string;
   value: number;
@@ -14750,51 +7965,119 @@ function SliderNumberField({
   step?: number;
   unit?: string;
 }) {
-  const stepBy = (dir: 1 | -1) => {
-    let n = (value ?? 0) + dir * step;
-    n = Math.max(min, Math.min(max, n));
-    onChange(n);
-  };
-  const btnS: React.CSSProperties = {
-    width: 22, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
-    border: "1px solid var(--p-color-border)", borderRadius: 4,
-    background: "var(--p-color-bg-surface)", cursor: "pointer",
-    fontSize: 14, lineHeight: 1, color: "var(--p-color-text)", padding: 0, flexShrink: 0,
-  };
+  const clamp = (n: number) => Math.max(min, Math.min(max, n));
   return (
     <FieldLabel label="">
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#000" }}>{label}</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-            <button style={btnS} onClick={() => stepBy(-1)} type="button">−</button>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--p-color-text)" }}>{label}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={value ?? 0}
+            onChange={(e) => onChange(clamp(Number(e.target.value)))}
+            style={{ flex: 1, minWidth: 0, cursor: "pointer", appearance: "none", WebkitAppearance: "none", height: 11, background: "transparent", outline: "none", border: "none", padding: 0, "--fill": `${(((value??0)-min)/(max-min))*100}%` } as any}
+          />
+          <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--p-color-border)", borderRadius: 6, background: "var(--p-color-bg-surface)", height: 28, overflow: "hidden", flexShrink: 0 }}>
             <input
               type="number"
               value={value ?? 0}
               min={min}
               max={max}
               step={step}
-              onChange={(e) => onChange(Number(e.target.value))}
-              style={{
-                width: 52, padding: "2px 4px", fontSize: 12, fontWeight: 600,
-                border: "1px solid var(--p-color-border)", borderRadius: 4,
-                background: "var(--p-color-bg-surface)", color: "var(--p-color-text)",
-                textAlign: "center", outline: "none", MozAppearance: "textfield",
-              }}
+              onChange={(e) => onChange(clamp(Number(e.target.value)))}
+              style={{ width: 36, padding: "0 6px", fontSize: 12, fontWeight: 500, border: "none", outline: "none", background: "transparent", color: "var(--p-color-text)", textAlign: "right", MozAppearance: "textfield" }}
             />
-            <button style={btnS} onClick={() => stepBy(1)} type="button">+</button>
-            <span style={{ fontSize: 10, color: "var(--p-color-text-secondary)", fontWeight: 600, minWidth: 20 }}>{unit}</span>
+            {unit && (
+              <span style={{ padding: "0 7px", fontSize: 11, fontWeight: 500, color: "var(--p-color-text-secondary)", background: "var(--p-color-bg-surface-secondary, #f6f6f7)", borderLeft: "1px solid var(--p-color-border)", height: "100%", display: "flex", alignItems: "center", userSelect: "none", flexShrink: 0 }}>
+                {unit.toLowerCase()}
+              </span>
+            )}
           </div>
         </div>
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={value ?? 0}
-          onChange={(e) => onChange(Number(e.target.value))}
-          style={{ width: "100%", accentColor: "var(--p-color-bg-fill-brand, #005bd3)", cursor: "pointer" }}
-        />
+        <style>{`
+          input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:99px;background:linear-gradient(to right,#1a1a1a var(--fill,0%),#d1d5db var(--fill,0%))}
+          input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:#1a1a1a;cursor:pointer;margin-top:-4px;box-shadow:none}
+          input[type=range]::-moz-range-track{height:3px;border-radius:99px;background:#d1d5db}
+          input[type=range]::-moz-range-progress{height:3px;border-radius:99px;background:#1a1a1a}
+          input[type=range]::-moz-range-thumb{width:11px;height:11px;border-radius:50%;background:#1a1a1a;cursor:pointer;border:none}
+          input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+        `}</style>
+      </div>
+    </FieldLabel>
+  );
+}
+
+// Slider + number box like SliderNumberField, but the unit is a selectable
+// dropdown (e.g. Width: 100 [% ▼]). The slider range adapts to the unit so a
+// percentage caps at 100 while px allows a larger range.
+function SliderUnitField({
+  label,
+  value,
+  unit,
+  onValueChange,
+  onUnitChange,
+  units = ["%", "px"],
+  step = 1,
+}: {
+  label: string;
+  value: number;
+  unit: string;
+  onValueChange: (v: number) => void;
+  onUnitChange: (u: string) => void;
+  units?: string[];
+  step?: number;
+}) {
+  // Percent/viewport units cap at 100; px gets a wider, more useful range.
+  const max = unit === "px" ? 1000 : 100;
+  const min = 0;
+  const clamp = (n: number) => Math.max(min, Math.min(max, n));
+  const v = clamp(value ?? 0);
+  return (
+    <FieldLabel label="">
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--p-color-text)" }}>{label}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={v}
+            onChange={(e) => onValueChange(clamp(Number(e.target.value)))}
+            style={{ flex: 1, minWidth: 0, cursor: "pointer", appearance: "none", WebkitAppearance: "none", height: 11, background: "transparent", outline: "none", border: "none", padding: 0, "--fill": `${((v - min) / (max - min)) * 100}%` } as any}
+          />
+          <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--p-color-border)", borderRadius: 6, background: "var(--p-color-bg-surface)", height: 28, overflow: "hidden", flexShrink: 0 }}>
+            <input
+              type="number"
+              value={v}
+              min={min}
+              max={max}
+              step={step}
+              onChange={(e) => onValueChange(clamp(Number(e.target.value)))}
+              style={{ width: 36, padding: "0 6px", fontSize: 12, fontWeight: 500, border: "none", outline: "none", background: "transparent", color: "var(--p-color-text)", textAlign: "right", MozAppearance: "textfield" }}
+            />
+            <select
+              value={unit}
+              onChange={(e) => onUnitChange(e.target.value)}
+              style={{ padding: "0 4px 0 7px", fontSize: 11, fontWeight: 500, color: "var(--p-color-text-secondary)", background: "var(--p-color-bg-surface-secondary, #f6f6f7)", borderLeft: "1px solid var(--p-color-border)", border: "none", borderLeftWidth: 1, borderLeftStyle: "solid", borderLeftColor: "var(--p-color-border)", height: "100%", cursor: "pointer", outline: "none", appearance: "auto" }}
+            >
+              {units.map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <style>{`
+          input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:99px;background:linear-gradient(to right,#1a1a1a var(--fill,0%),#d1d5db var(--fill,0%))}
+          input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:#1a1a1a;cursor:pointer;margin-top:-4px;box-shadow:none}
+          input[type=range]::-moz-range-track{height:3px;border-radius:99px;background:#d1d5db}
+          input[type=range]::-moz-range-progress{height:3px;border-radius:99px;background:#1a1a1a}
+          input[type=range]::-moz-range-thumb{width:11px;height:11px;border-radius:50%;background:#1a1a1a;cursor:pointer;border:none}
+          input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+        `}</style>
       </div>
     </FieldLabel>
   );
@@ -15191,7 +8474,7 @@ const LayoutBlockComponent = {
     ` : "";
 
     return (
-      <div id={uid} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={outerStyle}>
+      <div id={uid} className={[cssClass].filter(Boolean).join(" ") || undefined} style={outerStyle}>
         {(animCss || customCss) && <style>{animCss}{customCss}</style>}
         {/* Background video */}
         {bgType === "video" && bgVideo && (
@@ -15299,7 +8582,7 @@ const GridBlockComponent = {
     return (
       <div
         id={uid}
-        className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
+        className={[cssClass].filter(Boolean).join(" ") || undefined}
         style={{
           paddingTop: advPadding?.top ?? 0, paddingRight: advPadding?.right ?? 0,
           paddingBottom: advPadding?.bottom ?? 0, paddingLeft: advPadding?.left ?? 0,
@@ -15619,7 +8902,7 @@ const SectionBlockComponent = {
     return (
       <div
         id={uid}
-        className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
+        className={[cssClass].filter(Boolean).join(" ") || undefined}
         style={outerStyle}
       >
         {/* CSS */}
@@ -15721,9 +9004,9 @@ function SectionStyleFields({ props, set }: { props: any; set: (k: string, v: an
         options={[{ value: "none", label: "None" }, { value: "solid", label: "Solid" }, { value: "dashed", label: "Dashed" }, { value: "dotted", label: "Dotted" }]} />
       {props.borderStyle !== "none" && (
         <>
-          <StackedNumberField label="Width (px)" value={props.borderWidth ?? 1} onChange={(v) => set("borderWidth", v)} min={1} max={20} step={1} />
+          <SliderNumberField label="Width (px)" value={props.borderWidth ?? 1} onChange={(v) => set("borderWidth", v)} min={1} max={20} step={1} unit="px" />
           <ColorPickerField label="Color" value={props.borderColor ?? ""} onChange={(v) => set("borderColor", v)} />
-          <StackedNumberField label="Radius (px)" value={props.borderRadius ?? 0} onChange={(v) => set("borderRadius", v)} min={0} max={100} step={1} />
+          <SliderNumberField label="Radius (px)" value={props.borderRadius ?? 0} onChange={(v) => set("borderRadius", v)} min={0} max={100} step={1} unit="px" />
         </>
       )}
     </>
@@ -15897,10 +9180,10 @@ export const sectionTemplateConfig: Record<string, any> = {
         <StackedTextField label="Subtext" value={p.subtitle ?? ""} onChange={(v) => set("subtitle", v)} placeholder="Short supporting tagline" />
         <TabSection title="Primary Button" />
         <StackedTextField label="Label" value={p.primaryLabel ?? ""} onChange={(v) => set("primaryLabel", v)} placeholder="Get Started" />
-        <StackedTextField label="URL" value={p.primaryUrl ?? ""} onChange={(v) => set("primaryUrl", v)} placeholder="https://…" />
+        <LinkUrlField label="URL" value={p.primaryUrl ?? ""} onChange={(v) => set("primaryUrl", v)} />
         <TabSection title="Secondary Button" />
         <StackedTextField label="Label" value={p.secondaryLabel ?? ""} onChange={(v) => set("secondaryLabel", v)} placeholder="Learn More (leave blank to hide)" />
-        <StackedTextField label="URL" value={p.secondaryUrl ?? ""} onChange={(v) => set("secondaryUrl", v)} placeholder="https://…" />
+        <LinkUrlField label="URL" value={p.secondaryUrl ?? ""} onChange={(v) => set("secondaryUrl", v)} />
         <TabSection title="Image" />
         <ImageField label="Hero Image" value={p.imageUrl ?? ""} onChange={(v) => set("imageUrl", v)} />
         <StackedTextField label="Alt Text" value={p.imageAlt ?? ""} onChange={(v) => set("imageAlt", v)} placeholder="Describe the image" />
@@ -16070,7 +9353,7 @@ export const sectionTemplateConfig: Record<string, any> = {
         {p.showHeading !== false && <><StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Our Gallery" /><StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="A short description" /></>}
         <TabSection title="Grid" />
         <InlineSelect label="Columns" value={String(p.galleryColumns ?? 3)} onChange={(v) => set("galleryColumns", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }, { value: "5", label: "5" }]} />
-        <StackedNumberField label="Gap (px)" value={p.gap ?? 12} onChange={(v) => set("gap", v)} min={0} max={60} step={2} />
+        <SliderNumberField label="Gap (px)" value={p.gap ?? 12} onChange={(v) => set("gap", v)} min={0} max={60} step={2} unit="px" />
       </>
     )),
     defaultProps: baseSectionProps({ columns: 3, columnsTablet: 2, advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "Our Gallery", sectionSubtitle: "", galleryColumns: 3, gap: 12, showHeading: true }),
@@ -16286,10 +9569,10 @@ export const sectionTemplateConfig: Record<string, any> = {
         <StackedTextField label="Subtext" value={p.subtext ?? ""} onChange={(v) => set("subtext", v)} placeholder="Supporting line" />
         <TabSection title="Primary Button" />
         <StackedTextField label="Label" value={p.primaryLabel ?? ""} onChange={(v) => set("primaryLabel", v)} placeholder="Start Free Trial" />
-        <StackedTextField label="URL" value={p.primaryUrl ?? ""} onChange={(v) => set("primaryUrl", v)} placeholder="https://…" />
+        <LinkUrlField label="URL" value={p.primaryUrl ?? ""} onChange={(v) => set("primaryUrl", v)} />
         <TabSection title="Secondary Button" />
         <StackedTextField label="Label" value={p.secondaryLabel ?? ""} onChange={(v) => set("secondaryLabel", v)} placeholder="Learn More" />
-        <StackedTextField label="URL" value={p.secondaryUrl ?? ""} onChange={(v) => set("secondaryUrl", v)} placeholder="https://…" />
+        <LinkUrlField label="URL" value={p.secondaryUrl ?? ""} onChange={(v) => set("secondaryUrl", v)} />
         <TabSection title="Layout" />
         <AlignField label="Alignment" value={p.alignment ?? "text-center"} onChange={(v) => set("alignment", v)} />
       </>
@@ -16609,8 +9892,6 @@ export const config: Config<Props, RootProps> = {
     Divider: DividerComponent,
 
     Video: VideoComponent,
-
-    Icons: IconsComponent,
 
     BlockQuote: BlockQuoteComponent,
 

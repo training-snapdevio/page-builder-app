@@ -21,7 +21,7 @@ import { DEFAULT_GLOBAL_SETTINGS } from "../lib/settings.defaults";
 import { getAllGlobalBlocks } from "../lib/global-blocks.server";
 import { getSavedBlocks } from "../lib/saved-blocks.server";
 import { resolvePageBlocks } from "../lib/resolve-blocks";
-import { renderPageContentOnly, renderGlobalStyleCss } from "../lib/puck-renderer";
+import { renderPageContentOnly, renderGlobalStyleCss, collectBlockFonts } from "../lib/puck-renderer";
 import { settingsToCSSString, buildGoogleFontsImport } from "../lib/settings.server";
 import type { PuckData } from "../lib/page-schema";
 
@@ -171,7 +171,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // rules stay scoped to this widget and never leak into the theme.
     const styleCss = useThemeStyles
       ? buildThemeResetCss()
-      : buildGoogleFontsImport([settings.fontFamily ?? "", settings.headingFont ?? ""])
+      : buildGoogleFontsImport([settings.fontFamily ?? "", settings.headingFont ?? "", ...collectBlockFonts(resolved)])
         + settingsToCSSString(settings) + "\n" + renderGlobalStyleCss(settings);
 
     return jsonResponse({

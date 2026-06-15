@@ -17,6 +17,7 @@ import { resolvePageBlocks } from "../lib/resolve-blocks";
 import { getAllGlobalBlocks } from "../lib/global-blocks.server";
 import { getSavedBlocks } from "../lib/saved-blocks.server";
 import { getGlobalSettings, settingsToCSSString, buildGoogleFontsImport } from "../lib/settings.server";
+import { collectBlockFonts } from "../lib/puck-renderer";
 import { DEFAULT_GLOBAL_SETTINGS } from "../lib/settings.defaults";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -89,6 +90,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const fontsImport = buildGoogleFontsImport([
     settings.fontFamily ?? "",
     settings.headingFont ?? "",
+    ...collectBlockFonts(resolved),
   ]);
   const tokenCss = settingsToCSSString(settings);
 
@@ -97,22 +99,48 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Never cache the preview: a hard or soft refresh must always re-fetch the
+       latest saved page data so editor changes show up immediately. -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Preview: ${escHtml(page.title)}</title>
   <style>
     ${fontsImport}
     ${tokenCss}
     *, *::before, *::after { box-sizing: border-box; }
     body { margin: 0; font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif); }
-    img { max-width: 100%; height: auto; }
+    /* Default responsive images, but never override a block that sets its own
+       explicit width/height inline (e.g. Photo Collage grid/brick/carousel cells
+       use width:100%;height:100% with aspect-ratio). */
+    img:not([style*="height"]) { max-width: 100%; height: auto; }
+    /* Floating refresh button — re-fetches the latest saved page data. */
+    .pb-preview-refresh{position:fixed;right:18px;bottom:18px;z-index:2147483647;display:inline-flex;align-items:center;gap:7px;
+      padding:10px 16px;border:none;border-radius:999px;background:#1a1a1f;color:#fff;font-size:13px;font-weight:600;
+      font-family:inherit;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);transition:transform .15s ease,background .15s ease}
+    .pb-preview-refresh:hover{background:#000;transform:translateY(-1px)}
+    .pb-preview-refresh:active{transform:translateY(0)}
+    .pb-preview-refresh svg{width:15px;height:15px}
+    @media print{.pb-preview-refresh{display:none}}
   </style>
 </head>
 <body>
 ${body}
+<button class="pb-preview-refresh" onclick="window.location.reload(true)" title="Reload latest changes">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+  Refresh
+</button>
 </body>
 </html>`;
 
   return new Response(html, {
-    headers: { "Content-Type": "text/html" },
+    headers: {
+      "Content-Type": "text/html",
+      // Hard no-cache so refreshes always hit the loader and re-render fresh data.
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0",
+    },
   });
 };
 

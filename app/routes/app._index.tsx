@@ -22,7 +22,7 @@ import { DEFAULT_GLOBAL_SETTINGS, type GlobalSettings } from "../lib/settings.de
 import { getAllGlobalBlocks, type GlobalBlock } from "../lib/global-blocks.server";
 import { getSavedBlocks, type SavedBlock } from "../lib/saved-blocks.server";
 import { isValidPuckData } from "../lib/page-schema";
-import { renderPreviewBody, settingsToCSSString, buildGoogleFontsImport } from "../lib/puck-renderer";
+import { renderPreviewBody, settingsToCSSString, buildGoogleFontsImport, collectBlockFonts } from "../lib/puck-renderer";
 import { resolvePageBlocks } from "../lib/resolve-blocks";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -84,6 +84,7 @@ function buildPreviewDocument(
   const fontsImport = buildGoogleFontsImport([
     settings.fontFamily ?? "",
     settings.headingFont ?? "",
+    ...collectBlockFonts(resolved),
   ]);
   const tokenCss = settingsToCSSString(settings);
 
