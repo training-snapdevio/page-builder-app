@@ -345,11 +345,11 @@ function Space(p: Props): string {
   const classes = [uid, p.hideDesktop ? "puck-hide-desktop" : "", p.hideTablet ? "puck-hide-tablet" : "", p.hideMobile ? "puck-hide-mobile" : "", p.cssClass ? String(p.cssClass) : ""].filter(Boolean).join(" ");
   const idAttr = p.cssId ? ` id="${esc(String(p.cssId))}"` : "";
   const bgStyle = p.backgroundColor ? `background-color:${esc(p.backgroundColor as string)};` : "";
-  // <style> may be stripped by Shopify's page.content sanitiser. Use min-height
-  // inline on the div as a fallback so the spacer is always visible. The <style>
-  // block still handles responsive overrides on platforms that allow it.
-  const responsiveCss = `<style>.${uid}{height:${hD}}@media(max-width:1023px){.${uid}{height:${hT}}}@media(max-width:767px){.${uid}{height:${hM}}}</style>`;
-  return `${responsiveCss}<div${idAttr} class="${classes}" style="${bgStyle}min-height:${hD};width:100%;box-sizing:border-box"></div>`;
+  // Shopify themes reset height/min-height with !important — use padding-top
+  // as the primary spacing mechanism since themes almost never reset padding.
+  // Also include height+min-height as belt-and-suspenders.
+  const responsiveCss = `<style>.${uid}{padding-top:${hD}!important;height:0!important}@media(max-width:1023px){.${uid}{padding-top:${hT}!important}}@media(max-width:767px){.${uid}{padding-top:${hM}!important}}</style>`;
+  return `${responsiveCss}<div${idAttr} class="${classes}" style="${bgStyle}display:block;padding-top:${hD};height:0;min-height:0;width:100%;box-sizing:border-box;font-size:0;line-height:0;"></div>`;
 }
 
 function Image(p: Props): string {
@@ -621,9 +621,9 @@ function Button(p: Props): string {
   const borderStyle  = (p.borderStyle as string) || "none";
   const borderWidth  = Number(p.borderWidth ?? 2);
   const borderColor  = esc((p.borderColor as string) || "transparent");
-  // borderRadius can be numeric (px) or legacy string
+  // borderRadius can be numeric (px) or legacy string; 0 means sharp corners
   const borderRadiusRaw = p.borderRadius;
-  const borderRadius = typeof borderRadiusRaw === "number" ? `${borderRadiusRaw}px` : esc((borderRadiusRaw as string) || "6px");
+  const borderRadius = typeof borderRadiusRaw === "number" ? `${borderRadiusRaw}px` : (borderRadiusRaw != null && borderRadiusRaw !== "" ? esc(borderRadiusRaw as string) : "6px");
   const hoverTextColor = esc((p.hoverTextColor as string) || "");
   const hoverBgColor   = esc((p.hoverBgColor as string) || "");
   const hoverBorderColor = esc((p.hoverBorderColor as string) || "");
@@ -751,7 +751,8 @@ function PhotoCollage(p: Props): string {
   const valid = images.filter((img) => img.url);
   const gap = Number(p.gap) || 8;
   const gapPx = `${gap}px`;
-  const br = `${p.borderRadius ?? 0}px`;
+  const brVal = Number(p.borderRadius ?? 0);
+  const br = `${brVal}px`;
   const fit = (p.objectFit as string) || "cover";
   const layout = (p.layout as string) || "mixed";
   const aspectRatio = (p.aspectRatio as string) || "1:1";
@@ -786,7 +787,7 @@ function PhotoCollage(p: Props): string {
     `<img src="${esc(img.url ?? "")}" alt="${esc(img.alt || `Photo ${i + 1}`)}" loading="lazy" style="width:100%;height:100%;object-fit:${esc(fitVal)};display:block;transition:transform 0.3s ease,filter 0.3s ease">`;
 
   const wrapCell = (content: string, extraStyle: string) =>
-    `<div class="pb-collage-item" style="overflow:hidden;border-radius:${br};box-shadow:${shadow};${extraStyle}">${content}</div>`;
+    `<div class="pb-collage-item" style="overflow:hidden;border-radius:${br}!important;box-shadow:${shadow};${extraStyle}">${content}</div>`;
 
   const wrapClass = ["pb-collage-wrap", hideClasses].filter(Boolean).join(" ");
 
@@ -1069,53 +1070,65 @@ function renderDivider(p: Props): string {
   const align = (p.alignment as string) || "center";
   const justify = flexJustify(align);
 
-  // Build the line HTML for a given width style
+  // Build one line segment. widthStyle is either "flex:1;" (inside icon row) or "width:Xunit;" (standalone).
+  // We use display:block on the wrapper and an inner <hr>-style element so Shopify theme resets
+  // (e.g. *{display:block}, *{height:0}, *{border:0}) cannot hide both wrappers simultaneously.
   const buildLine = (widthStyle: string): string => {
+    const baseWrap = `display:block;${widthStyle}overflow:visible;align-self:center;flex-shrink:${widthStyle.startsWith("flex:1") ? "1" : "0"};`;
     if (lineStyle === "gradient") {
       const c1 = esc((p.gradientStart as string) || "#e5e7eb");
       const c2 = esc((p.gradientEnd   as string) || "#e5e7eb");
-      return `<div style="flex:1;${widthStyle}height:${th}px;background:linear-gradient(90deg,${c1},${c2});align-self:center"></div>`;
+      return `<div style="${baseWrap}height:${th}px;min-height:${th}px;background:linear-gradient(90deg,${c1},${c2});"></div>`;
     }
     if (lineStyle === "shadow") {
-      return `<div style="flex:1;${widthStyle}height:${th * 4}px;background:radial-gradient(ellipse at 50% 0%,${color} 0%,transparent 70%);align-self:center"></div>`;
+      const h = th * 4;
+      return `<div style="${baseWrap}height:${h}px;min-height:${h}px;background:radial-gradient(ellipse at 50% 0%,${color} 0%,transparent 70%);"></div>`;
     }
     if (lineStyle === "wave") {
       const h = Math.max(th * 6, 12);
       const mid = h / 2;
       const amp = mid * 0.8;
       const path = `M0,${mid} C15,${mid - amp} 15,${mid + amp} 30,${mid} S45,${mid - amp} 60,${mid} S75,${mid + amp} 90,${mid} S105,${mid - amp} 120,${mid} S135,${mid + amp} 150,${mid} S165,${mid - amp} 180,${mid} S195,${mid + amp} 210,${mid} S225,${mid - amp} 240,${mid} S255,${mid + amp} 270,${mid} S285,${mid - amp} 300,${mid} S315,${mid + amp} 330,${mid} S345,${mid - amp} 360,${mid} S375,${mid + amp} 390,${mid} S405,${mid - amp} 420,${mid} S435,${mid + amp} 450,${mid} S465,${mid - amp} 480,${mid} S495,${mid + amp} 510,${mid} S525,${mid - amp} 540,${mid} S555,${mid + amp} 570,${mid} S585,${mid - amp} 600,${mid}`;
-      return `<div style="flex:1;${widthStyle}height:${h}px;align-self:center;overflow:visible"><svg width="100%" height="${h}" viewBox="0 0 600 ${h}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><path d="${path}" fill="none" stroke="${color}" stroke-width="${th}" vector-effect="non-scaling-stroke"/></svg></div>`;
+      return `<div style="${baseWrap}height:${h}px;min-height:${h}px;"><svg width="100%" height="${h}" viewBox="0 0 600 ${h}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible"><path d="${path}" fill="none" stroke="${color}" stroke-width="${th}" vector-effect="non-scaling-stroke"/></svg></div>`;
     }
     if (lineStyle === "zigzag") {
       const h = Math.max(th * 6, 12);
       const pts = Array.from({ length: 61 }, (_, i) => `${i * 10},${i % 2 === 0 ? h : 0}`).join(" ");
-      return `<div style="flex:1;${widthStyle}height:${h}px;align-self:center;overflow:visible"><svg width="100%" height="${h}" viewBox="0 0 600 ${h}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="${th}" vector-effect="non-scaling-stroke"/></svg></div>`;
+      return `<div style="${baseWrap}height:${h}px;min-height:${h}px;"><svg width="100%" height="${h}" viewBox="0 0 600 ${h}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="${th}" vector-effect="non-scaling-stroke"/></svg></div>`;
     }
-    // Solid lines render as a filled div (height = thickness) so they survive
-    // aggressive theme resets that strip borders (e.g. `*{border:0}`). Dashed /
-    // dotted / double still need a real border to show their pattern.
-    if (lineStyle === "dashed" || lineStyle === "dotted" || lineStyle === "double") {
-      return `<div style="flex:1;${widthStyle}border-top:${th}px ${lineStyle} ${color};align-self:center;box-sizing:border-box"></div>`;
-    }
-    return `<div style="flex:1;${widthStyle}height:${th}px;background:${color};align-self:center"></div>`;
+    // solid / dashed / dotted / double — use both height+background AND border-top so at least
+    // one survives any Shopify theme reset. The outer div gives height; border-top draws the line.
+    const bStyle = lineStyle === "dashed" || lineStyle === "dotted" || lineStyle === "double" ? lineStyle : "solid";
+    return `<div style="${baseWrap}height:${th}px;min-height:${th}px;border-top:${th}px ${bStyle} ${color};background:${color};box-sizing:content-box;font-size:0;line-height:0;"></div>`;
   };
 
   let inner = "";
   if (p.showElement) {
     const elType = (p.elementType as string) || "icon";
     const iconVal = ((p.elementIcon as string) || "").trim();
-    const hasIconContent = elType !== "text" ? !!iconVal : true;
-    if (hasIconContent) {
+    const imgUrl = ((p.elementImage as string) || "").trim();
+    const imgW = Number(p.elementImageWidth ?? 40);
+    const imgH = Number(p.elementImageHeight ?? 40);
+    const hasContent = elType === "text" ? true : elType === "image" ? !!imgUrl : !!iconVal;
+    if (hasContent) {
       const elSpacing = `${Number(p.elementSpacing ?? 12)}px`;
-      const elContent = elType === "text"
-        ? `<span style="font-size:${p.elementFontSize ?? 14}px;color:${esc((p.elementTextColor as string) || color)};white-space:nowrap">${esc((p.elementText as string) || "OR")}</span>`
-        : `<span style="font-size:${p.iconSize ?? 20}px;color:${esc((p.iconColor as string) || color)};line-height:1">${esc(iconVal)}</span>`;
+      let elContent: string;
+      if (elType === "text") {
+        elContent = `<span style="font-size:${p.elementFontSize ?? 14}px;color:${esc((p.elementTextColor as string) || color)};white-space:nowrap;line-height:1;">${esc((p.elementText as string) || "OR")}</span>`;
+      } else if (elType === "image") {
+        const imgR = Number(p.elementImageRadius ?? 0);
+        elContent = `<img src="${imgUrl.replace(/"/g, "&quot;")}" alt="" style="width:${imgW}px;height:${imgH}px;object-fit:contain;display:inline-block;vertical-align:middle;${imgR > 0 ? `border-radius:${imgR}px;` : ""}" />`;
+      } else {
+        elContent = `<span style="font-size:${p.iconSize ?? 20}px;color:${esc((p.iconColor as string) || color)};line-height:1;display:inline-block;">${esc(iconVal)}</span>`;
+      }
       const elPos = (p.elementPosition as string) || "center";
-      const lineEl = buildLine("flex:1;");
-      const elDiv = `<div style="flex-shrink:0;padding:0 ${elSpacing}">${elContent}</div>`;
-      if (elPos === "left")       inner = `<div style="display:flex;align-items:center;width:${width}">${elDiv}${lineEl}</div>`;
-      else if (elPos === "right") inner = `<div style="display:flex;align-items:center;width:${width}">${lineEl}${elDiv}</div>`;
-      else                        inner = `<div style="display:flex;align-items:center;width:${width}">${lineEl}${elDiv}${lineEl}</div>`;
+      // Build left and right line segments independently so each is a fresh div
+      const lineLeft  = buildLine("flex:1;");
+      const lineRight = buildLine("flex:1;");
+      const elDiv = `<div style="flex-shrink:0;padding:0 ${elSpacing};display:flex;align-items:center;">${elContent}</div>`;
+      if (elPos === "left")       inner = `<div style="display:flex;align-items:center;width:${width};">${elDiv}${lineRight}</div>`;
+      else if (elPos === "right") inner = `<div style="display:flex;align-items:center;width:${width};">${lineLeft}${elDiv}</div>`;
+      else                        inner = `<div style="display:flex;align-items:center;width:${width};">${lineLeft}${elDiv}${lineRight}</div>`;
     } else {
       inner = buildLine(`width:${width};`);
     }
@@ -1123,7 +1136,7 @@ function renderDivider(p: Props): string {
     inner = buildLine(`width:${width};`);
   }
 
-  return `<div style="${spacing}padding-top:${gap}px;padding-bottom:${gap}px;display:flex;justify-content:${justify};${advBgStyle(p)}">${inner}</div>`;
+  return `<div style="${spacing}padding-top:${gap}px;padding-bottom:${gap}px;display:flex;justify-content:${justify};align-items:center;${advBgStyle(p)}">${inner}</div>`;
 }
 
 function renderVideo(p: Props): string {
@@ -1132,12 +1145,10 @@ function renderVideo(p: Props): string {
   const sourceType = (p.sourceType as string) || "youtube";
   const aspectRatio = (p.aspectRatio as string) || "16:9";
   const videoWidthVal = p.videoWidthVal ?? 100;
-  const videoWidthUnit = (p.videoWidthUnit as string) || "%";
-  const width = `${videoWidthVal}${videoWidthUnit}`;
+  const width = `${Number(videoWidthVal) || 100}%`;
   const borderRadius = `${Number(p.borderRadius ?? 0)}px`;
   const ratioMap: Record<string, string> = { "16:9": "56.25%", "4:3": "75%", "1:1": "100%" };
-  const paddingBottom = aspectRatio === "custom" ? "0" : (ratioMap[aspectRatio] ?? "56.25%");
-  const containerH = aspectRatio === "custom" ? `${Number(p.customHeightVal ?? 450)}${esc((p.customHeightUnit as string) || "px")}` : "0";
+  const paddingBottom = ratioMap[aspectRatio] ?? "56.25%";
   const isNative = sourceType === "self" || sourceType === "upload";
   const autoplay = p.autoplay as boolean;
 
@@ -1167,7 +1178,7 @@ function renderVideo(p: Props): string {
     embedUrl = `https://player.vimeo.com/video/${id}?${params.toString()}`;
   }
 
-  const containerStyle = `position:relative;width:${width};padding-bottom:${paddingBottom};height:${containerH !== "0" ? containerH : "0"};overflow:hidden;border-radius:${borderRadius};background:#000;`;
+  const containerStyle = `position:relative;width:${width};padding-bottom:${paddingBottom};height:0;overflow:hidden;border-radius:${borderRadius};background:#000;`;
   const absStyle = `position:absolute;inset:0;width:100%;height:100%;`;
 
   let videoInner = "";
@@ -1202,42 +1213,82 @@ const SOCIAL_BRAND: Record<string, string> = {
 };
 
 function renderSocialIcons(p: Props): string {
-  const spacing = advSpacing(p);
+  const m = p.advMargin as any ?? {};
+  const pad = p.advPadding as any ?? {};
+  const mt = m.top ?? 0, mr = m.right ?? 0, mb = m.bottom ?? 0, ml = m.left ?? 0;
+  const pt = pad.top ?? 8, pr = pad.right ?? 0, pb = pad.bottom ?? 8, pl = pad.left ?? 0;
+  const outerSpacing = `margin:${mt}px ${mr}px ${mb}px ${ml}px;padding:${pt}px ${pr}px ${pb}px ${pl}px;`;
+  const cssId = esc((p.cssId as string) || "") || "social-icons-blk";
+  const cssClass = esc((p.cssClass as string) || "");
+  const zIndex = p.zIndex != null ? `z-index:${p.zIndex};` : "";
+  const hideClass = [
+    p.hideDesktop ? "puck-hide-desktop" : "",
+    p.hideTablet  ? "puck-hide-tablet"  : "",
+    p.hideMobile  ? "puck-hide-mobile"  : "",
+  ].filter(Boolean).join(" ");
+  const classAttr = [cssClass, hideClass].filter(Boolean).join(" ");
+
   const enabled = (p.enabled as string[]) ?? ["facebook", "instagram", "twitter", "youtube"];
   const urls = (p.urls as Record<string, string>) ?? {};
   const newTab = p.newTab !== false;
   const iconStyle = (p.iconStyle as string) || "filled";
-  const iconSize = parseFloat((p.iconSize as string) || "24") || 24;
+  const sz = Number(p.iconSize) || 24;
+  const bgsz = Number(p.bgSize) || 40;
   const iconColor = (p.iconColor as string) || "";
   const iconBgColor = (p.iconBgColor as string) || "";
+  const iconHoverColor = (p.iconHoverColor as string) || "";
+  const iconHoverBg = (p.iconHoverBg as string) || "";
   const bgShape = (p.bgShape as string) || "circle";
-  const bgSize = esc((p.bgSize as string) || "40px");
   const borderStyle = (p.borderStyle as string) || "none";
-  const borderWidth = p.borderWidth ?? 1;
+  const borderWidth = Number(p.borderWidth ?? 1);
   const borderColor = (p.borderColor as string) || "";
-  const borderRadius = esc((p.borderRadius as string) || "50%");
-  const iconSpacing = esc((p.iconSpacing as string) || "12px");
+  const iconSpacing = Number(p.iconSpacing ?? 12);
   const alignment = (p.alignment as string) || "left";
   const shapeRadius = bgShape === "circle" ? "50%" : bgShape === "rounded" ? "10px" : bgShape === "square" ? "0px" : undefined;
+  const isOutlined = iconStyle === "outlined";
+  const isMinimal  = iconStyle === "minimal";
+  const isBranded  = iconStyle === "branded";
+  const bgColorStyle = (p.advBgType as string) === "color" && p.advBgColor ? `background-color:${esc(p.advBgColor as string)};` : "";
+
+  const hoverCss = (iconHoverColor || iconHoverBg)
+    ? `<style>#${cssId} a:hover .puck-si{${iconHoverColor ? `color:${iconHoverColor}!important;` : ""}${iconHoverBg ? `background:${iconHoverBg}!important;` : ""}transition:all 0.2s;}#${cssId} a .puck-si{transition:all 0.2s;}</style>`
+    : "";
 
   const icons = enabled.map(key => {
     const svg = SOCIAL_SVGS[key] ?? "";
     const brand = SOCIAL_BRAND[key] ?? "#333";
-    const isBranded = iconStyle === "branded";
-    const color = isBranded ? (bgShape !== "none" ? "#fff" : brand) : (iconColor || "currentColor");
-    const bg = bgShape !== "none" ? (isBranded ? brand : (iconBgColor || "#e5e7eb")) : "";
-    const border = borderStyle === "solid" ? `border:${borderWidth}px solid ${borderColor || color};` : "";
-    const innerStyle = bgShape !== "none"
-      ? `display:inline-flex;align-items:center;justify-content:center;width:${bgSize};height:${bgSize};background:${bg};border-radius:${shapeRadius};${border}color:${color};flex-shrink:0;font-size:${iconSize}px;`
-      : `display:inline-flex;align-items:center;justify-content:center;color:${color};font-size:${iconSize}px;`;
-    const inner = `<span style="${innerStyle}">${svg}</span>`;
+    const resolvedColor = isBranded
+      ? (bgShape !== "none" ? "#fff" : brand)
+      : isOutlined
+      ? (iconColor || brand)
+      : isMinimal
+      ? (iconColor || brand)
+      : (iconColor || "currentColor");
+    const bg = isMinimal
+      ? ""
+      : bgShape !== "none"
+      ? (isBranded ? brand : (iconBgColor || "#e5e7eb"))
+      : isOutlined
+      ? "transparent"
+      : "";
+    const borderW = isOutlined ? 2 : (borderStyle === "solid" ? borderWidth : 0);
+    const borderC = isOutlined ? (iconColor || brand) : (borderColor || resolvedColor);
+    const borderCss = borderW > 0
+      ? `border-width:${borderW}px;border-style:solid;border-color:${borderC};box-sizing:border-box;`
+      : "";
+    const resolvedBorderRadius = isOutlined ? (shapeRadius ?? "8px") : shapeRadius;
+    const hasContainer = bgShape !== "none" || isOutlined;
+    const wh = hasContainer ? bgsz : sz;
+    const innerStyle = `display:inline-flex;align-items:center;justify-content:center;width:${wh}px;height:${wh}px;${bg ? `background:${bg};` : ""}${resolvedBorderRadius ? `border-radius:${resolvedBorderRadius};` : ""}${borderCss}color:${resolvedColor};flex-shrink:0;`;
+    const svgWrap = `<span style="width:${sz}px;height:${sz}px;display:inline-flex;align-items:center;justify-content:center;font-size:${sz}px;">${svg}</span>`;
+    const inner = `<span class="puck-si" style="${innerStyle}">${svgWrap}</span>`;
     const url = urls[key];
     return url
       ? `<a href="${esc(url)}" target="${newTab ? "_blank" : "_self"}" rel="noopener noreferrer" title="${esc(key)}" style="text-decoration:none;color:inherit">${inner}</a>`
-      : `<span style="${innerStyle}opacity:0.4" title="${esc(key)} (no URL)">${svg}</span>`;
+      : `<span class="puck-si" style="${innerStyle}opacity:0.4;" title="${esc(key)} (no URL)">${svgWrap}</span>`;
   }).join("");
 
-  return `<div style="${spacing}${advBgStyle(p)}"><div style="display:flex;gap:${iconSpacing};flex-wrap:wrap;justify-content:${flexJustify(alignment)}">${icons}</div></div>`;
+  return `${hoverCss}<div id="${cssId}"${classAttr ? ` class="${classAttr}"` : ""} style="${outerSpacing}${zIndex}${bgColorStyle}"><div style="display:flex;gap:${iconSpacing}px;flex-wrap:wrap;justify-content:${flexJustify(alignment)}">${icons}</div></div>`;
 }
 
 const SHARE_PLATFORMS_R = [
@@ -1250,23 +1301,42 @@ const SHARE_PLATFORMS_R = [
 ];
 
 function renderShareButtons(p: Props): string {
-  const spacing = advSpacing(p);
+  const m = p.advMargin as any ?? {};
+  const pad = p.advPadding as any ?? {};
+  const mt = m.top ?? 0, mr = m.right ?? 0, mb = m.bottom ?? 0, ml = m.left ?? 0;
+  const pt = pad.top ?? 8, pr = pad.right ?? 0, pb = pad.bottom ?? 8, pl = pad.left ?? 0;
+  const outerSpacing = `margin:${mt}px ${mr}px ${mb}px ${ml}px;padding:${pt}px ${pr}px ${pb}px ${pl}px;`;
+  const cssId = esc((p.cssId as string) || "") || `share-blk`;
+  const cssClass = esc((p.cssClass as string) || "");
+  const zIndex = p.zIndex != null ? `z-index:${p.zIndex};` : "";
+  const hideClass = [
+    p.hideDesktop ? "puck-hide-desktop" : "",
+    p.hideTablet  ? "puck-hide-tablet"  : "",
+    p.hideMobile  ? "puck-hide-mobile"  : "",
+  ].filter(Boolean).join(" ");
+  const classAttr = [cssClass, hideClass].filter(Boolean).join(" ");
+  const bgColorStyle = (p.advBgType as string) === "color" && p.advBgColor ? `background-color:${esc(p.advBgColor as string)};` : "";
+  const hoverBg = (p.hoverBg as string) || "";
+  const hoverCss = hoverBg
+    ? `<style>#${cssId} .puck-share-btn:hover{background:${hoverBg}!important;transition:background 0.2s;}#${cssId} .puck-share-btn{transition:background 0.2s;}</style>`
+    : "";
+
   const enabled = (p.enabled as string[]) ?? ["facebook", "twitter", "whatsapp", "email", "copy"];
   const labels = (p.labels as Record<string, string>) ?? {};
   const showLabel = p.showLabel !== false;
   const btnStyle = (p.btnStyle as string) || "icon-text";
   const btnSize = (p.btnSize as string) || "medium";
-  const borderRadius = esc((p.borderRadius as string) || "6px");
-  const spacing2 = esc((p.spacing as string) || "8px");
+  const borderRadius = `${p.borderRadius != null ? Number(p.borderRadius) : 6}px`;
+  const spacing2 = `${Number(p.spacing) || 8}px`;
   const iconColor = (p.iconColor as string) || "";
   const textColor = (p.textColor as string) || "";
   const bgColor = (p.bgColor as string) || "";
   const useBrandColors = !!p.useBrandColors;
-  const fontSize = esc((p.fontSize as string) || "0.875rem");
+  const fontSize = `${Number(p.fontSize) || 14}px`;
   const fontWeight = p.fontWeight || "600";
   const alignment = (p.alignment as string) || "left";
   const sizeMap: Record<string, string> = { small: "8px 12px", medium: "10px 16px", large: "12px 20px" };
-  const pad = sizeMap[btnSize] ?? sizeMap.medium;
+  const btnPad = sizeMap[btnSize] ?? sizeMap.medium;
 
   const platforms = SHARE_PLATFORMS_R.filter(pl => enabled.includes(pl.key));
   const shareUrlMap: Record<string, string> = {
@@ -1277,22 +1347,24 @@ function renderShareButtons(p: Props): string {
     email:     "mailto:?body=",
   };
 
+  const btnBaseStyle = `display:inline-flex;align-items:center;gap:6px;padding:${btnPad};font-size:${fontSize};font-weight:${fontWeight};border-radius:${borderRadius};cursor:pointer;`;
   const btns = platforms.map(pl => {
-    const resolvedBg = useBrandColors ? pl.brand : (bgColor || "#f3f4f6");
-    const resolvedText = useBrandColors ? "#fff" : (textColor || "var(--text-color)");
-    const resolvedIcon = useBrandColors ? "#fff" : (iconColor || "var(--text-color)");
+    const resolvedBg   = useBrandColors ? pl.brand : (bgColor || "#f3f4f6");
+    const resolvedText = useBrandColors ? "#fff"    : (textColor || "var(--text-color,#111)");
+    const resolvedIcon = useBrandColors ? "#fff"    : (iconColor || "var(--text-color,#111)");
     const btnLabel = labels[pl.key] ?? pl.label;
-    const iconHtml = btnStyle !== "text-only" ? `<span style="color:${resolvedIcon};font-weight:700">${pl.icon}</span>` : "";
-    const labelHtml = btnStyle !== "icon-only" && showLabel ? `<span>${btnLabel}</span>` : "";
+    const iconHtml  = btnStyle !== "text-only"                       ? `<span style="color:${resolvedIcon};font-weight:700">${pl.icon}</span>` : "";
+    const labelHtml = btnStyle !== "icon-only" && showLabel          ? `<span>${btnLabel}</span>` : "";
     const btnContent = `${iconHtml}${iconHtml && labelHtml ? " " : ""}${labelHtml}`;
+    const colorStyle = `color:${resolvedText};background:${resolvedBg};`;
     if (pl.key === "copy") {
-      return `<button onclick="(function(b){var t=b.textContent;navigator.clipboard&&navigator.clipboard.writeText(window.location.href).then(function(){b.textContent='Copied!';setTimeout(function(){b.textContent=t},2000)})})(this)" style="display:inline-flex;align-items:center;gap:6px;padding:${pad};font-size:${fontSize};font-weight:${fontWeight};color:${resolvedText};background:${resolvedBg};border:none;border-radius:${borderRadius};cursor:pointer">${btnContent}</button>`;
+      return `<button class="puck-share-btn" onclick="(function(b){var t=b.innerHTML;navigator.clipboard&&navigator.clipboard.writeText(window.location.href).then(function(){b.innerHTML='Copied!';setTimeout(function(){b.innerHTML=t},2000)})})(this)" style="${btnBaseStyle}${colorStyle}border:none;">${btnContent}</button>`;
     }
     const shareBase = shareUrlMap[pl.key] ?? "#";
-    return `<a href="${shareBase}%7BURL%7D" onclick="event.preventDefault();window.open('${shareBase}'+encodeURIComponent(window.location.href),'_blank','noopener,noreferrer')" style="display:inline-flex;align-items:center;gap:6px;padding:${pad};font-size:${fontSize};font-weight:${fontWeight};color:${resolvedText};background:${resolvedBg};border-radius:${borderRadius};text-decoration:none;cursor:pointer">${btnContent}</a>`;
+    return `<a class="puck-share-btn" href="${shareBase}%7BURL%7D" onclick="event.preventDefault();window.open('${shareBase}'+encodeURIComponent(window.location.href),'_blank','noopener,noreferrer')" style="${btnBaseStyle}${colorStyle}text-decoration:none;">${btnContent}</a>`;
   }).join("");
 
-  return `<div style="${spacing}${advBgStyle(p)}"><div style="display:flex;gap:${spacing2};flex-wrap:wrap;justify-content:${flexJustify(alignment)}">${btns}</div></div>`;
+  return `${hoverCss}<div id="${cssId}"${classAttr ? ` class="${classAttr}"` : ""} style="${outerSpacing}${zIndex}${bgColorStyle}"><div style="display:flex;gap:${spacing2};flex-wrap:wrap;justify-content:${flexJustify(alignment)}">${btns}</div></div>`;
 }
 
 function renderStarRating(p: Props): string {
@@ -1329,34 +1401,121 @@ function renderStarRating(p: Props): string {
 
 function renderProgressBar(p: Props): string {
   const spacing = advSpacing(p);
-  const title = esc((p.title as string) || "");
-  const pct = Math.min(100, Math.max(0, (p.percentage as number) ?? 75));
-  const barHeight = p.barHeight ?? 12;
-  const barColor = esc((p.barColor as string) || "#0158ad");
-  const barBg = esc((p.barBg as string) || "#e5e7eb");
-  const barRadius = p.barRadius ?? 6;
-  const displayPct = p.displayPercentage !== false;
-  const titleFontSize = esc((p.titleFontSize as string) || "0.9rem");
-  const titleFontWeight = p.titleFontWeight || "600";
-  const titleColor = esc((p.titleColor as string) || "var(--text-color)");
-  const titlePos = (p.titlePosition as string) || "above";
-  const labelFontSize = esc((p.labelFontSize as string) || "0.8rem");
-  const labelColor = esc((p.labelColor as string) || "var(--text-color)");
-  const labelPos = (p.labelPosition as string) || "outside-right";
+  const pbType   = (p.pbType as string) || "line";
+  const label    = esc((p.label as string) || "");
+  const pct      = Math.min(100, Math.max(0, (p.value as number) ?? 75));
+  const showPct  = p.showPercentage !== false;
+  const fillStyle = (p.fillStyle as string) || "solid";
+  const fc       = esc((p.fillColor as string)  || "#0158ad");
+  const tc       = esc((p.trackColor as string) || "#e5e7eb");
+  const gradEnd  = esc((p.gradientEnd as string) || "#60a5fa");
+  const lineH    = Number(p.lineHeight ?? 12);
+  const lineR    = Number(p.lineRadius  ?? 6);
+  const lfs      = Number(p.labelFontSize  ?? 14);
+  const lc       = esc((p.labelColor  as string) || "var(--text-color)");
+  const pfs      = Number(p.pctFontSize ?? 13);
+  const pc       = esc((p.pctColor as string) || "var(--text-color)");
+  const alignment = (p.alignment as string) || "left";
+  const alignCss  = alignment === "center" ? "text-align:center;" : alignment === "right" ? "text-align:right;" : "";
 
-  let titleRow = "";
-  if (title && titlePos === "above") {
-    const labelRight = displayPct && labelPos === "outside-right" ? `<span style="font-size:${labelFontSize};color:${labelColor};font-weight:600">${pct}%</span>` : "";
-    titleRow = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:${titleFontSize};font-weight:${titleFontWeight};color:${titleColor}">${title}</span>${labelRight}</div>`;
+  // fill background CSS value
+  let fillBg: string;
+  if (fillStyle === "gradient") {
+    fillBg = `linear-gradient(90deg,${fc},${gradEnd})`;
+  } else if (fillStyle === "striped") {
+    fillBg = fc;
+  } else {
+    fillBg = fc;
+  }
+  const stripedOverlay = fillStyle === "striped"
+    ? `;background-image:repeating-linear-gradient(45deg,transparent,transparent 8px,rgba(255,255,255,0.2) 8px,rgba(255,255,255,0.2) 16px)`
+    : "";
+
+  // ── line helper ──────────────────────────────────────────────────────────────
+  // Heights are set in explicit px (not height:100%) and reinforced with
+  // min-height + a guard class so Shopify themes that reset `height:auto` on
+  // divs can't collapse the bar to invisibility.
+  const buildLine = (rowLabel: string, rowPct: number, mb = 0): string => {
+    const headerLabel = rowLabel ? `<span style="font-size:${lfs}px;color:${lc};display:inline-block">${esc(rowLabel)}</span>` : "";
+    const headerPct   = showPct   ? `<span style="font-size:${pfs}px;color:${pc};font-weight:600;display:inline-block">${rowPct}%</span>` : "";
+    const header = (rowLabel || showPct)
+      ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;line-height:1.4">${headerLabel}${headerPct}</div>`
+      : "";
+    const fillDiv = `<div class="pb-bar-fill" style="display:block;height:${lineH}px;min-height:${lineH}px;width:${rowPct}%;max-width:100%;background:${fillBg}${stripedOverlay};border-radius:${lineR}px;box-sizing:border-box"></div>`;
+    const track   = `<div class="pb-bar-track" style="display:block;position:relative;height:${lineH}px;min-height:${lineH}px;width:100%;background:${tc};border-radius:${lineR}px;overflow:hidden;box-sizing:border-box;line-height:0;font-size:0">${fillDiv}</div>`;
+    const mbStyle = mb ? `margin-bottom:${mb}px;` : "";
+    return `<div style="${mbStyle}display:block">${header}${track}</div>`;
+  };
+
+  // ── circle SVG helper ────────────────────────────────────────────────────────
+  const buildCircleSvg = (sz: number, thick: number, disp: number, cardFill = "none"): string => {
+    const r    = (sz - thick) / 2;
+    const cx   = sz / 2;
+    const cy   = sz / 2;
+    const circ = 2 * Math.PI * r;
+    const dash = (disp / 100) * circ;
+    const rest = circ - dash;
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" style="transform:rotate(-90deg)"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${cardFill}" stroke="${tc}" stroke-width="${thick}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${fc}" stroke-width="${thick}" stroke-linecap="round" stroke-dasharray="${dash} ${rest}"/></svg>`;
+  };
+
+  // Every type shares this outer wrapper. display:block + box-sizing guard against
+  // themes that float or reset the content wrapper's children.
+  const wrap = (inner: string) =>
+    `<div style="display:block;box-sizing:border-box;width:100%;${spacing}${alignCss}${advBgStyle(p)}">${inner}</div>`;
+
+  // ── type: line ───────────────────────────────────────────────────────────────
+  if (pbType === "line") {
+    return wrap(buildLine(label, pct));
   }
 
-  let insideTitle = title && titlePos === "inside" ? `<span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:${titleFontSize};font-weight:${titleFontWeight};color:${titleColor || "#fff"};white-space:nowrap">${title}</span>` : "";
-  let insideLabel = displayPct && labelPos === "inside" ? `<span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:${labelFontSize};color:${labelColor || "#fff"};font-weight:600;white-space:nowrap">${pct}%</span>` : "";
+  // ── type: circle ─────────────────────────────────────────────────────────────
+  if (pbType === "circle") {
+    const sz    = Number(p.circleSize ?? 120);
+    const thick = Number(p.ringThickness ?? 10);
+    const showInside = p.showLabelInside !== false;
+    const pctHtml   = showPct && showInside ? `<span style="font-size:${pfs}px;color:${pc};font-weight:700;line-height:1.1;display:block">${pct}%</span>` : "";
+    const lblHtml   = label && showInside ? `<span style="font-size:${Math.round(lfs * 0.78)}px;color:${lc};margin-top:2px;display:block">${label}</span>` : "";
+    const inner     = showInside ? `<div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center">${pctHtml}${lblHtml}</div>` : "";
+    const below     = !showInside && label ? `<span style="font-size:${lfs}px;color:${lc};display:block">${label}</span>` : "";
+    return wrap(`<div style="display:inline-flex;flex-direction:column;align-items:center;gap:6px"><div style="position:relative;width:${sz}px;height:${sz}px;display:block;line-height:0;font-size:0">${buildCircleSvg(sz, thick, pct)}${inner}</div>${below}</div>`);
+  }
 
-  const fill = `<div style="height:100%;width:${pct}%;background:${barColor};border-radius:${barRadius}px;position:relative;transition:width 0.8s ease">${insideTitle}${insideLabel}</div>`;
-  const track = `<div style="position:relative;height:${barHeight}px;background:${barBg};border-radius:${barRadius}px;overflow:hidden">${fill}</div>`;
+  // ── type: step ───────────────────────────────────────────────────────────────
+  if (pbType === "step") {
+    const total    = Math.max(1, Number(p.totalSteps ?? 5));
+    const active   = Math.min(total, Math.max(0, Number(p.activeStep ?? 3)));
+    const showNums = !!p.showStepNumbers;
+    const labelHtml = label ? `<div style="font-size:${lfs}px;color:${lc};margin-bottom:8px;display:block">${label}</div>` : "";
+    const steps = Array.from({ length: total }, (_, i) => {
+      const on = i < active;
+      const numHtml = showNums ? `<span style="font-size:${Math.max(9, lineH - 3)}px;color:${on ? "#fff" : lc}">${i + 1}</span>` : "";
+      return `<div style="flex:1;height:${lineH}px;min-height:${lineH}px;border-radius:${lineR}px;background:${on ? fc : tc};display:flex;align-items:center;justify-content:center;box-sizing:border-box">${numHtml}</div>`;
+    }).join("");
+    const pctHtml = showPct ? `<div style="font-size:${pfs}px;color:${pc};margin-top:6px;display:block">${Math.round((active / total) * 100)}%</div>` : "";
+    return wrap(`${labelHtml}<div style="display:flex;gap:6px;align-items:stretch">${steps}</div>${pctHtml}`);
+  }
 
-  return `<div style="${spacing}${advBgStyle(p)}">${titleRow}${track}</div>`;
+  // ── type: multirow ───────────────────────────────────────────────────────────
+  if (pbType === "multirow") {
+    const rows: Array<{ label: string; value: number }> = (p.multiRows as Array<{ label: string; value: number }>) ?? [{ label: "Row 1", value: 60 }];
+    const rowsHtml = rows.map((row, i) => buildLine(row.label, Math.min(100, Math.max(0, row.value)), i < rows.length - 1 ? 10 : 0)).join("");
+    return wrap(rowsHtml);
+  }
+
+  // ── type: circlecard ─────────────────────────────────────────────────────────
+  if (pbType === "circlecard") {
+    const sz      = Number(p.circleSize ?? 120);
+    const thick   = Number(p.ringThickness ?? 10);
+    const cardBg  = esc((p.cardBg as string) || "#ffffff");
+    const showBelow = p.showLabelBelow !== false;
+    const pctHtml   = showPct ? `<span style="font-size:${pfs}px;color:${pc};font-weight:700;display:block">${pct}%</span>` : "";
+    const inner     = `<div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center">${pctHtml}</div>`;
+    const belowLbl  = showBelow && label ? `<span style="font-size:${lfs}px;color:${lc};font-weight:600;display:block">${label}</span>` : "";
+    return wrap(`<div style="display:inline-flex;flex-direction:column;align-items:center;gap:10px;padding:16px;background:${cardBg};border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08)"><div style="position:relative;width:${sz}px;height:${sz}px;display:block;line-height:0;font-size:0">${buildCircleSvg(sz, thick, pct, cardBg)}${inner}</div>${belowLbl}</div>`);
+  }
+
+  // fallback → line
+  return wrap(buildLine(label, pct));
 }
 
 function renderAlert(p: Props): string {
@@ -1370,9 +1529,10 @@ function renderAlert(p: Props): string {
     custom:  { bg: "#f9fafb", text: "#111827", border: "#e5e7eb", icon: "🔔" },
   };
   const t = typeMap[alertType] ?? typeMap.info;
-  const resolvedBg = esc((p.bgColor as string) || t.bg);
-  const resolvedText = esc((p.textColor as string) || t.text);
-  const resolvedBorder = esc((p.borderColor as string) || t.border);
+  const isCustomType = alertType === "custom";
+  const resolvedBg = esc(isCustomType && (p.bgColor as string) ? (p.bgColor as string) : t.bg);
+  const resolvedText = esc(isCustomType && (p.textColor as string) ? (p.textColor as string) : t.text);
+  const resolvedBorder = esc(isCustomType && (p.borderColor as string) ? (p.borderColor as string) : t.border);
   const rawIcon = (p.customIcon as string) || "";
   const isImgIcon = rawIcon && (rawIcon.startsWith("http") || rawIcon.startsWith("/") || rawIcon.startsWith("data:"));
   const resolvedIcon = isImgIcon ? "" : esc(rawIcon || t.icon);
@@ -1386,7 +1546,7 @@ function renderAlert(p: Props): string {
   const titleFontWeight = p.titleFontWeight || "700";
   const msgFontSize = `${Number(p.msgFontSize) || 14}px`;
   const lineHeight = Number(p.lineHeight) ? Number(p.lineHeight) / 10 : 1.5;
-  const iconColor = esc((p.iconColor as string) || resolvedText);
+  const iconColor = esc(isCustomType && (p.iconColor as string) ? (p.iconColor as string) : resolvedText);
 
   let borderCss = "";
   if (borderStyle === "left-only") borderCss = `border-left:${borderWidth}px solid ${resolvedBorder};`;
@@ -1398,7 +1558,7 @@ function renderAlert(p: Props): string {
   let iconHtml = "";
   if (showIcon) {
     iconHtml = isImgIcon
-      ? `<img src="${esc(rawIcon)}" alt="icon" style="width:1.5rem;height:1.5rem;object-fit:contain;flex-shrink:0" />`
+      ? `<img src="${rawIcon.replace(/"/g, "&quot;")}" alt="icon" style="width:1.5rem;height:1.5rem;object-fit:contain;flex-shrink:0" />`
       : `<span style="font-size:1.25rem;color:${iconColor};flex-shrink:0;line-height:1.3">${resolvedIcon}</span>`;
   }
   const titleHtml = alertTitle ? `<div style="font-size:${titleFontSize};font-weight:${titleFontWeight};margin-bottom:4px">${alertTitle}</div>` : "";
@@ -1544,6 +1704,8 @@ function renderBlock(block: Block, zones: Zones): string {
 // container. Uses !important so it overrides the inline styles written by each render function.
 const RESPONSIVE_CSS = `<style data-pb="responsive">
 img{max-width:100%;height:auto}
+.pb-bar-track{display:block!important;overflow:hidden!important;box-sizing:border-box!important}
+.pb-bar-fill{display:block!important;box-sizing:border-box!important}
 @media(max-width:767px){
 .pb-grid-2col{grid-template-columns:1fr!important;gap:32px!important}
 .pb-grid-ncol{grid-template-columns:1fr!important}

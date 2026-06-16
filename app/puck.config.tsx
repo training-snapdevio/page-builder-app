@@ -5138,9 +5138,6 @@ function LinkUrlField({ value, onChange, label = "Link URL" }: { value: string; 
           }}
         />
         {error && <div style={{ color: "#d72c0d", fontSize: 11, marginTop: 3 }}>{error}</div>}
-        {!error && draft && (
-          <div style={{ fontSize: 11, color: "var(--p-color-text-secondary)", marginTop: 3, wordBreak: "break-all" }}>{draft}</div>
-        )}
       </>
     </StackedField>
   );
@@ -6093,8 +6090,8 @@ const ButtonComponent = {
 
     const padding = sizeMap[sizePreset ?? "medium"] ?? sizeMap.medium;
 
-    // Numeric borderRadius → px string; string passthrough for legacy values
-    const borderRadiusValue = typeof borderRadius === "number" ? `${borderRadius}px` : (borderRadius || "6px");
+    // Numeric borderRadius → px string; string passthrough for legacy values; 0 means sharp corners
+    const borderRadiusValue = typeof borderRadius === "number" ? `${borderRadius}px` : (borderRadius != null && borderRadius !== "" ? borderRadius : "6px");
 
     const btnClass = `puck-btn-${cssId || "b"}`;
 
@@ -6260,10 +6257,13 @@ const DividerComponent = {
                           options={[
                             { value: "icon", label: "Icon / Emoji" },
                             { value: "text", label: "Text" },
+                            { value: "image", label: "Image" },
                           ]}
                         />
                         {props.elementType === "text"
                           ? <StackedTextField label="Text" value={props.elementText ?? ""} onChange={(v) => set("elementText", v)} placeholder="OR" />
+                          : props.elementType === "image"
+                          ? <ImageField label="Image" value={props.elementImage ?? ""} onChange={(v) => set("elementImage", v)} />
                           : <StackedTextField label="Icon (emoji or char)" value={props.elementIcon ?? "✦"} onChange={(v) => set("elementIcon", v)} placeholder="e.g. ✦ ★ •" />
                         }
                         <InlineSelect
@@ -6319,10 +6319,21 @@ const DividerComponent = {
                     {hasElement && (
                       <>
                         <TabSection title="Icon / Text Style" />
-                        <SliderNumberField label="Icon Size (px)" value={props.iconSize ?? 20} onChange={(v) => set("iconSize", v)} min={10} max={80} step={1} unit="px" />
-                        <ColorPickerField label="Icon Color" value={props.iconColor ?? ""} onChange={(v) => set("iconColor", v)} />
-                        <ColorPickerField label="Text Color" value={props.elementTextColor ?? ""} onChange={(v) => set("elementTextColor", v)} />
-                        <SliderNumberField label="Text Font Size (px)" value={props.elementFontSize ?? 14} onChange={(v) => set("elementFontSize", v)} min={10} max={48} step={1} unit="px" />
+                        {(props.elementType ?? "icon") !== "image" && (
+                          <>
+                            <SliderNumberField label="Icon Size (px)" value={props.iconSize ?? 20} onChange={(v) => set("iconSize", v)} min={10} max={80} step={1} unit="px" />
+                            <ColorPickerField label="Icon Color" value={props.iconColor ?? ""} onChange={(v) => set("iconColor", v)} />
+                            <ColorPickerField label="Text Color" value={props.elementTextColor ?? ""} onChange={(v) => set("elementTextColor", v)} />
+                            <SliderNumberField label="Text Font Size (px)" value={props.elementFontSize ?? 14} onChange={(v) => set("elementFontSize", v)} min={10} max={48} step={1} unit="px" />
+                          </>
+                        )}
+                        {(props.elementType ?? "icon") === "image" && (
+                          <>
+                            <SliderNumberField label="Image Width (px)" value={props.elementImageWidth ?? 40} onChange={(v) => set("elementImageWidth", v)} min={8} max={300} step={1} unit="px" />
+                            <SliderNumberField label="Image Height (px)" value={props.elementImageHeight ?? 40} onChange={(v) => set("elementImageHeight", v)} min={8} max={300} step={1} unit="px" />
+                            <SliderNumberField label="Image Border Radius (px)" value={props.elementImageRadius ?? 0} onChange={(v) => set("elementImageRadius", v)} min={0} max={150} step={1} unit="px" />
+                          </>
+                        )}
                         <SliderNumberField label="Spacing from Line (px)" value={props.elementSpacing ?? 12} onChange={(v) => set("elementSpacing", v)} min={0} max={60} step={1} unit="px" />
                       </>
                     )}
@@ -6359,6 +6370,10 @@ const DividerComponent = {
     elementType: "icon",
     elementText: "OR",
     elementIcon: "✦",
+    elementImage: "",
+    elementImageWidth: 40,
+    elementImageHeight: 40,
+    elementImageRadius: 0,
     elementPosition: "center",
     thickness: 1,
     lineColor: "",
@@ -6388,6 +6403,10 @@ const DividerComponent = {
     elementType,
     elementText,
     elementIcon,
+    elementImage,
+    elementImageWidth,
+    elementImageHeight,
+    elementImageRadius,
     elementPosition,
     thickness,
     lineColor,
@@ -6446,12 +6465,14 @@ const DividerComponent = {
     };
 
     const iconVal = (elementIcon as string) || "";
-    const hasIconContent = elementType !== "text" ? !!iconVal.trim() : true;
+    const hasIconContent = elementType === "text" ? true : elementType === "image" ? !!(elementImage as string) : !!iconVal.trim();
     const elementContent = showElement && hasIconContent
       ? (
         <div style={{ display: "flex", alignItems: "center", flexShrink: 0, padding: `0 ${elementSpacing ?? 12}px` }}>
           {elementType === "text"
             ? <span style={{ fontSize: elementFontSize || 14, color: elementTextColor || color, whiteSpace: "nowrap" }}>{elementText || "OR"}</span>
+            : elementType === "image"
+            ? <img src={elementImage as string} alt="" style={{ width: elementImageWidth || 40, height: elementImageHeight || 40, objectFit: "contain", display: "block", borderRadius: `${elementImageRadius ?? 0}px` }} />
             : <span style={{ fontSize: iconSize || 20, color: iconColor || color, lineHeight: 1 }}>{iconVal}</span>
           }
         </div>
@@ -6671,40 +6692,17 @@ const VideoComponent = {
                         { value: "16:9", label: "16:9 (Widescreen)" },
                         { value: "4:3", label: "4:3 (Standard)" },
                         { value: "1:1", label: "1:1 (Square)" },
-                        { value: "custom", label: "Custom Height" },
                       ]}
                     />
-                    <NumberUnitField
+                    <SliderUnitField
                       label="Width"
                       value={props.videoWidthVal ?? 100}
-                      unit={props.videoWidthUnit ?? "%"}
+                      unit="%"
                       onValueChange={(v) => set("videoWidthVal", v)}
-                      onUnitChange={(u) => set("videoWidthUnit", u)}
-                      units={["%", "px", "vw"]}
-                      min={0} max={9999} step={1}
+                      onUnitChange={() => {}}
+                      units={["%"]}
+                      step={1}
                     />
-                    {props.aspectRatio === "custom" && (
-                      <NumberUnitField label="Custom Height" value={props.customHeightVal ?? 450} unit={props.customHeightUnit ?? "px"} onValueChange={(v) => set("customHeightVal", v)} onUnitChange={(u) => set("customHeightUnit", u)} units={["px", "vh", "%"]} min={50} max={2000} step={1} />
-                    )}
-
-                    <TabSection title="Play Button" />
-                    <InlineSelect
-                      label="Play Button Style"
-                      value={props.playBtnStyle ?? "default"}
-                      onChange={(v) => set("playBtnStyle", v)}
-                      options={[
-                        { value: "default", label: "Default" },
-                        { value: "custom", label: "Custom" },
-                      ]}
-                    />
-                    {props.playBtnStyle === "custom" && (
-                      <>
-                        <SliderNumberField label="Play Icon Size (px)" value={props.playIconSize ?? 64} onChange={(v) => set("playIconSize", v)} min={20} max={200} step={4} unit="px" />
-                        <ColorPickerField label="Play Icon Color" value={props.playIconColor ?? "#fff"} onChange={(v) => set("playIconColor", v)} />
-                        <ColorPickerField label="Play Button Background" value={props.playBtnBg ?? "rgba(0,0,0,0.5)"} onChange={(v) => set("playBtnBg", v)} />
-                        <SliderNumberField label="Play Button Border Radius (px)" value={props.playBtnRadius ?? 50} onChange={(v) => set("playBtnRadius", v)} min={0} max={200} step={1} unit="px" />
-                      </>
-                    )}
 
                     <TabSection title="Border" />
                     <SliderNumberField label="Border Radius (px)" value={props.borderRadius ?? 0} onChange={(v) => set("borderRadius", v)} min={0} max={100} step={1} unit="px" />
@@ -6743,7 +6741,6 @@ const VideoComponent = {
     aspectRatio: "16:9",
     videoWidthVal: 100,
     videoWidthUnit: "%",
-    customHeightVal: 450, customHeightUnit: "px",
     playBtnStyle: "default",
     playIconSize: 64,
     playIconColor: "#fff",
@@ -6770,8 +6767,6 @@ const VideoComponent = {
     aspectRatio,
     videoWidthVal,
     videoWidthUnit,
-    customHeightVal,
-    customHeightUnit,
     playBtnStyle,
     playIconSize,
     playIconColor,
@@ -6789,7 +6784,7 @@ const VideoComponent = {
   }) => {
     const [playing, setPlaying] = useState(false);
 
-    const ratioMap: Record<string, string> = { "16:9": "56.25%", "4:3": "75%", "1:1": "100%", "custom": "0" };
+    const ratioMap: Record<string, string> = { "16:9": "56.25%", "4:3": "75%", "1:1": "100%" };
     const paddingBottom = ratioMap[aspectRatio ?? "16:9"] ?? "56.25%";
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
 
@@ -6823,13 +6818,12 @@ const VideoComponent = {
     const btnBg = playBtnBg || "rgba(0,0,0,0.5)";
     const btnRadius = playBtnStyle === "custom" ? `${playBtnRadius ?? 50}px` : "50%";
     const btnColor = playIconColor || "#fff";
-    const resolvedCustomHeight = `${customHeightVal ?? 450}${customHeightUnit ?? "px"}`;
 
     const containerStyle: React.CSSProperties = {
       position: "relative",
-      width: `${videoWidthVal ?? 100}${videoWidthUnit ?? "%"}`,
-      paddingBottom: aspectRatio === "custom" ? 0 : paddingBottom,
-      height: aspectRatio === "custom" ? resolvedCustomHeight : 0,
+      width: `${videoWidthVal ?? 100}%`,
+      paddingBottom,
+      height: 0,
       overflow: "hidden",
       borderRadius: `${borderRadius ?? 0}px`,
       backgroundColor: "#000",
@@ -6981,16 +6975,55 @@ const SocialIconsComponent = {
                 {tab === "content" && (
                   <>
                     <TabSection title="Platforms" />
-                    {SOCIAL_PLATFORMS.map(p => (
-                      <div key={p.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <ToggleField label={p.label} value={enabled.includes(p.key)} onChange={(v) => set("enabled", v ? [...enabled, p.key] : enabled.filter(k => k !== p.key))} />
-                        </div>
-                        {enabled.includes(p.key) && (
-                          <LinkUrlField label={`${p.label} URL`} value={urls[p.key] ?? ""} onChange={(v) => set("urls", { ...urls, [p.key]: v })} />
-                        )}
-                      </div>
-                    ))}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                      {SOCIAL_PLATFORMS.map((pl, i) => {
+                        const isOn = enabled.includes(pl.key);
+                        return (
+                          <div key={pl.key}>
+                            {/* Platform row: name left, toggle right */}
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0" }}>
+                              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--p-color-text)" }}>{pl.label}</span>
+                              <label style={{ display: "inline-flex", alignItems: "center", cursor: "pointer", flexShrink: 0 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isOn}
+                                  onChange={(e) => set("enabled", e.target.checked ? [...enabled, pl.key] : enabled.filter(k => k !== pl.key))}
+                                  style={{ display: "none" }}
+                                />
+                                <span style={{
+                                  display: "inline-block", width: 32, height: 18, borderRadius: 9,
+                                  background: isOn ? "#1a1a1a" : "#d1d5db",
+                                  position: "relative", transition: "background 0.15s",
+                                }}>
+                                  <span style={{
+                                    position: "absolute", top: 2, left: isOn ? 16 : 2,
+                                    width: 14, height: 14, borderRadius: "50%", background: "#fff",
+                                    transition: "left 0.15s",
+                                  }} />
+                                </span>
+                              </label>
+                            </div>
+                            {/* URL input only when enabled */}
+                            {isOn && (
+                              <div style={{ paddingBottom: 6 }}>
+                                <input
+                                  type="url"
+                                  value={urls[pl.key] ?? ""}
+                                  placeholder={`${pl.label} URL…`}
+                                  onChange={(e) => set("urls", { ...urls, [pl.key]: e.target.value })}
+                                  style={{
+                                    width: "100%", padding: "4px 8px", fontSize: 12, boxSizing: "border-box",
+                                    border: "1px solid var(--p-color-border)", borderRadius: 4,
+                                    background: "var(--p-color-bg-surface)", color: "var(--p-color-text)",
+                                    outline: "none",
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                     <ToggleField label="Open in New Tab" value={props.newTab !== false} onChange={(v) => set("newTab", v)} />
                   </>
                 )}
@@ -7013,7 +7046,7 @@ const SocialIconsComponent = {
                       <>
                         <SliderNumberField label="Border Width (px)" value={props.borderWidth ?? 1} onChange={(v) => set("borderWidth", v)} min={1} max={10} step={1} unit="px" />
                         <ColorPickerField label="Border Color" value={props.borderColor ?? ""} onChange={(v) => set("borderColor", v)} />
-                        <StackedTextField label="Border Radius" value={props.borderRadius ?? "0px"} onChange={(v) => set("borderRadius", v)} placeholder="e.g. 50% or 8px" />
+                        <SliderNumberField label="Border Radius (px)" value={props.borderRadius ?? 0} onChange={(v) => set("borderRadius", v)} min={0} max={50} step={1} unit="px" />
                       </>
                     )}
                     <TabSection title="Alignment" />
@@ -7046,7 +7079,7 @@ const SocialIconsComponent = {
     urls: {}, newTab: true,
     iconStyle: "filled", iconSize: 24, iconColor: "", iconHoverColor: "", iconSpacing: 12,
     iconBgColor: "", iconHoverBg: "", bgShape: "circle", bgSize: 40,
-    borderStyle: "none", borderWidth: 1, borderColor: "", borderRadius: "50%",
+    borderStyle: "none", borderWidth: 1, borderColor: "", borderRadius: 0,
     alignment: "left",
     advBgType: "none", advBgColor: "", advMargin: { top: 0, right: 0, bottom: 0, left: 0 }, advPadding: { top: 8, right: 0, bottom: 8, left: 0 },
     hideDesktop: false, hideTablet: false, hideMobile: false, cssId: "", cssClass: "", zIndex: null,
@@ -7083,11 +7116,8 @@ const SocialIconsComponent = {
               : isOutlined
               ? "transparent"
               : undefined;
-            const border = isOutlined
-              ? `2px solid ${iconColor || p.brandColor}`
-              : borderStyle === "solid"
-              ? `${borderWidth || 1}px solid ${borderColor || resolvedColor}`
-              : undefined;
+            const borderW = isOutlined ? 2 : (borderStyle === "solid" ? (borderWidth || 1) : 0);
+            const borderC = isOutlined ? (iconColor || p.brandColor) : (borderColor || resolvedColor);
             const hasContainer = bgShape !== "none" || isOutlined;
             const innerStyle: React.CSSProperties = {
               display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -7095,7 +7125,7 @@ const SocialIconsComponent = {
               height: hasContainer ? bgsz : sz,
               backgroundColor: bgColor,
               borderRadius: isOutlined ? (shapeRadius ?? "8px") : shapeRadius,
-              border,
+              ...(borderW > 0 ? { borderWidth: borderW, borderStyle: "solid", borderColor: borderC, boxSizing: "border-box" } : {}),
               color: resolvedColor,
               flexShrink: 0,
             };
@@ -7159,15 +7189,55 @@ const ShareButtonsComponent = {
                 {tab === "content" && (
                   <>
                     <TabSection title="Platforms" />
-                    {SHARE_PLATFORMS.map(p => (
-                      <div key={p.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        <ToggleField label={p.label} value={enabled.includes(p.key)} onChange={(v) => set("enabled", v ? [...enabled, p.key] : enabled.filter(k => k !== p.key))} />
-                        {enabled.includes(p.key) && (
-                          <StackedTextField label={`${p.label} Label`} value={labels[p.key] ?? p.label} onChange={(v) => set("labels", { ...labels, [p.key]: v })} placeholder={p.label} />
-                        )}
-                      </div>
-                    ))}
-                    <ToggleField label="Show Label" value={props.showLabel !== false} onChange={(v) => set("showLabel", v)} />
+                    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                      {SHARE_PLATFORMS.map((pl, i) => {
+                        const isOn = enabled.includes(pl.key);
+                        return (
+                          <div key={pl.key}>
+                            {/* Platform row: name left, toggle right */}
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0" }}>
+                              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--p-color-text)" }}>{pl.label}</span>
+                              <label style={{ display: "inline-flex", alignItems: "center", cursor: "pointer", flexShrink: 0 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isOn}
+                                  onChange={(e) => set("enabled", e.target.checked ? [...enabled, pl.key] : enabled.filter(k => k !== pl.key))}
+                                  style={{ display: "none" }}
+                                />
+                                <span style={{
+                                  display: "inline-block", width: 32, height: 18, borderRadius: 9,
+                                  background: isOn ? "#1a1a1a" : "#d1d5db",
+                                  position: "relative", transition: "background 0.15s",
+                                }}>
+                                  <span style={{
+                                    position: "absolute", top: 2, left: isOn ? 16 : 2,
+                                    width: 14, height: 14, borderRadius: "50%", background: "#fff",
+                                    transition: "left 0.15s",
+                                  }} />
+                                </span>
+                              </label>
+                            </div>
+                            {/* Custom label input only when enabled */}
+                            {isOn && (
+                              <div style={{ paddingBottom: 6 }}>
+                                <input
+                                  type="text"
+                                  value={labels[pl.key] ?? pl.label}
+                                  placeholder={pl.label}
+                                  onChange={(e) => set("labels", { ...labels, [pl.key]: e.target.value })}
+                                  style={{
+                                    width: "100%", padding: "4px 8px", fontSize: 12, boxSizing: "border-box",
+                                    border: "1px solid var(--p-color-border)", borderRadius: 4,
+                                    background: "var(--p-color-bg-surface)", color: "var(--p-color-text)",
+                                    outline: "none",
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </>
                 )}
                 {tab === "style" && (
@@ -7175,8 +7245,8 @@ const ShareButtonsComponent = {
                     <TabSection title="Button Style" />
                     <InlineSelect label="Style" value={props.btnStyle ?? "icon-text"} onChange={(v) => set("btnStyle", v)} options={[{ value: "icon-only", label: "Icon Only" }, { value: "icon-text", label: "Icon + Text" }, { value: "text-only", label: "Text Only" }]} />
                     <InlineSelect label="Size" value={props.btnSize ?? "medium"} onChange={(v) => set("btnSize", v)} options={[{ value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }]} />
-                    <StackedTextField label="Border Radius" value={props.borderRadius ?? "6px"} onChange={(v) => set("borderRadius", v)} placeholder="e.g. 6px or 50%" />
-                    <StackedTextField label="Spacing Between" value={props.spacing ?? "8px"} onChange={(v) => set("spacing", v)} placeholder="e.g. 8px" />
+                    <SliderNumberField label="Border Radius (px)" value={props.borderRadius ?? 6} onChange={(v) => set("borderRadius", v)} min={0} max={50} step={1} unit="px" />
+                    <SliderNumberField label="Spacing Between (px)" value={props.spacing ?? 8} onChange={(v) => set("spacing", v)} min={0} max={60} step={1} unit="px" />
                     <TabSection title="Colors" />
                     <ColorPickerField label="Icon Color" value={props.iconColor ?? ""} onChange={(v) => set("iconColor", v)} />
                     <ColorPickerField label="Text Color" value={props.textColor ?? ""} onChange={(v) => set("textColor", v)} />
@@ -7184,7 +7254,7 @@ const ShareButtonsComponent = {
                     <ColorPickerField label="Hover Background" value={props.hoverBg ?? ""} onChange={(v) => set("hoverBg", v)} />
                     <ToggleField label="Use Brand Colors" value={!!props.useBrandColors} onChange={(v) => set("useBrandColors", v)} />
                     <TabSection title="Typography" />
-                    <StackedTextField label="Font Size" value={props.fontSize ?? "0.875rem"} onChange={(v) => set("fontSize", v)} placeholder="e.g. 0.875rem" />
+                    <SliderNumberField label="Font Size (px)" value={props.fontSize ?? 14} onChange={(v) => set("fontSize", v)} min={8} max={36} step={1} unit="px" />
                     <InlineSelect label="Font Weight" value={props.fontWeight ?? "600"} onChange={(v) => set("fontWeight", v)} options={[{ value: "400", label: "Normal" }, { value: "600", label: "Semi Bold" }, { value: "700", label: "Bold" }]} />
                     <TabSection title="Alignment" />
                     <AlignField label="Alignment" value={props.alignment ?? "left"} onChange={(v) => set("alignment", v)} options={[{ value: "left", icon: <AlignLeft size={15} />, title: "Left" }, { value: "center", icon: <AlignCenter size={15} />, title: "Center" }, { value: "right", icon: <AlignRight size={15} />, title: "Right" }]} />
@@ -7214,9 +7284,9 @@ const ShareButtonsComponent = {
   defaultProps: {
     enabled: ["facebook", "twitter", "whatsapp", "email", "copy"],
     labels: {}, showLabel: true,
-    btnStyle: "icon-text", btnSize: "medium", borderRadius: "6px", spacing: "8px",
+    btnStyle: "icon-text", btnSize: "medium", borderRadius: 6, spacing: 8,
     iconColor: "", textColor: "", bgColor: "", hoverBg: "", useBrandColors: false,
-    fontSize: "0.875rem", fontWeight: "600",
+    fontSize: 14, fontWeight: "600",
     alignment: "left",
     advBgType: "none", advBgColor: "", advMargin: { top: 0, right: 0, bottom: 0, left: 0 }, advPadding: { top: 8, right: 0, bottom: 8, left: 0 },
     hideDesktop: false, hideTablet: false, hideMobile: false, cssId: "", cssClass: "", zIndex: null,
@@ -7225,7 +7295,8 @@ const ShareButtonsComponent = {
     const [copied, setCopied] = useState(false);
     const id = cssId || `share-${Math.random().toString(36).slice(2, 7)}`;
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
-    const sizeMap = { small: { px: "8px 12px", fs: "0.75rem" }, medium: { px: "10px 16px", fs: fontSize || "0.875rem" }, large: { px: "12px 20px", fs: "1rem" } };
+    const resolvedFontSize = `${Number(fontSize) || 14}px`;
+    const sizeMap = { small: { px: "8px 12px", fs: "12px" }, medium: { px: "10px 16px", fs: resolvedFontSize }, large: { px: "12px 20px", fs: "16px" } };
     const s = sizeMap[btnSize ?? "medium"] ?? sizeMap.medium;
     const hoverCss = hoverBg ? `#${id} .puck-share-btn:hover { background: ${hoverBg} !important; transition: background 0.2s; } #${id} .puck-share-btn { transition: background 0.2s; }` : "";
     const platforms = SHARE_PLATFORMS.filter(p => (enabled ?? []).includes(p.key));
@@ -7247,7 +7318,7 @@ const ShareButtonsComponent = {
     return (
       <div id={id} className={[cssClass].filter(Boolean).join(" ") || undefined} style={{ paddingTop: advPadding?.top ?? 8, paddingRight: advPadding?.right ?? 0, paddingBottom: advPadding?.bottom ?? 8, paddingLeft: advPadding?.left ?? 0, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
         {hoverCss && <style>{hoverCss}</style>}
-        <div style={{ display: "flex", gap: spacing || "8px", flexWrap: "wrap", justifyContent: alignment === "center" ? "center" : alignment === "right" ? "flex-end" : "flex-start" }}>
+        <div style={{ display: "flex", gap: `${Number(spacing) || 8}px`, flexWrap: "wrap", justifyContent: alignment === "center" ? "center" : alignment === "right" ? "flex-end" : "flex-start" }}>
           {platforms.map(p => {
             const resolvedBg = useBrandColors ? p.brandColor : (bgColor || "#f3f4f6");
             const resolvedText = useBrandColors ? "#fff" : (textColor || "var(--text-color)");
@@ -7255,7 +7326,7 @@ const ShareButtonsComponent = {
             const isCopy = p.key === "copy";
             const btnLabel = (labels as any)?.[p.key] ?? p.label;
             return (
-              <button key={p.key} className="puck-share-btn" onClick={() => handleShare(p.key)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: s.px, fontSize: s.fs, fontWeight: fontWeight || "600", color: resolvedText, backgroundColor: resolvedBg, border: "none", borderRadius: borderRadius || "6px", cursor: "pointer" }}>
+              <button key={p.key} className="puck-share-btn" onClick={() => handleShare(p.key)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: s.px, fontSize: s.fs, fontWeight: fontWeight || "600", color: resolvedText, backgroundColor: resolvedBg, border: "none", borderRadius: `${borderRadius != null ? Number(borderRadius) : 6}px`, cursor: "pointer" }}>
                 {btnStyle !== "text-only" && <span style={{ color: resolvedIcon, fontWeight: 700 }}>{isCopy && copied ? "✓" : p.icon}</span>}
                 {btnStyle !== "icon-only" && showLabel && <span>{isCopy && copied ? "Copied!" : btnLabel}</span>}
               </button>
@@ -7296,21 +7367,64 @@ const StarRatingComponent = {
               <>
                 {tab === "content" && (
                   <>
-                    <SliderNumberField label="Rating Value (0–5)" value={props.ratingValue ?? 4} onChange={(v) => set("ratingValue", v)} min={0} max={5} step={0.5} unit="" />
+                    {(() => {
+                      const rv = props.ratingValue ?? 4;
+                      const filledClr = props.filledColor ?? "#f59e0b";
+                      const emptyClr = props.emptyColor ?? "#d1d5db";
+                      return (
+                        <StackedField label={`Rating Value — ${rv}`}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 2, padding: "4px 0" }}>
+                            {[1,2,3,4,5].map((n) => {
+                              const isHalf = rv === n - 0.5;
+                              const isFull = rv >= n;
+                              return (
+                                <span
+                                  key={n}
+                                  title={`Set ${n}`}
+                                  onClick={() => {
+                                    // clicking same full star → go to half; clicking full star at half → go to prev
+                                    if (isFull && rv === n) set("ratingValue", n - 0.5);
+                                    else set("ratingValue", n);
+                                  }}
+                                  style={{ fontSize: 24, lineHeight: 1, cursor: "pointer", userSelect: "none",
+                                    color: isFull ? filledClr : isHalf ? filledClr : emptyClr,
+                                    opacity: isHalf ? 0.6 : 1 }}
+                                >
+                                  {isHalf ? "½" : "★"}
+                                </span>
+                              );
+                            })}
+                            <span
+                              title="Clear"
+                              onClick={() => set("ratingValue", 0)}
+                              style={{ fontSize: 12, marginLeft: 6, cursor: "pointer", color: "var(--p-color-text-subdued, #6b7280)", userSelect: "none" }}
+                            >✕</span>
+                          </div>
+                        </StackedField>
+                      );
+                    })()}
                     <ToggleField label="Show Number" value={props.showNumber !== false} onChange={(v) => set("showNumber", v)} />
                     <InlineSelect label="Number Position" value={props.numberPosition ?? "after"} onChange={(v) => set("numberPosition", v)} options={[{ value: "before", label: "Before Stars" }, { value: "after", label: "After Stars" }]} />
-                    <StackedNumberField label="Review Count" value={props.reviewCount ?? 0} onChange={(v) => set("reviewCount", v)} min={0} step={1} />
+                    <StackedField label="Review Count">
+                      <input
+                        type="number"
+                        min={0}
+                        value={props.reviewCount ?? 0}
+                        onChange={(e) => set("reviewCount", Math.max(0, parseInt(e.target.value) || 0))}
+                        style={{ width: "100%", padding: "4px 8px", fontSize: 12, boxSizing: "border-box", border: "1px solid var(--p-color-border)", borderRadius: 4, background: "var(--p-color-bg-surface)", color: "var(--p-color-text)", outline: "none" }}
+                      />
+                    </StackedField>
                   </>
                 )}
                 {tab === "style" && (
                   <>
                     <TabSection title="Stars" />
-                    <StackedTextField label="Star Size" value={props.starSize ?? "24px"} onChange={(v) => set("starSize", v)} placeholder="e.g. 24px or 1.5rem" />
+                    <SliderNumberField label="Star Size (px)" value={typeof props.starSize === "number" ? props.starSize : parseInt(props.starSize ?? "24") || 24} onChange={(v) => set("starSize", `${v}px`)} min={8} max={96} step={1} unit="px" />
                     <ColorPickerField label="Filled Color" value={props.filledColor ?? "#f59e0b"} onChange={(v) => set("filledColor", v)} />
                     <ColorPickerField label="Empty Color" value={props.emptyColor ?? "#d1d5db"} onChange={(v) => set("emptyColor", v)} />
-                    <StackedTextField label="Gap Between Stars" value={props.starGap ?? "4px"} onChange={(v) => set("starGap", v)} placeholder="e.g. 4px" />
+                    <SliderNumberField label="Gap Between Stars (px)" value={typeof props.starGap === "number" ? props.starGap : parseInt(props.starGap ?? "4") || 4} onChange={(v) => set("starGap", `${v}px`)} min={0} max={32} step={1} unit="px" />
                     <TabSection title="Number" />
-                    <StackedTextField label="Font Size" value={props.numFontSize ?? "1rem"} onChange={(v) => set("numFontSize", v)} placeholder="e.g. 1rem" />
+                    <SliderNumberField label="Font Size (px)" value={typeof props.numFontSize === "number" ? props.numFontSize : parseInt(props.numFontSize ?? "16") || 16} onChange={(v) => set("numFontSize", `${v}px`)} min={8} max={72} step={1} unit="px" />
                     <InlineSelect label="Font Weight" value={props.numFontWeight ?? "700"} onChange={(v) => set("numFontWeight", v)} options={[{ value: "400", label: "Normal" }, { value: "700", label: "Bold" }]} />
                     <ColorPickerField label="Color" value={props.numColor ?? ""} onChange={(v) => set("numColor", v)} />
                     <TabSection title="Alignment" />
@@ -7341,7 +7455,7 @@ const StarRatingComponent = {
   defaultProps: {
     ratingValue: 4, showNumber: true, numberPosition: "after", reviewCount: 0,
     starSize: "24px", filledColor: "#f59e0b", emptyColor: "#d1d5db", starGap: "4px",
-    numFontSize: "1rem", numFontWeight: "700", numColor: "",
+    numFontSize: "16px", numFontWeight: "700", numColor: "",
     alignment: "left",
     advBgType: "none", advBgColor: "", advMargin: { top: 0, right: 0, bottom: 0, left: 0 }, advPadding: { top: 8, right: 0, bottom: 8, left: 0 },
     hideDesktop: false, hideTablet: false, hideMobile: false, cssId: "", cssClass: "", zIndex: null,
@@ -7370,7 +7484,7 @@ const StarRatingComponent = {
       );
     });
     const numEl = showNumber && (
-      <span style={{ fontSize: numFontSize || "1rem", fontWeight: numFontWeight || "700", color: numColor || "var(--text-color)", whiteSpace: "nowrap" }}>
+      <span style={{ fontSize: numFontSize || "16px", fontWeight: numFontWeight || "700", color: numColor || "var(--text-color)", whiteSpace: "nowrap" }}>
         {val.toFixed(1)}{reviewCount ? ` (${reviewCount} reviews)` : ""}
       </span>
     );
@@ -7697,7 +7811,6 @@ const AlertComponent = {
           }
           dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } });
         };
-        const bgType = props.advBgType ?? "none";
         return (
           <BlockTabBar blockKey="Alert">
             {(tab) => (
@@ -7737,11 +7850,7 @@ const AlertComponent = {
                 {tab === "advanced" && (
                   <>
                     <TabSection title="Spacing" />
-                    <FourSideField label="Margin (px)" value={props.advMargin} onChange={(v) => set("advMargin", v)} />
                     <FourSideField label="Padding (px)" value={props.advPadding ?? { top: 16, right: 16, bottom: 16, left: 16 }} onChange={(v) => set("advPadding", v)} />
-                    <TabSection title="Background" />
-                    <InlineSelect label="Type" value={bgType} onChange={(v) => set("advBgType", v)} options={[{ value: "none", label: "None" }, { value: "color", label: "Color" }]} />
-                    {bgType === "color" && <ColorPickerField label="Color" value={props.advBgColor ?? ""} onChange={(v) => set("advBgColor", v)} />}
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -7773,9 +7882,10 @@ const AlertComponent = {
       custom:  { bg: "#f9fafb", text: "#111827", border: "#e5e7eb", icon: "🔔" },
     };
     const t = typeMap[alertType ?? "info"] ?? typeMap.info;
-    const resolvedBg = bgColor || t.bg;
-    const resolvedText = textColor || t.text;
-    const resolvedBorder = borderColor || t.border;
+    const isCustomType = (alertType ?? "info") === "custom";
+    const resolvedBg = (isCustomType && bgColor) ? bgColor : t.bg;
+    const resolvedText = (isCustomType && textColor) ? textColor : t.text;
+    const resolvedBorder = (isCustomType && borderColor) ? borderColor : t.border;
     const isImgIcon = customIcon && (customIcon.startsWith("http") || customIcon.startsWith("/") || customIcon.startsWith("data:"));
     const resolvedIcon = isImgIcon ? null : (customIcon || t.icon);
     const titleFs = `${Number(titleFontSize) || 16}px`;
@@ -7793,7 +7903,7 @@ const AlertComponent = {
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
           {showIcon && (isImgIcon
             ? <img src={customIcon} alt="icon" style={{ width: "1.5rem", height: "1.5rem", objectFit: "contain", flexShrink: 0 }} />
-            : <span style={{ fontSize: "1.25rem", color: iconColor || resolvedText, flexShrink: 0, lineHeight: 1.3 }}>{resolvedIcon}</span>
+            : <span style={{ fontSize: "1.25rem", color: (isCustomType && iconColor) ? iconColor : resolvedText, flexShrink: 0, lineHeight: 1.3 }}>{resolvedIcon}</span>
           )}
           <div style={{ flex: 1 }}>
             {alertTitle && <div style={{ fontSize: titleFs, fontWeight: titleFontWeight || "700", marginBottom: 4 }}>{alertTitle}</div>}
@@ -7846,21 +7956,21 @@ const BlockQuoteComponent = {
                   <>
                     <TabSection title="Quote Text" />
                     <InlineSelect label="Font Family" value={props.quoteFontFamily ?? "inherit"} onChange={(v) => { set("quoteFontFamily", v); loadGoogleFont(v); }} options={[{ value: "inherit", label: "Theme Default" }, { value: "Arial, Helvetica, sans-serif", label: "Arial" }, { value: "Georgia, serif", label: "Georgia" }, { value: "'Courier New', monospace", label: "Courier New" }, { value: "Impact, sans-serif", label: "Impact" }, { value: "Inter, sans-serif", label: "Inter" }, { value: "Poppins, sans-serif", label: "Poppins" }, { value: "'Roboto Serif', serif", label: "Roboto Serif" }, { value: "'New York', 'New York Small', 'Times New Roman', serif", label: "New York" }, { value: "'Open Sans', sans-serif", label: "Open Sans" }]} />
-                    <StackedTextField label="Font Size" value={props.quoteFontSize ?? "1.25rem"} onChange={(v) => set("quoteFontSize", v)} placeholder="e.g. 1.25rem or 20px" />
+                    <SliderNumberField label="Font Size (px)" value={typeof props.quoteFontSize === "number" ? props.quoteFontSize : parseInt(props.quoteFontSize ?? "20") || 20} onChange={(v) => set("quoteFontSize", `${v}px`)} min={8} max={72} step={1} unit="px" />
                     <InlineSelect label="Font Style" value={props.quoteFontStyle ?? "italic"} onChange={(v) => set("quoteFontStyle", v)} options={[{ value: "normal", label: "Normal" }, { value: "italic", label: "Italic" }]} />
                     <ColorPickerField label="Text Color" value={props.quoteTextColor ?? ""} onChange={(v) => set("quoteTextColor", v)} />
-                    <StackedTextField label="Line Height" value={props.quoteLineHeight ?? "1.7"} onChange={(v) => set("quoteLineHeight", v)} placeholder="e.g. 1.7 or 2rem" />
+                    <SliderNumberField label="Line Height" value={typeof props.quoteLineHeight === "number" ? props.quoteLineHeight : parseFloat(props.quoteLineHeight ?? "1.7") || 1.7} onChange={(v) => set("quoteLineHeight", v)} min={1} max={3} step={0.1} unit="" />
                     <TabSection title="Author" />
                     <ColorPickerField label="Name Color" value={props.nameColor ?? ""} onChange={(v) => set("nameColor", v)} />
-                    <StackedTextField label="Name Font Size" value={props.nameFontSize ?? "1rem"} onChange={(v) => set("nameFontSize", v)} placeholder="e.g. 1rem" />
+                    <SliderNumberField label="Name Font Size (px)" value={typeof props.nameFontSize === "number" ? props.nameFontSize : parseInt(props.nameFontSize ?? "16") || 16} onChange={(v) => set("nameFontSize", `${v}px`)} min={8} max={48} step={1} unit="px" />
                     <InlineSelect label="Name Font Weight" value={props.nameFontWeight ?? "700"} onChange={(v) => set("nameFontWeight", v)} options={[{ value: "400", label: "Normal" }, { value: "700", label: "Bold" }]} />
                     <ColorPickerField label="Title Color" value={props.titleColor ?? ""} onChange={(v) => set("titleColor", v)} />
-                    <StackedTextField label="Title Font Size" value={props.titleFontSize ?? "0.875rem"} onChange={(v) => set("titleFontSize", v)} placeholder="e.g. 0.875rem" />
-                    <StackedTextField label="Image Size" value={props.imageSize ?? "48px"} onChange={(v) => set("imageSize", v)} placeholder="e.g. 48px" />
-                    <StackedTextField label="Image Border Radius" value={props.imageBorderRadius ?? "50%"} onChange={(v) => set("imageBorderRadius", v)} placeholder="e.g. 50% or 8px" />
+                    <SliderNumberField label="Title Font Size (px)" value={typeof props.titleFontSize === "number" ? props.titleFontSize : parseInt(props.titleFontSize ?? "14") || 14} onChange={(v) => set("titleFontSize", `${v}px`)} min={8} max={36} step={1} unit="px" />
+                    <SliderNumberField label="Image Size (px)" value={typeof props.imageSize === "number" ? props.imageSize : parseInt(props.imageSize ?? "48") || 48} onChange={(v) => set("imageSize", `${v}px`)} min={24} max={160} step={1} unit="px" />
+                    <SliderNumberField label="Image Border Radius (px)" value={typeof props.imageBorderRadius === "number" ? props.imageBorderRadius : parseInt(props.imageBorderRadius ?? "50") || 50} onChange={(v) => set("imageBorderRadius", `${v}px`)} min={0} max={100} step={1} unit="px" />
                     <TabSection title="Quote Icon" />
                     <ColorPickerField label="Icon Color" value={props.iconColor ?? ""} onChange={(v) => set("iconColor", v)} />
-                    <StackedTextField label="Icon Size" value={props.iconSize ?? "3rem"} onChange={(v) => set("iconSize", v)} placeholder="e.g. 3rem or 48px" />
+                    <SliderNumberField label="Icon Size (px)" value={typeof props.iconSize === "number" ? props.iconSize : parseInt(props.iconSize ?? "48") || 48} onChange={(v) => set("iconSize", `${v}px`)} min={16} max={96} step={1} unit="px" />
                     <InlineSelect label="Icon Position" value={props.iconPosition ?? "top-left"} onChange={(v) => set("iconPosition", v)} options={[{ value: "top-left", label: "Top Left" }, { value: "top-right", label: "Top Right" }]} />
                     <TabSection title="Border" />
                     <InlineSelect label="Border Style" value={props.borderType ?? "left"} onChange={(v) => set("borderType", v)} options={[{ value: "none", label: "None" }, { value: "left", label: "Left Border" }, { value: "top", label: "Top Border" }, { value: "box", label: "Box" }]} />
@@ -7899,9 +8009,9 @@ const BlockQuoteComponent = {
   },
   defaultProps: {
     quoteText: "The best way to predict the future is to create it.", authorName: "", authorTitle: "", authorImage: "", showQuoteIcon: true,
-    quoteFontFamily: "inherit", quoteFontSize: "1.25rem", quoteFontStyle: "italic", quoteTextColor: "", quoteLineHeight: "1.7",
-    nameColor: "", nameFontSize: "1rem", nameFontWeight: "700", titleColor: "", titleFontSize: "0.875rem", imageSize: "48px", imageBorderRadius: "50%",
-    iconColor: "", iconSize: "3rem", iconPosition: "top-left",
+    quoteFontFamily: "inherit", quoteFontSize: "20px", quoteFontStyle: "italic", quoteTextColor: "", quoteLineHeight: 1.7,
+    nameColor: "", nameFontSize: "16px", nameFontWeight: "700", titleColor: "", titleFontSize: "14px", imageSize: "48px", imageBorderRadius: "50px",
+    iconColor: "", iconSize: "48px", iconPosition: "top-left",
     borderType: "left", borderColor: "", borderWidth: 4,
     bgColor: "",
     alignment: "left",
