@@ -1197,19 +1197,34 @@ export default function PuckSplatEditor({
     const savedBlockItems = savedBlocks.filter((b) => b.blockType !== "section");
     const savedSectionItems = savedBlocks.filter((b) => b.blockType === "section");
 
+    const BLOCK_KEYS = [
+      "MarqueeBar", "HeadingBlock", "Text", "Article", "PhotoCollage",
+      "Image", "Space", "Button", "Divider", "Video", "BlockQuote",
+      "StarRating", "ProgressBar", "Alert", "SocialIcons", "ShareButtons",
+      "Section_Logos",
+    ];
+
+    const SECTION_KEYS = [
+      "GlobalHeader", "GlobalFooter",
+      "Section_Hero", "Section", "LayoutBlock", "GridBlock",
+      "Section_About", "Section_Gallery", "Section_Testimonial", "Section_Carousel",
+      "Section_Form", "Section_Countdown", "Section_MediaCarousel", "Section_Services",
+      "Section_Pricing", "Section_CTA", "Section_FAQ", "Section_Team",
+      "Section_Features", "Section_Newsletter", "Section_Video",
+    ];
+
     return {
       ...config,
       categories: {
-        components: {
+        blocks: {
           title: "Blocks",
-          components: allDynamicComponentNames.filter(
-            (k) => !k.startsWith("GlobalBlock_") && !k.startsWith("SavedBlock_") && k !== "GlobalBlock"
-              && k !== "GradientHero" && k !== "Accordian"
-              && k !== "AboutSection" && k !== "GallerySection" && k !== "ServiceSection"
-              && k !== "ContactSection" && k !== "TestimonialSection"
-              && k !== "Hero",
-          ),
+          components: BLOCK_KEYS.filter((k) => allDynamicComponentNames.includes(k)),
           defaultExpanded: true,
+        },
+        sections: {
+          title: "Sections",
+          components: SECTION_KEYS.filter((k) => allDynamicComponentNames.includes(k)),
+          defaultExpanded: false,
         },
         ...(globalComponentNames.length > 0
           ? { global: { title: "Global Blocks", components: globalComponentNames, defaultExpanded: true } }

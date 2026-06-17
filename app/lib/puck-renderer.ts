@@ -309,20 +309,73 @@ function HeadingBlock(p: Props): string {
   const letterSpacing = p.letterSpacing != null ? `${p.letterSpacing}px` : "normal";
   const subtitleColor = esc((p.subtitleColor as string) || "var(--text-color)");
   const subtitleSize = p.subtitleSize ? `${p.subtitleSize}px` : "var(--base-font-size, 1rem)";
-  const dividerMargin = align === "center" ? "margin-left:auto;margin-right:auto" : align === "right" ? "margin-left:auto" : "";
   const m = (p.advMargin as any) ?? { top: 0, right: 0, bottom: 0, left: 0 };
   const pd = (p.advPadding as any) ?? { top: 24, right: 24, bottom: 24, left: 24 };
   const hideClass = [p.hideDesktop ? "puck-hide-desktop" : "", p.hideTablet ? "puck-hide-tablet" : "", p.hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
+
+  // Background: only apply when advBgType is explicitly set (not "none")
+  const advBgType = (p.advBgType as string) || "none";
+  let bgCss = "";
+  if (advBgType === "color" && p.backgroundColor) {
+    bgCss = `background:${esc(p.backgroundColor as string)};`;
+  } else if (advBgType === "gradient" && p.advGradientColor1 && p.advGradientColor2) {
+    bgCss = `background:linear-gradient(${p.advGradientAngle ?? 135}deg,${esc(p.advGradientColor1 as string)},${esc(p.advGradientColor2 as string)});`;
+  }
+
+  // Border
+  const advBorderStyle = (p.advBorderStyle as string) || "none";
+  const bw = (p.advBorderWidth as any) ?? { top: 0, right: 0, bottom: 0, left: 0 };
+  const borderCss = advBorderStyle !== "none"
+    ? `border-style:${advBorderStyle};border-width:${bw.top}px ${bw.right}px ${bw.bottom}px ${bw.left}px;border-color:${esc((p.advBorderColor as string) || "currentColor")};`
+    : "";
+  // Border radius
+  const br = (p.advBorderRadius as any) ?? { top: 0, right: 0, bottom: 0, left: 0 };
+  const radiusCss = (br.top || br.right || br.bottom || br.left)
+    ? `border-radius:${br.top}px ${br.right}px ${br.bottom}px ${br.left}px;`
+    : "";
+  // Opacity
+  const opacityCss = (p.opacity != null && (p.opacity as number) !== 100)
+    ? `opacity:${(p.opacity as number) / 100};`
+    : "";
+  // z-index
+  const zCss = p.zIndex != null ? `z-index:${p.zIndex};position:relative;` : "";
+
   const headingStyle = `font-size:${fs};font-weight:${fontWeight};font-family:${fontFamily};font-style:${fontStyle};text-transform:${textTransform};text-decoration:${textDecoration};line-height:${lineHeight};letter-spacing:${letterSpacing};color:${color};margin:0;`;
-  const wrapStyle = `text-align:${align};background:${esc((p.backgroundColor as string) || "transparent")};margin:${m.top}px ${m.right}px ${m.bottom}px ${m.left}px;padding:${pd.top}px ${pd.right}px ${pd.bottom}px ${pd.left}px`;
+  const wrapStyle = `text-align:${align};${bgCss}${borderCss}${radiusCss}${opacityCss}${zCss}margin:${m.top}px ${m.right}px ${m.bottom}px ${m.left}px;padding:${pd.top}px ${pd.right}px ${pd.bottom}px ${pd.left}px`;
   const linkUrl = esc((p.linkUrl as string) || "");
   const headingHtml = linkUrl
     ? `<a href="${linkUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;color:inherit"><${tag} style="${headingStyle}">${esc(p.title)}</${tag}></a>`
     : `<${tag} style="${headingStyle}">${esc(p.title)}</${tag}>`;
+
+  // Divider rendering — uses border-top instead of height+background so Shopify
+  // theme resets (height:auto!important, background resets) cannot collapse them.
+  const dividerType = (p.dividerType as string) || "none";
+  const dividerColor = esc((p.dividerColor as string) || (p.textColor as string) || "var(--primary-color, #1a1a1a)");
+  const dividerLength = Number(p.dividerLength) || 60;
+  const dividerThickness = Number(p.dividerThickness) || 3;
+  const dividerIcon = esc((p.dividerIcon as string) || "⭐");
+  const dividerAlign = (p.dividerAlignment as string) || "center";
+  const dividerMarginCss = dividerAlign === "center" ? "margin-left:auto;margin-right:auto;" : dividerAlign === "right" ? "margin-left:auto;" : "";
+
+  // Generate a unique class so !important overrides are scoped
+  const dvId = `pb-dv-${Math.random().toString(36).slice(2, 8)}`;
+
+  let dividerHtml = "";
+  if (dividerType === "line") {
+    dividerHtml = `<style>.${dvId}{display:block!important;width:${dividerLength}px!important;border:none!important;border-top:${dividerThickness}px solid ${dividerColor}!important;height:0!important;padding:0!important;margin-top:16px!important;${dividerMarginCss}border-radius:2px!important;box-sizing:content-box!important;background:none!important;}</style><div class="${dvId}"></div>`;
+  } else if (dividerType === "double-line") {
+    dividerHtml = `<style>.${dvId}{display:block!important;width:${dividerLength}px!important;margin-top:16px!important;${dividerMarginCss}padding:0!important;background:none!important;}.${dvId} span{display:block!important;width:100%!important;height:0!important;border:none!important;border-top:${dividerThickness}px solid ${dividerColor}!important;padding:0!important;margin:0!important;box-sizing:content-box!important;background:none!important;}</style><div class="${dvId}"><span></span><span style="margin-top:6px!important;display:block!important"></span></div>`;
+  } else if (dividerType === "line-with-icon") {
+    const lineMaxW = Math.round(dividerLength / 4);
+    const justifyMap: Record<string, string> = { center: "center", right: "flex-end", left: "flex-start" };
+    const justify = justifyMap[dividerAlign] || "flex-start";
+    dividerHtml = `<style>.${dvId}{display:flex!important;align-items:center!important;gap:12px!important;justify-content:${justify}!important;margin-top:16px!important;padding:0!important;background:none!important;}.${dvId} span.pb-dv-line{display:block!important;flex:1!important;height:0!important;max-width:${lineMaxW}px!important;border:none!important;border-top:${dividerThickness}px solid ${dividerColor}!important;padding:0!important;margin:0!important;box-sizing:content-box!important;background:none!important;}</style><div class="${dvId}"><span class="pb-dv-line"></span><span style="font-size:1.5rem;white-space:nowrap;flex-shrink:0">${dividerIcon}</span><span class="pb-dv-line"></span></div>`;
+  }
+
   return `<div class="${hideClass}" style="${wrapStyle}">
   ${headingHtml}
-  ${p.subtitle ? `<p style="font-size:${subtitleSize};color:${subtitleColor};margin-top:8px">${esc(p.subtitle as string)}</p>` : ""}
-  ${p.showDivider ? `<div style="width:60px;height:3px;background:${color};border-radius:2px;margin-top:12px;${dividerMargin}"></div>` : ""}
+  ${p.subtitle ? `<p style="font-size:${subtitleSize};color:${subtitleColor};margin-top:8px;margin-bottom:0">${esc(p.subtitle as string)}</p>` : ""}
+  ${dividerHtml}
 </div>`;
 }
 
@@ -1558,7 +1611,7 @@ function renderAlert(p: Props): string {
   let iconHtml = "";
   if (showIcon) {
     iconHtml = isImgIcon
-      ? `<img src="${rawIcon.replace(/"/g, "&quot;")}" alt="icon" style="width:1.5rem;height:1.5rem;object-fit:contain;flex-shrink:0" />`
+      ? `<img src="${rawIcon.replace(/"/g, "&quot;")}" alt="icon" style="width:1.5rem;height:1.5rem;object-fit:contain;flex-shrink:0;border-radius:0" />`
       : `<span style="font-size:1.25rem;color:${iconColor};flex-shrink:0;line-height:1.3">${resolvedIcon}</span>`;
   }
   const titleHtml = alertTitle ? `<div style="font-size:${titleFontSize};font-weight:${titleFontWeight};margin-bottom:4px">${alertTitle}</div>` : "";

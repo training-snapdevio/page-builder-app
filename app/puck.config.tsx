@@ -3518,11 +3518,12 @@ const commonComponents: any = {
                   {/* ── CONTENT TAB ── */}
                   {tab === "content" && (
                     <>
-                      <StackedTextField
-                        label="Text"
+                      <StackedTextareaField
+                        label="Title"
                         value={props.title ?? ""}
                         onChange={(v) => set("title", v)}
                         placeholder="Enter heading..."
+                        rows={3}
                       />
                       <InlineSelect
                         label="HTML Tag"
@@ -3713,7 +3714,6 @@ const commonComponents: any = {
                           { value: "none", label: "None" },
                           { value: "color", label: "Color" },
                           { value: "gradient", label: "Gradient" },
-                          { value: "image", label: "Image" },
                         ]}
                       />
                       {bgType === "color" && (
@@ -3737,14 +3737,6 @@ const commonComponents: any = {
                           />
                           <SliderNumberField label="Angle (deg)" value={props.advGradientAngle ?? 135} onChange={(v) => set("advGradientAngle", v)} min={0} max={360} step={15} unit="°" />
                         </>
-                      )}
-                      {bgType === "image" && (
-                        <StackedTextField
-                          label="Image URL"
-                          value={props.advBgImage ?? ""}
-                          onChange={(v) => set("advBgImage", v)}
-                          placeholder="https://..."
-                        />
                       )}
 
                       <TabSection title="Border" />
@@ -4026,23 +4018,24 @@ const commonComponents: any = {
             <div style={{ marginTop: 16 }}>
               {dividerType === "line" && (
                 <div style={{
-                  height: dividerThickness || 3,
-                  backgroundColor: dividerColor || textColor || "var(--primary-color)",
-                  borderRadius: 2,
                   width: dividerLength || 60,
-                  marginLeft: dividerAlignment === "right" ? "auto" : dividerAlignment === "center" ? "auto" : 0,
+                  height: 0,
+                  borderTop: `${dividerThickness || 3}px solid ${dividerColor || textColor || "var(--primary-color)"}`,
+                  borderRadius: 2,
+                  marginLeft: dividerAlignment === "center" ? "auto" : dividerAlignment === "right" ? "auto" : 0,
                   marginRight: dividerAlignment === "center" ? "auto" : dividerAlignment === "right" ? 0 : "auto",
+                  boxSizing: "content-box",
                 }} />
               )}
               {dividerType === "double-line" && (
                 <div style={{
                   display: "flex", flexDirection: "column", gap: 6,
                   width: dividerLength || 60,
-                  marginLeft: dividerAlignment === "right" ? "auto" : dividerAlignment === "center" ? "auto" : 0,
+                  marginLeft: dividerAlignment === "center" ? "auto" : dividerAlignment === "right" ? "auto" : 0,
                   marginRight: dividerAlignment === "center" ? "auto" : dividerAlignment === "right" ? 0 : "auto",
                 }}>
-                  <div style={{ height: dividerThickness || 2, backgroundColor: dividerColor || textColor || "var(--primary-color)" }} />
-                  <div style={{ height: dividerThickness || 2, backgroundColor: dividerColor || textColor || "var(--primary-color)" }} />
+                  <div style={{ height: 0, borderTop: `${dividerThickness || 2}px solid ${dividerColor || textColor || "var(--primary-color)"}`, boxSizing: "content-box" }} />
+                  <div style={{ height: 0, borderTop: `${dividerThickness || 2}px solid ${dividerColor || textColor || "var(--primary-color)"}`, boxSizing: "content-box" }} />
                 </div>
               )}
               {dividerType === "line-with-icon" && (
@@ -4050,9 +4043,9 @@ const commonComponents: any = {
                   display: "flex", alignItems: "center", gap: 12,
                   justifyContent: dividerAlignment === "right" ? "flex-end" : dividerAlignment === "center" ? "center" : "flex-start",
                 }}>
-                  <div style={{ flex: 1, height: dividerThickness || 3, backgroundColor: dividerColor || textColor || "var(--primary-color)", maxWidth: dividerLength ? dividerLength / 4 : 30 }} />
-                  <span style={{ fontSize: "1.5rem", whiteSpace: "nowrap" }}>{dividerIcon || "⭐"}</span>
-                  <div style={{ flex: 1, height: dividerThickness || 3, backgroundColor: dividerColor || textColor || "var(--primary-color)", maxWidth: dividerLength ? dividerLength / 4 : 30 }} />
+                  <div style={{ flex: 1, height: 0, borderTop: `${dividerThickness || 3}px solid ${dividerColor || textColor || "var(--primary-color)"}`, maxWidth: dividerLength ? dividerLength / 4 : 30, boxSizing: "content-box" }} />
+                  <span style={{ fontSize: "1.5rem", whiteSpace: "nowrap", flexShrink: 0 }}>{dividerIcon || "⭐"}</span>
+                  <div style={{ flex: 1, height: 0, borderTop: `${dividerThickness || 3}px solid ${dividerColor || textColor || "var(--primary-color)"}`, maxWidth: dividerLength ? dividerLength / 4 : 30, boxSizing: "content-box" }} />
                 </div>
               )}
             </div>
@@ -6656,7 +6649,6 @@ const VideoComponent = {
                       options={[
                         { value: "youtube", label: "YouTube" },
                         { value: "vimeo", label: "Vimeo" },
-                        { value: "self", label: "Self Hosted" },
                         { value: "upload", label: "Upload File" },
                       ]}
                     />
@@ -7902,7 +7894,7 @@ const AlertComponent = {
       <div id={cssId || undefined} className={[cssClass].filter(Boolean).join(" ") || undefined} style={{ paddingTop: advPadding?.top ?? 16, paddingRight: advPadding?.right ?? 16, paddingBottom: advPadding?.bottom ?? 16, paddingLeft: advPadding?.left ?? 16, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, backgroundColor: resolvedBg, color: resolvedText, borderRadius: borderRadius ?? 8, zIndex: zIndex ?? undefined, position: "relative", lineHeight: lh, ...borderCss, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
           {showIcon && (isImgIcon
-            ? <img src={customIcon} alt="icon" style={{ width: "1.5rem", height: "1.5rem", objectFit: "contain", flexShrink: 0 }} />
+            ? <img src={customIcon} alt="icon" style={{ width: "1.5rem", height: "1.5rem", objectFit: "contain", flexShrink: 0, borderRadius: 0 }} />
             : <span style={{ fontSize: "1.25rem", color: (isCustomType && iconColor) ? iconColor : resolvedText, flexShrink: 0, lineHeight: 1.3 }}>{resolvedIcon}</span>
           )}
           <div style={{ flex: 1 }}>
@@ -9833,30 +9825,6 @@ export const sectionTemplateConfig: Record<string, any> = {
           {p.videoUrl
             ? <div style={{ aspectRatio: "16/9", background: "#000", borderRadius: 8, overflow: "hidden" }}><iframe src={`https://www.youtube.com/embed/${p.videoUrl.match(/(?:v=|youtu\.be\/)([^&?/]+)/)?.[1] ?? ""}`} style={{ width: "100%", height: "100%", border: "none" }} allowFullScreen /></div>
             : <SectionDZ slot={1} label={`Video block — paste ${p.sourceType || "YouTube"} URL or upload`} icon="🎬" minH={300} hint="Drop Video block" />}
-        </div>
-      </SectionCanvasWrap>
-    ),
-  },
-
-  // ── Stats ─────────────────────────────────────────────────────────────────
-  Section_Stats: {
-    label: "Stats",
-    fields: makeSectionFields("Section_Stats", (p, set) => (
-      <>
-        <TabSection title="Heading (optional)" />
-        <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Leave blank to hide" />
-        <TabSection title="Stats Grid" />
-        <InlineSelect label="Count" value={String(p.statCount ?? 4)} onChange={(v) => set("statCount", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }, { value: "6", label: "6" }]} />
-        <ToggleField label="Show Dividers" value={p.showDividers !== false} onChange={(v) => set("showDividers", v)} />
-        <ColorPickerField label="Accent Color" value={p.accentColor ?? "#005bd3"} onChange={(v) => set("accentColor", v)} />
-      </>
-    )),
-    defaultProps: baseSectionProps({ columns: 4, columnsTablet: 2, advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "", statCount: 4, showDividers: true, accentColor: "#005bd3" }),
-    render: (p: any) => (
-      <SectionCanvasWrap props={p}>
-        {p.sectionTitle && <SectionDZ slot={0} label={p.sectionTitle} icon="H" minH={50} hint="Drop Heading block" />}
-        <div style={{ marginTop: p.sectionTitle ? 24 : 0, borderTop: p.showDividers !== false ? "1px solid #e5e7eb" : undefined, borderBottom: p.showDividers !== false ? "1px solid #e5e7eb" : undefined, padding: "24px 0" }}>
-          <SecGrid cols={p.statCount ?? 4} gap={24}>{Array.from({ length: p.statCount ?? 4 }).map((_, i) => <SectionDZ key={i} slot={i + 1} label={`Stat ${i + 1} — number + label`} icon="#" minH={90} hint="Drop Heading + Text blocks" />)}</SecGrid>
         </div>
       </SectionCanvasWrap>
     ),
