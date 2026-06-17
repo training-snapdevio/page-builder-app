@@ -1144,6 +1144,36 @@ function TabSection({ title }: { title: string }) {
   );
 }
 
+// Returns a wrapper style that visually dims a block in the editor when it is
+// set to hide on a given viewport, without actually hiding it (so the user can
+// still select and edit it). The puck-hide-* CSS classes are only applied by
+// puck-renderer.ts (preview) and builder.js (storefront).
+function EditorHideOverlay({ hideDesktop, hideTablet, hideMobile }: { hideDesktop?: boolean; hideTablet?: boolean; hideMobile?: boolean }) {
+  const labels = [
+    hideDesktop && "Desktop",
+    hideTablet  && "Tablet",
+    hideMobile  && "Mobile",
+  ].filter(Boolean).join(", ");
+  if (!labels) return null;
+  return (
+    <div style={{
+      position: "absolute", inset: 0, pointerEvents: "none", zIndex: 10,
+      background: "rgba(0,0,0,0.04)",
+      border: "1.5px dashed #f59e0b",
+      borderRadius: 4,
+      display: "flex", alignItems: "flex-start", justifyContent: "flex-end",
+    }}>
+      <span style={{
+        background: "#f59e0b", color: "#fff", fontSize: 10, fontWeight: 700,
+        padding: "2px 6px", borderRadius: "0 4px 0 4px", lineHeight: 1.6,
+        letterSpacing: "0.04em", whiteSpace: "nowrap",
+      }}>
+        Hidden on {labels}
+      </span>
+    </div>
+  );
+}
+
 // Compact 4-side spacing input (Margin / Padding)
 function FourSideField({
   label,
@@ -4625,12 +4655,13 @@ const commonComponents: any = {
 
       return (
         <div
-          className={hideClasses || undefined}
           style={{
+            position: "relative",
             marginTop: m.top, marginRight: m.right, marginBottom: m.bottom, marginLeft: m.left,
             paddingTop: pd.top, paddingRight: pd.right, paddingBottom: pd.bottom, paddingLeft: pd.left,
           }}
         >
+          <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
           <div style={{ maxWidth: 860, margin: "0 auto" }}>
             {isHorizontal ? (
               <div style={{ display: "flex", flexDirection: imagePosition === "left" ? "row" : "row-reverse", gap: 48, alignItems: "flex-start" }}>
@@ -4826,10 +4857,10 @@ const commonComponents: any = {
                       />
                       <SliderNumberField
                         label="Border Radius (px)"
-                        value={props.borderRadius ?? 0}
+                        value={props.borderRadius ?? 8}
                         onChange={(v: any) => set("borderRadius", v)}
                         min={0}
-                        max={20}
+                        max={50}
                         step={1}
                         unit="px"
                       />
@@ -4910,7 +4941,7 @@ const commonComponents: any = {
         { url: "", alt: "Photo 3" },
       ],
       gap: 8,
-      borderRadius: 0,
+      borderRadius: 8,
       objectFit: "cover",
       aspectRatio: "1:1",
       hoverEffect: "none",
@@ -4924,7 +4955,7 @@ const commonComponents: any = {
     render: ({ layout, images, gap, borderRadius, objectFit, aspectRatio, hoverEffect, boxShadow, shadowStrength, hideDesktop, hideTablet, hideMobile }: any) => {
       const imgs = ((images as any[]) ?? []).filter((img: any) => img.url);
       const gapPx = `${gap ?? 8}px`;
-      const br = `${borderRadius ?? 0}px`;
+      const br = `${borderRadius ?? 8}px`;
       const fit = objectFit ?? "cover";
       const shadow = !boxShadow
         ? "none"
@@ -4955,7 +4986,7 @@ const commonComponents: any = {
           <div
             key={i}
             className="pb-collage-item"
-            style={{ overflow: "hidden", borderRadius: br, boxShadow: shadow, ...cellStyle }}
+            style={{ overflow: "hidden", borderRadius: br, boxShadow: shadow, position: "relative", ...cellStyle }}
           >
             <img
               src={img.url}
@@ -4963,6 +4994,8 @@ const commonComponents: any = {
               onMouseEnter={() => setHovered(true)}
               onMouseLeave={() => setHovered(false)}
               style={{
+                position: "absolute",
+                inset: 0,
                 width: "100%",
                 height: "100%",
                 objectFit: (fitOverride ?? fit) as any,
@@ -4975,47 +5008,37 @@ const commonComponents: any = {
         );
       };
 
+      let content: React.ReactNode;
+
       if (!imgs.length) {
-        return (
-          <div className={hideClasses || undefined} style={{ background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 200, borderRadius: br, color: "#6b7280", fontSize: 14 }}>
+        content = (
+          <div style={{ background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 200, borderRadius: br, color: "#6b7280", fontSize: 14 }}>
             Add photos in the Content tab
           </div>
         );
-      }
-
-      // ── GRID: uniform cells forced to the chosen aspect ratio ──
-      if (layout === "grid") {
-        return (
-          <div className={hideClasses || undefined} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: gapPx }}>
+      } else if (layout === "grid") {
+        content = (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: gapPx }}>
             {imgs.map((img: any, i: number) => (
               <ImgCell key={i} img={img} i={i} cellStyle={{ aspectRatio: ar }} />
             ))}
           </div>
         );
-      }
-
-      // ── BRICK: staggered brick wall — EVERY tile is identical in width & height.
-      //    Full rows hold N bricks; offset rows hold N-1 bricks flanked by a half
-      //    brick at each end, so every row is exactly the container width (no
-      //    overflow) and the seams stagger like real brickwork. Aspect ratio
-      //    controls tile proportions. ──
-      if (layout === "brick") {
-        const FULL = 3;     // bricks in a full row
+      } else if (layout === "brick") {
+        const FULL = 3;
         const brickW = `calc((100% - ${(FULL - 1)} * ${gapPx}) / ${FULL})`;
         const halfW = `calc((${brickW} - ${gapPx}) / 2)`;
         const rows: { items: any[]; offset: boolean }[] = [];
-        let bi = 0;
-        let rowNo = 0;
+        let bi = 0; let rowNo = 0;
         while (bi < imgs.length) {
           const offset = rowNo % 2 === 1;
           const count = offset ? FULL - 1 : FULL;
           rows.push({ items: imgs.slice(bi, bi + count), offset });
-          bi += count;
-          rowNo += 1;
+          bi += count; rowNo += 1;
         }
         let imgIdx = 0;
-        return (
-          <div className={hideClasses || undefined} style={{ display: "flex", flexDirection: "column", gap: gapPx, overflow: "hidden" }}>
+        content = (
+          <div style={{ display: "flex", flexDirection: "column", gap: gapPx, overflow: "hidden" }}>
             {rows.map(({ items, offset }: { items: any[]; offset: boolean }, rIdx: number) => (
               <div key={rIdx} style={{ display: "flex", gap: gapPx }}>
                 {offset && <div style={{ flex: `0 0 ${halfW}` }} />}
@@ -5027,36 +5050,30 @@ const commonComponents: any = {
             ))}
           </div>
         );
-      }
-
-      // ── CAROUSEL: horizontal scrolling strip; each photo a fixed-width slide. ──
-      if (layout === "carousel") {
-        return (
-          <div
-            className={hideClasses || undefined}
-            style={{ display: "flex", gap: gapPx, overflowX: "auto", paddingBottom: 6, scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}
-          >
+      } else if (layout === "carousel") {
+        content = (
+          <div style={{ display: "flex", gap: gapPx, overflowX: "auto", paddingBottom: 6, scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
             {imgs.map((img: any, i: number) => (
-              <ImgCell
-                key={i}
-                img={img}
-                i={i}
-                cellStyle={{ flex: "0 0 auto", width: "min(70%, 360px)", aspectRatio: ar, scrollSnapAlign: "start" }}
-              />
+              <ImgCell key={i} img={img} i={i} cellStyle={{ flex: "0 0 auto", width: "min(70%, 360px)", aspectRatio: ar, scrollSnapAlign: "start" }} />
             ))}
+          </div>
+        );
+      } else {
+        // mixed (default)
+        content = (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: gapPx }}>
+            {imgs.map((img: any, i: number) => {
+              const cellStyle = i === 0 ? { gridColumn: "span 2", gridRow: "span 2", aspectRatio: ar } : { aspectRatio: ar };
+              return <ImgCell key={i} img={img} i={i} cellStyle={cellStyle} />;
+            })}
           </div>
         );
       }
 
-      // mixed (default): first image spans 2×2, all cells use aspect ratio
       return (
-        <div className={hideClasses || undefined} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: gapPx }}>
-          {imgs.map((img: any, i: number) => {
-            const cellStyle = i === 0
-              ? { gridColumn: "span 2", gridRow: "span 2" }
-              : { aspectRatio: ar };
-            return <ImgCell key={i} img={img} i={i} cellStyle={cellStyle} />;
-          })}
+        <div style={{ position: "relative" }}>
+          <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+          {content}
         </div>
       );
     },
@@ -5677,23 +5694,25 @@ const SpaceComponent = {
     const toCssLen = (val: any, unit: any, fallback: string): string => {
       if (val == null || val === "") return fallback;
       const s = String(val);
-      if (/[a-z%]+$/i.test(s)) return s; // already has a unit
+      if (/[a-z%]+$/i.test(s)) return s;
       return `${s}${unit || "px"}`;
     };
     const hD = toCssLen(heightDesktop, heightDesktopUnit, "32px");
     const hT = toCssLen(heightTablet,  heightTabletUnit,  hD);
     const hM = toCssLen(heightMobile,  heightMobileUnit,  hT);
     const uid = `sp-${id || "x"}`;
+    // Use padding-top as primary height mechanism — matches the Shopify renderer.
+    // Shopify themes reset height/min-height with !important so padding-top is more reliable.
     const responsiveCss = `
-      .${uid} { height: ${hD}; }
-      @media (max-width: 1024px) { .${uid} { height: ${hT}; } }
-      @media (max-width: 640px) { .${uid} { height: ${hM}; } }
+      .${uid} { padding-top: ${hD} !important; height: 0 !important; }
+      @media (max-width: 1024px) { .${uid} { padding-top: ${hT} !important; } }
+      @media (max-width: 640px)  { .${uid} { padding-top: ${hM} !important; } }
     `;
     return (
       <div
         id={cssId || undefined}
-        className={[uid, cssClass].filter(Boolean).join(" ") || undefined}
-        style={{ backgroundColor: backgroundColor || "transparent", zIndex: zIndex ?? undefined }}
+        className={[uid, hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
+        style={{ backgroundColor: backgroundColor || undefined, zIndex: zIndex ?? undefined, display: "block", height: 0, paddingTop: hD, minHeight: 0, width: "100%", boxSizing: "border-box", fontSize: 0, lineHeight: 0 }}
       >
         <style>{responsiveCss}</style>
       </div>
@@ -6074,6 +6093,8 @@ const ButtonComponent = {
     zIndex,
     opacity,
   }: any) => {
+    const [hovered, setHovered] = useState(false);
+
     const sizeMap: Record<string, React.CSSProperties> = {
       small:  { paddingTop: 8,  paddingRight: 16, paddingBottom: 8,  paddingLeft: 16 },
       medium: { paddingTop: 12, paddingRight: 24, paddingBottom: 12, paddingLeft: 24 },
@@ -6118,6 +6139,15 @@ const ButtonComponent = {
       @keyframes puck-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
     `;
 
+    // Derive hover override styles applied via React state (works inside Puck editor where :hover CSS may not fire)
+    const hoverOverrides: React.CSSProperties = hovered ? {
+      ...(hoverTextColor ? { color: hoverTextColor } : {}),
+      ...(hoverBgColor ? { background: hoverBgColor } : {}),
+      ...(hoverBorderColor ? { borderColor: hoverBorderColor } : {}),
+      ...(hoverAnimation === "grow" ? { transform: "scale(1.05)" } : {}),
+      ...(hoverAnimation === "shrink" ? { transform: "scale(0.96)" } : {}),
+    } : {};
+
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
     const wrapBg = advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {};
 
@@ -6129,7 +6159,7 @@ const ButtonComponent = {
         <img src={icon} alt="" style={{ width: iconWidth ?? 20, height: iconHeight ?? 20, objectFit: "contain", display: "block", flexShrink: 0 }} />
       ) : icon && icon.trimStart().startsWith("<svg") ? (
         <span
-          style={{ display: "inline-flex", alignItems: "center", width: iconWidth ?? 20, height: iconHeight ?? 20, flexShrink: 0, color: iconColor || "currentColor", fill: iconColor || "currentColor" }}
+          style={{ display: "inline-flex", alignItems: "center", width: iconWidth ?? 20, height: iconHeight ?? 20, flexShrink: 0, color: (hovered && iconHoverColor) ? iconHoverColor : (iconColor || "currentColor"), fill: (hovered && iconHoverColor) ? iconHoverColor : (iconColor || "currentColor") }}
           dangerouslySetInnerHTML={{ __html: icon.replace(/<svg\b/, `<svg style="width:${iconWidth ?? 20}px;height:${iconHeight ?? 20}px;color:${iconColor || "currentColor"};fill:${iconColor || "currentColor"}"`) }}
         />
       ) : (
@@ -6146,6 +6176,8 @@ const ButtonComponent = {
     const btnEl = (
       <button
         className={btnClass}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         style={{
           display: fullWidth ? "flex" : "inline-flex",
           width: fullWidth ? "100%" : undefined,
@@ -6165,6 +6197,8 @@ const ButtonComponent = {
           cursor: "pointer",
           opacity: opacity != null ? opacity / 100 : 1,
           textDecoration: "none",
+          transition: "color 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.2s ease",
+          ...hoverOverrides,
         }}
       >
         {showIcon && iconPosition === "before" && iconEl}
@@ -6298,6 +6332,7 @@ const DividerComponent = {
                   <>
                     <TabSection title="Line" />
                     <SliderNumberField label="Thickness (px)" value={props.thickness ?? 1} onChange={(v) => set("thickness", v)} min={1} max={20} step={1} unit="px" />
+                    <SliderNumberField label="Border Radius (px)" value={props.borderRadius ?? 0} onChange={(v) => set("borderRadius", v)} min={0} max={50} step={1} unit="px" />
                     {(props.lineStyle ?? "solid") !== "gradient" && (
                       <ColorPickerField label="Color" value={props.lineColor ?? ""} onChange={(v) => set("lineColor", v)} />
                     )}
@@ -6369,6 +6404,7 @@ const DividerComponent = {
     elementImageRadius: 0,
     elementPosition: "center",
     thickness: 1,
+    borderRadius: 0,
     lineColor: "",
     gradientStart: "#e5e7eb",
     gradientEnd: "#e5e7eb",
@@ -6402,6 +6438,7 @@ const DividerComponent = {
     elementImageRadius,
     elementPosition,
     thickness,
+    borderRadius: dividerBorderRadius,
     lineColor,
     gradientStart,
     gradientEnd,
@@ -6422,23 +6459,32 @@ const DividerComponent = {
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
     const color = lineColor || "#e5e7eb";
     const th = Number(thickness) || 1;
+    const br = Number(dividerBorderRadius ?? 0);
+    const brPx = br > 0 ? `${br}px` : undefined;
 
-    const lineEl = (style: React.CSSProperties) => {
+    // inFlex=true when this line segment sits inside a flex row (beside an icon/text element)
+    const lineEl = (inFlex: boolean, widthOverride?: string) => {
+      const baseStyle: React.CSSProperties = inFlex
+        ? { flex: 1, minWidth: 0, alignSelf: "center" }
+        : { display: "block", width: widthOverride ?? "100%", alignSelf: "center" };
+
       if (lineStyle === "gradient") {
         const c1 = gradientStart || "#e5e7eb";
         const c2 = gradientEnd   || "#e5e7eb";
-        return <div style={{ flex: 1, height: th, background: `linear-gradient(90deg, ${c1}, ${c2})`, alignSelf: "center", ...style }} />;
+        return <div style={{ ...baseStyle, height: th, minHeight: th, background: `linear-gradient(90deg, ${c1}, ${c2})`, borderRadius: brPx }} />;
       }
       if (lineStyle === "shadow") {
-        return <div style={{ flex: 1, height: th * 4, background: `radial-gradient(ellipse at 50% 0%, ${color} 0%, transparent 70%)`, alignSelf: "center", ...style }} />;
+        const h = Math.max(th * 4, 4);
+        return <div style={{ ...baseStyle, height: h, minHeight: h, background: `radial-gradient(ellipse at 50% 0%, ${color} 0%, transparent 70%)`, borderRadius: brPx }} />;
       }
       if (lineStyle === "wave") {
         const h = Math.max(th * 6, 12);
         const mid = h / 2;
+        const amp = mid * 0.8;
         return (
-          <div style={{ flex: 1, height: h, overflow: "visible", alignSelf: "center", ...style }}>
-            <svg width="100%" height={h} viewBox={`0 0 600 ${h}`} preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-              <path d={`M0,${mid} C15,${mid - mid * 0.8} 15,${mid + mid * 0.8} 30,${mid} S45,${mid - mid * 0.8} 60,${mid} S75,${mid + mid * 0.8} 90,${mid} S105,${mid - mid * 0.8} 120,${mid} S135,${mid + mid * 0.8} 150,${mid} S165,${mid - mid * 0.8} 180,${mid} S195,${mid + mid * 0.8} 210,${mid} S225,${mid - mid * 0.8} 240,${mid} S255,${mid + mid * 0.8} 270,${mid} S285,${mid - mid * 0.8} 300,${mid} S315,${mid + mid * 0.8} 330,${mid} S345,${mid - mid * 0.8} 360,${mid} S375,${mid + mid * 0.8} 390,${mid} S405,${mid - mid * 0.8} 420,${mid} S435,${mid + mid * 0.8} 450,${mid} S465,${mid - mid * 0.8} 480,${mid} S495,${mid + mid * 0.8} 510,${mid} S525,${mid - mid * 0.8} 540,${mid} S555,${mid + mid * 0.8} 570,${mid} S585,${mid - mid * 0.8} 600,${mid}`} fill="none" stroke={color} strokeWidth={th} vectorEffect="non-scaling-stroke" />
+          <div style={{ ...baseStyle, height: h, minHeight: h, overflow: "visible" }}>
+            <svg width="100%" height={h} viewBox={`0 0 600 ${h}`} preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style={{ display: "block", overflow: "visible" }}>
+              <path d={`M0,${mid} C15,${mid-amp} 15,${mid+amp} 30,${mid} S45,${mid-amp} 60,${mid} S75,${mid+amp} 90,${mid} S105,${mid-amp} 120,${mid} S135,${mid+amp} 150,${mid} S165,${mid-amp} 180,${mid} S195,${mid+amp} 210,${mid} S225,${mid-amp} 240,${mid} S255,${mid+amp} 270,${mid} S285,${mid-amp} 300,${mid} S315,${mid+amp} 330,${mid} S345,${mid-amp} 360,${mid} S375,${mid+amp} 390,${mid} S405,${mid-amp} 420,${mid} S435,${mid+amp} 450,${mid} S465,${mid-amp} 480,${mid} S495,${mid+amp} 510,${mid} S525,${mid-amp} 540,${mid} S555,${mid+amp} 570,${mid} S585,${mid-amp} 600,${mid}`} fill="none" stroke={color} strokeWidth={th} vectorEffect="non-scaling-stroke" />
             </svg>
           </div>
         );
@@ -6447,14 +6493,31 @@ const DividerComponent = {
         const h = Math.max(th * 6, 12);
         const pts = Array.from({ length: 61 }, (_, i) => `${i * 10},${i % 2 === 0 ? h : 0}`).join(" ");
         return (
-          <div style={{ flex: 1, height: h, overflow: "visible", alignSelf: "center", ...style }}>
-            <svg width="100%" height={h} viewBox={`0 0 600 ${h}`} preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <div style={{ ...baseStyle, height: h, minHeight: h, overflow: "visible" }}>
+            <svg width="100%" height={h} viewBox={`0 0 600 ${h}`} preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style={{ display: "block", overflow: "visible" }}>
               <polyline points={pts} fill="none" stroke={color} strokeWidth={th} vectorEffect="non-scaling-stroke" />
             </svg>
           </div>
         );
       }
-      return <div style={{ flex: 1, borderTop: `${th}px ${lineStyle || "solid"} ${color}`, alignSelf: "center", ...style }} />;
+      if (lineStyle === "double") {
+        const gap2 = Math.max(th, 2);
+        return (
+          <div style={{ ...baseStyle, display: "flex", flexDirection: "column", gap: gap2, borderRadius: brPx }}>
+            <div style={{ height: th, minHeight: th, background: color, borderRadius: brPx }} />
+            <div style={{ height: th, minHeight: th, background: color, borderRadius: brPx }} />
+          </div>
+        );
+      }
+      // solid / dashed / dotted — render as a real height div so it's always visible
+      const bStyle = lineStyle === "dashed" ? "dashed" : lineStyle === "dotted" ? "dotted" : "solid";
+      return (
+        <div style={{ ...baseStyle, height: th, minHeight: th, borderRadius: brPx, overflow: "hidden",
+          background: bStyle === "solid" ? color : "transparent",
+          borderTop: bStyle !== "solid" ? `${th}px ${bStyle} ${color}` : undefined,
+          boxSizing: "content-box" as const,
+        }} />
+      );
     };
 
     const iconVal = (elementIcon as string) || "";
@@ -6480,18 +6543,19 @@ const DividerComponent = {
     const lineWrap = showElement && elementContent
       ? (
         <div style={{ display: "flex", alignItems: "center", width: lineWidthCss }}>
-          {elementPosition === "center" || elementPosition === "right" ? lineEl({}) : null}
+          {elementPosition === "center" || elementPosition === "right" ? lineEl(true) : null}
           {elementContent}
-          {elementPosition === "center" || elementPosition === "left" ? lineEl({}) : null}
+          {elementPosition === "center" || elementPosition === "left" ? lineEl(true) : null}
         </div>
       )
-      : lineEl({ width: lineWidthCss });
+      : lineEl(false, lineWidthCss);
 
     return (
       <div
         id={cssId || undefined}
-        className={[cssClass].filter(Boolean).join(" ") || undefined}
+        className={cssClass || undefined}
         style={{
+          position: "relative",
           paddingTop: gap ?? 16,
           paddingBottom: gap ?? 16,
           marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0,
@@ -6501,6 +6565,7 @@ const DividerComponent = {
           zIndex: zIndex ?? undefined,
         }}
       >
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         {lineWrap}
       </div>
     );
@@ -7359,53 +7424,10 @@ const StarRatingComponent = {
               <>
                 {tab === "content" && (
                   <>
-                    {(() => {
-                      const rv = props.ratingValue ?? 4;
-                      const filledClr = props.filledColor ?? "#f59e0b";
-                      const emptyClr = props.emptyColor ?? "#d1d5db";
-                      return (
-                        <StackedField label={`Rating Value — ${rv}`}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 2, padding: "4px 0" }}>
-                            {[1,2,3,4,5].map((n) => {
-                              const isHalf = rv === n - 0.5;
-                              const isFull = rv >= n;
-                              return (
-                                <span
-                                  key={n}
-                                  title={`Set ${n}`}
-                                  onClick={() => {
-                                    // clicking same full star → go to half; clicking full star at half → go to prev
-                                    if (isFull && rv === n) set("ratingValue", n - 0.5);
-                                    else set("ratingValue", n);
-                                  }}
-                                  style={{ fontSize: 24, lineHeight: 1, cursor: "pointer", userSelect: "none",
-                                    color: isFull ? filledClr : isHalf ? filledClr : emptyClr,
-                                    opacity: isHalf ? 0.6 : 1 }}
-                                >
-                                  {isHalf ? "½" : "★"}
-                                </span>
-                              );
-                            })}
-                            <span
-                              title="Clear"
-                              onClick={() => set("ratingValue", 0)}
-                              style={{ fontSize: 12, marginLeft: 6, cursor: "pointer", color: "var(--p-color-text-subdued, #6b7280)", userSelect: "none" }}
-                            >✕</span>
-                          </div>
-                        </StackedField>
-                      );
-                    })()}
+                    <SliderNumberField label="Rating Value" value={props.ratingValue ?? 4} onChange={(v) => set("ratingValue", Math.round(v * 10) / 10)} min={0} max={5} step={0.5} unit="" />
                     <ToggleField label="Show Number" value={props.showNumber !== false} onChange={(v) => set("showNumber", v)} />
                     <InlineSelect label="Number Position" value={props.numberPosition ?? "after"} onChange={(v) => set("numberPosition", v)} options={[{ value: "before", label: "Before Stars" }, { value: "after", label: "After Stars" }]} />
-                    <StackedField label="Review Count">
-                      <input
-                        type="number"
-                        min={0}
-                        value={props.reviewCount ?? 0}
-                        onChange={(e) => set("reviewCount", Math.max(0, parseInt(e.target.value) || 0))}
-                        style={{ width: "100%", padding: "4px 8px", fontSize: 12, boxSizing: "border-box", border: "1px solid var(--p-color-border)", borderRadius: 4, background: "var(--p-color-bg-surface)", color: "var(--p-color-text)", outline: "none" }}
-                      />
-                    </StackedField>
+                    <SliderNumberField label="Review Count" value={props.reviewCount ?? 0} onChange={(v) => set("reviewCount", Math.max(0, Math.round(v)))} min={0} max={99999} step={1} unit="" />
                   </>
                 )}
                 {tab === "style" && (
@@ -7525,15 +7547,34 @@ const ProgressBarComponent = {
               <>
                 {tab === "content" && (
                   <>
-                    <StackedTextField label="Label" value={props.label ?? ""} onChange={(v) => set("label", v)} placeholder="Skill or metric..." />
-                    <SliderNumberField label="Value (0–100)" value={props.value ?? 75} onChange={(v) => set("value", Math.min(100, Math.max(0, v)))} min={0} max={100} step={1} unit="%" />
+                    {pbType !== "multirow" && (
+                      <>
+                        <StackedTextField label="Label" value={props.label ?? ""} onChange={(v) => set("label", v)} placeholder="Skill or metric..." />
+                        <SliderNumberField label="Value (0–100)" value={props.value ?? 75} onChange={(v) => set("value", Math.min(100, Math.max(0, v)))} min={0} max={100} step={1} unit="%" />
+                      </>
+                    )}
                     <ToggleField label="Show Percentage" value={showPct} onChange={(v) => set("showPercentage", v)} />
+                    {pbType === "multirow" && (
+                      <>
+                        <TabSection title="Rows" />
+                        {rows.map((row, i) => (
+                          <div key={i} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "8px 8px 4px", marginBottom: 6 }}>
+                            <StackedTextField label={`Row ${i + 1} Label`} value={row.label} onChange={(v) => { const next = rows.map((r, j) => j === i ? { ...r, label: v } : r); set("multiRows", next); }} placeholder="Label..." />
+                            <SliderNumberField label={`Row ${i + 1} Value`} value={row.value} onChange={(v) => { const next = rows.map((r, j) => j === i ? { ...r, value: Math.min(100, Math.max(0, v)) } : r); set("multiRows", next); }} min={0} max={100} step={1} unit="%" />
+                            {rows.length > 1 && (
+                              <button onClick={() => set("multiRows", rows.filter((_, j) => j !== i))} style={{ fontSize: 11, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: "2px 0" }}>Remove row</button>
+                            )}
+                          </div>
+                        ))}
+                        <button onClick={() => set("multiRows", [...rows, { label: `Row ${rows.length + 1}`, value: 50 }])} style={{ fontSize: 12, color: "#0158ad", background: "none", border: "1px solid #0158ad", borderRadius: 4, cursor: "pointer", padding: "4px 10px", width: "100%", marginBottom: 8 }}>+ Add Row</button>
+                      </>
+                    )}
                   </>
                 )}
                 {tab === "style" && (
                   <>
                     <TabSection title="Type" />
-                    <InlineSelect label="Type" value={pbType} onChange={(v) => set("pbType", v)} options={[{ value: "line", label: "Line" }, { value: "circle", label: "Circle" }, { value: "step", label: "Step" }, { value: "multirow", label: "Multi Row" }, { value: "circlecard", label: "Circle Card" }]} />
+                    <InlineSelect label="Type" value={pbType} onChange={(v) => set("pbType", v)} options={[{ value: "line", label: "Line" }, { value: "circle", label: "Circle" }, { value: "semicircle", label: "Semi-Circle" }, { value: "step", label: "Step" }, { value: "multirow", label: "Multi Row" }]} />
 
                     {pbType === "line" && (
                       <>
@@ -7571,17 +7612,6 @@ const ProgressBarComponent = {
 
                     {pbType === "multirow" && (
                       <>
-                        <TabSection title="Rows" />
-                        {rows.map((row, i) => (
-                          <div key={i} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "8px 8px 4px", marginBottom: 6 }}>
-                            <StackedTextField label={`Row ${i + 1} Label`} value={row.label} onChange={(v) => { const next = rows.map((r, j) => j === i ? { ...r, label: v } : r); set("multiRows", next); }} placeholder="Label..." />
-                            <SliderNumberField label={`Row ${i + 1} Value`} value={row.value} onChange={(v) => { const next = rows.map((r, j) => j === i ? { ...r, value: Math.min(100, Math.max(0, v)) } : r); set("multiRows", next); }} min={0} max={100} step={1} unit="%" />
-                            {rows.length > 1 && (
-                              <button onClick={() => set("multiRows", rows.filter((_, j) => j !== i))} style={{ fontSize: 11, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: "2px 0" }}>Remove row</button>
-                            )}
-                          </div>
-                        ))}
-                        <button onClick={() => set("multiRows", [...rows, { label: `Row ${rows.length + 1}`, value: 50 }])} style={{ fontSize: 12, color: "#0158ad", background: "none", border: "1px solid #0158ad", borderRadius: 4, cursor: "pointer", padding: "4px 10px", width: "100%", marginBottom: 8 }}>+ Add Row</button>
                         <TabSection title="Style" />
                         <InlineSelect label="Fill Style" value={fillStyle} onChange={(v) => set("fillStyle", v)} options={[{ value: "solid", label: "Solid" }, { value: "striped", label: "Striped" }, { value: "gradient", label: "Gradient" }]} />
                         <ColorPickerField label="Fill Color" value={props.fillColor ?? "#0158ad"} onChange={(v) => set("fillColor", v)} />
@@ -7592,14 +7622,14 @@ const ProgressBarComponent = {
                       </>
                     )}
 
-                    {pbType === "circlecard" && (
+                    {pbType === "semicircle" && (
                       <>
-                        <TabSection title="Circle Card" />
-                        <SliderNumberField label="Size (px)" value={props.circleSize ?? 120} onChange={(v) => set("circleSize", v)} min={40} max={300} step={4} unit="px" />
-                        <SliderNumberField label="Ring Thickness (px)" value={props.ringThickness ?? 10} onChange={(v) => set("ringThickness", v)} min={2} max={40} step={1} unit="px" />
+                        <TabSection title="Semi-Circle" />
+                        <SliderNumberField label="Size (px)" value={props.circleSize ?? 160} onChange={(v) => set("circleSize", v)} min={60} max={400} step={4} unit="px" />
+                        <SliderNumberField label="Ring Thickness (px)" value={props.ringThickness ?? 14} onChange={(v) => set("ringThickness", v)} min={2} max={60} step={1} unit="px" />
                         <ColorPickerField label="Fill Color" value={props.fillColor ?? "#0158ad"} onChange={(v) => set("fillColor", v)} />
-                        <ColorPickerField label="Card Background Color" value={props.cardBg ?? "#ffffff"} onChange={(v) => set("cardBg", v)} />
-                        <ToggleField label="Show Label Below" value={props.showLabelBelow !== false} onChange={(v) => set("showLabelBelow", v)} />
+                        <ColorPickerField label="Background Color" value={props.trackColor ?? "#e5e7eb"} onChange={(v) => set("trackColor", v)} />
+                        <ToggleField label="Show Label Inside" value={props.showLabelInside !== false} onChange={(v) => set("showLabelInside", v)} />
                       </>
                     )}
 
@@ -7643,10 +7673,9 @@ const ProgressBarComponent = {
     fillStyle: "solid", fillColor: "#0158ad", gradientEnd: "#60a5fa", trackColor: "#e5e7eb",
     lineHeight: 12, lineRadius: 6,
     circleSize: 120, ringThickness: 10,
-    showLabelInside: true, showLabelBelow: true,
+    showLabelInside: true,
     totalSteps: 5, activeStep: 3, showStepNumbers: false,
     multiRows: [{ label: "Row 1", value: 60 }, { label: "Row 2", value: 40 }],
-    cardBg: "#ffffff",
     labelFontSize: 14, labelColor: "",
     pctFontSize: 13, pctColor: "",
     alignment: "left", animation: "fill",
@@ -7654,7 +7683,7 @@ const ProgressBarComponent = {
     hideDesktop: false, hideTablet: false, hideMobile: false, cssId: "", cssClass: "", zIndex: null,
   },
   render: (props: any) => {
-    const { label, value, showPercentage, pbType, fillStyle, fillColor, gradientEnd, trackColor, lineHeight, lineRadius, circleSize, ringThickness, showLabelInside, showLabelBelow, totalSteps, activeStep, showStepNumbers, multiRows, cardBg, labelFontSize, labelColor, pctFontSize, pctColor, alignment, animation, advBgType, advBgColor, advMargin, advPadding, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex } = props;
+    const { label, value, showPercentage, pbType, fillStyle, fillColor, gradientEnd, trackColor, lineHeight, lineRadius, circleSize, ringThickness, showLabelInside, totalSteps, activeStep, showStepNumbers, multiRows, labelFontSize, labelColor, pctFontSize, pctColor, alignment, animation, advBgType, advBgColor, advMargin, advPadding, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex } = props;
     const pct = Math.min(100, Math.max(0, value ?? 75));
     const animFill = animation === "fill";
     const [displayed, setDisplayed] = useState(animFill ? 0 : pct);
@@ -7668,7 +7697,6 @@ const ProgressBarComponent = {
       return () => obs.disconnect();
     }, [pct, animFill]);
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
-    const uid = cssId || "pb-blk";
     const fc = fillColor || "#0158ad";
     const tc = trackColor || "#e5e7eb";
     const lfs = labelFontSize || 14;
@@ -7691,27 +7719,54 @@ const ProgressBarComponent = {
     };
 
     const renderLine = (rowLabel: string, rowPct: number, rowDisplayed: number, key?: number) => (
-      <div key={key} style={{ marginBottom: key !== undefined ? 10 : 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-          {rowLabel && <span style={{ fontSize: lfs, color: lc }}>{rowLabel}</span>}
-          {showPercentage && <span style={{ fontSize: pfs, color: pc, fontWeight: 600 }}>{rowPct}%</span>}
+      <div key={key} style={{ marginBottom: key !== undefined ? 12 : 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 8 }}>
+          {rowLabel && <span style={{ fontSize: lfs, color: lc, flex: 1 }}>{rowLabel}</span>}
+          {showPercentage && <span style={{ fontSize: pfs, color: pc, fontWeight: 600, flexShrink: 0 }}>{rowPct}%</span>}
         </div>
-        <div style={{ position: "relative", height: lineHeight || 12, backgroundColor: tc, borderRadius: lineRadius ?? 6, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${rowDisplayed}%`, background: fillBg, borderRadius: lineRadius ?? 6, transition: animFill ? "width 900ms ease" : undefined }} />
+        <div className="pb-bar-track" style={{ position: "relative", height: lineHeight || 12, backgroundColor: tc, borderRadius: lineRadius ?? 6, overflow: "hidden" }}>
+          <div className="pb-bar-fill" style={{ height: "100%", width: `${rowDisplayed}%`, background: fillBg, borderRadius: lineRadius ?? 6, transition: animFill ? "width 900ms ease" : undefined }} />
         </div>
       </div>
     );
 
-    const renderCircleSvg = (sz: number, thick: number, p: number, disp: number, isCard = false) => {
+    const renderCircleSvg = (sz: number, thick: number, disp: number) => {
       const r = (sz - thick) / 2;
       const cx = sz / 2, cy = sz / 2;
       const circ = 2 * Math.PI * r;
       const dash = (disp / 100) * circ;
       return (
         <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`} style={{ transform: "rotate(-90deg)" }}>
-          <circle cx={cx} cy={cy} r={r} fill={isCard ? (cardBg || "#fff") : "none"} stroke={tc} strokeWidth={thick} />
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke={tc} strokeWidth={thick} />
           <circle cx={cx} cy={cy} r={r} fill="none" stroke={fc} strokeWidth={thick} strokeLinecap="round"
             strokeDasharray={`${dash} ${circ}`} style={{ transition: animFill ? "stroke-dasharray 900ms ease" : undefined }} />
+        </svg>
+      );
+    };
+
+    // Semi-circle: draws only the top 180° arc
+    const renderSemiCircleSvg = (sz: number, thick: number, disp: number) => {
+      const r = (sz - thick) / 2;
+      const cx = sz / 2;
+      const cy = sz / 2;
+      const halfCirc = Math.PI * r; // half circumference
+      const dash = (disp / 100) * halfCirc;
+      // Full circle but only top half visible — rotate so arc starts at left
+      const fullCirc = 2 * Math.PI * r;
+      return (
+        <svg width={sz} height={sz / 2 + thick} viewBox={`0 0 ${sz} ${sz / 2 + thick}`} style={{ overflow: "visible" }}>
+          {/* background track arc */}
+          <path
+            d={`M ${thick / 2} ${cy} A ${r} ${r} 0 0 1 ${sz - thick / 2} ${cy}`}
+            fill="none" stroke={tc} strokeWidth={thick} strokeLinecap="round"
+          />
+          {/* fill arc */}
+          <path
+            d={`M ${thick / 2} ${cy} A ${r} ${r} 0 0 1 ${sz - thick / 2} ${cy}`}
+            fill="none" stroke={fc} strokeWidth={thick} strokeLinecap="round"
+            strokeDasharray={`${dash} ${halfCirc}`}
+            style={{ transition: animFill ? "stroke-dasharray 900ms ease" : undefined }}
+          />
         </svg>
       );
     };
@@ -7719,24 +7774,45 @@ const ProgressBarComponent = {
     const type = pbType ?? "line";
 
     return (
-      <div ref={ref} id={cssId || undefined} className={[cssClass].filter(Boolean).join(" ") || undefined} style={wrapStyle}>
+      <div ref={ref} id={cssId || undefined} className={cssClass || undefined} style={{ ...wrapStyle, position: "relative" }}>
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
 
         {type === "line" && renderLine(label ?? "", pct, displayed)}
 
         {type === "circle" && (
           <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
             <div style={{ position: "relative", width: circleSize || 120, height: circleSize || 120 }}>
-              {renderCircleSvg(circleSize || 120, ringThickness || 10, pct, displayed)}
+              {renderCircleSvg(circleSize || 120, ringThickness || 10, displayed)}
               {showLabelInside !== false && (
-                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                  {showPercentage && <span style={{ fontSize: pfs, color: pc, fontWeight: 700, lineHeight: 1.1 }}>{pct}%</span>}
-                  {label && <span style={{ fontSize: lfs * 0.78, color: lc, marginTop: 2 }}>{label}</span>}
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                  {showPercentage && <span style={{ fontSize: pfs, color: pc, fontWeight: 700, lineHeight: 1 }}>{pct}%</span>}
+                  {label && <span style={{ fontSize: lfs * 0.78, color: lc, lineHeight: 1 }}>{label}</span>}
                 </div>
               )}
             </div>
             {showLabelInside === false && label && <span style={{ fontSize: lfs, color: lc }}>{label}</span>}
           </div>
         )}
+
+        {type === "semicircle" && (() => {
+          const sz = circleSize || 160;
+          const thick = ringThickness || 14;
+          const halfH = sz / 2 + thick;
+          return (
+            <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+              <div style={{ position: "relative", width: sz, height: halfH }}>
+                {renderSemiCircleSvg(sz, thick, displayed)}
+                {showLabelInside !== false && (
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 4 }}>
+                    {showPercentage && <span style={{ fontSize: pfs, color: pc, fontWeight: 700, lineHeight: 1.2 }}>{pct}%</span>}
+                    {label && <span style={{ fontSize: lfs * 0.8, color: lc, marginTop: 2 }}>{label}</span>}
+                  </div>
+                )}
+              </div>
+              {showLabelInside === false && label && <span style={{ fontSize: lfs, color: lc }}>{label}</span>}
+            </div>
+          );
+        })()}
 
         {type === "step" && (() => {
           const total = Math.max(1, totalSteps ?? 5);
@@ -7757,25 +7833,13 @@ const ProgressBarComponent = {
         })()}
 
         {type === "multirow" && (() => {
-          const rows: Array<{ label: string; value: number }> = multiRows ?? [{ label: "Row 1", value: 60 }];
+          const rowData: Array<{ label: string; value: number }> = multiRows ?? [{ label: "Row 1", value: 60 }];
           return (
             <div>
-              {rows.map((row, i) => renderLine(row.label, Math.min(100, Math.max(0, row.value)), animFill ? 0 : Math.min(100, Math.max(0, row.value)), i))}
+              {rowData.map((row, i) => renderLine(row.label, Math.min(100, Math.max(0, row.value)), animFill ? 0 : Math.min(100, Math.max(0, row.value)), i))}
             </div>
           );
         })()}
-
-        {type === "circlecard" && (
-          <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 10, padding: 16, backgroundColor: cardBg || "#fff", borderRadius: 12, boxShadow: "0 2px 12px rgba(0,0,0,0.08)" }}>
-            <div style={{ position: "relative", width: circleSize || 120, height: circleSize || 120 }}>
-              {renderCircleSvg(circleSize || 120, ringThickness || 10, pct, displayed, true)}
-              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {showPercentage && <span style={{ fontSize: pfs, color: pc, fontWeight: 700 }}>{pct}%</span>}
-              </div>
-            </div>
-            {showLabelBelow !== false && label && <span style={{ fontSize: lfs, color: lc, fontWeight: 600 }}>{label}</span>}
-          </div>
-        )}
       </div>
     );
   },

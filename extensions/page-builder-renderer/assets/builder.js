@@ -713,38 +713,277 @@
   }
 
   function PhotoCollage(p) {
-    var pad = (p.padding != null ? p.padding : 40) + 'px 24px';
-    var bg = p.backgroundColor || '#fff';
-    var gap = Number(p.gap) || 8;
+    var gap = Number(p.gap != null ? p.gap : 8);
+    var gapPx = gap + 'px';
     var br = (p.borderRadius != null ? p.borderRadius : 8) + 'px';
+    var fit = p.objectFit || 'cover';
     var images = Array.isArray(p.images) ? p.images : [];
     var valid = images.filter(function (img) { return img.url; });
     if (!valid.length) return '';
-    if (p.layout === 'hero') {
-      var heroSpans = [
-        'grid-column:1;grid-row:1 / span 3',
-        'grid-column:2;grid-row:1',
-        'grid-column:3;grid-row:1',
-        'grid-column:2;grid-row:2',
-        'grid-column:3;grid-row:2',
-      ];
-      return '<section style="background:' + esc(bg) + ';padding:' + pad + '">' +
-        '<div style="max-width:1200px;margin:0 auto;display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:repeat(3,160px);gap:' + gap + 'px">' +
-        valid.slice(0, 5).map(function (img, i) {
-          return '<div style="' + (heroSpans[i] || '') + ';border-radius:' + br + ';overflow:hidden"><img src="' + esc(img.url) + '" alt="' + esc(img.alt || '') + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block"></div>';
-        }).join('') +
-        '</div></section>';
+
+    var arMap = { '1:1': '1/1', '4:3': '4/3', '16:9': '16/9', '3:2': '3/2' };
+    var ar = arMap[p.aspectRatio] || '1/1';
+
+    var shadow = !p.boxShadow ? 'none'
+      : p.shadowStrength === 'strong' ? '0 8px 24px rgba(0,0,0,0.3)'
+      : p.shadowStrength === 'medium' ? '0 4px 12px rgba(0,0,0,0.2)'
+      : '0 2px 6px rgba(0,0,0,0.12)';
+
+    var hideClass = [
+      p.hideDesktop ? 'puck-hide-desktop' : '',
+      p.hideTablet  ? 'puck-hide-tablet'  : '',
+      p.hideMobile  ? 'puck-hide-mobile'  : ''
+    ].filter(Boolean).join(' ');
+    var classAttr = ['pb-collage-wrap', hideClass].filter(Boolean).join(' ');
+
+    function wrapCell(img, i, extraStyle) {
+      return '<div class="pb-collage-item" style="overflow:hidden;border-radius:' + br + ';box-shadow:' + shadow + ';position:relative;' + (extraStyle || '') + '">' +
+        '<img src="' + esc(img.url) + '" alt="' + esc(img.alt || ('Photo ' + (i + 1))) + '" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:' + esc(fit) + ';display:block">' +
+        '</div>';
     }
-    var spans = ['grid-column:span 2;grid-row:span 2', '', '', '', 'grid-column:span 2', '', '', 'grid-column:span 2', ''];
-    return '<section style="background:' + esc(bg) + ';padding:' + pad + '">' +
-      '<div style="max-width:1200px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,200px);gap:' + gap + 'px">' +
-      valid.slice(0, 9).map(function (img, i) {
-        return '<div style="' + (spans[i] || '') + ';border-radius:' + br + ';overflow:hidden"><img src="' + esc(img.url) + '" alt="' + esc(img.alt || '') + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block"></div>';
-      }).join('') +
-      '</div></section>';
+
+    var layout = p.layout || 'mixed';
+
+    if (layout === 'grid') {
+      var cells = valid.map(function (img, i) {
+        return wrapCell(img, i, 'aspect-ratio:' + ar + ';');
+      }).join('');
+      return '<div class="' + classAttr + '" style="display:grid;grid-template-columns:repeat(3,1fr);gap:' + gapPx + '">' + cells + '</div>';
+    }
+
+    if (layout === 'brick') {
+      var FULL = 3;
+      var brickW = 'calc((100% - ' + (FULL - 1) + ' * ' + gapPx + ') / ' + FULL + ')';
+      var halfW  = 'calc((' + brickW + ' - ' + gapPx + ') / 2)';
+      var rows = [];
+      var bi = 0; var rowNo = 0;
+      while (bi < valid.length) {
+        var offset = rowNo % 2 === 1;
+        var count = offset ? FULL - 1 : FULL;
+        rows.push({ items: valid.slice(bi, bi + count), offset: offset });
+        bi += count; rowNo++;
+      }
+      var imgIdx = 0;
+      var rowsHtml = rows.map(function (row) {
+        var edge = row.offset ? '<div style="flex:0 0 ' + halfW + '"></div>' : '';
+        var tiles = row.items.map(function (img) {
+          return wrapCell(img, imgIdx++, 'flex:0 0 ' + brickW + ';aspect-ratio:' + ar + ';');
+        }).join('');
+        return '<div style="display:flex;gap:' + gapPx + '">' + edge + tiles + edge + '</div>';
+      }).join('');
+      return '<div class="' + classAttr + '" style="display:flex;flex-direction:column;gap:' + gapPx + ';overflow:hidden">' + rowsHtml + '</div>';
+    }
+
+    if (layout === 'carousel') {
+      var cells2 = valid.map(function (img, i) {
+        return wrapCell(img, i, 'flex:0 0 auto;width:min(70%,360px);aspect-ratio:' + ar + ';scroll-snap-align:start;');
+      }).join('');
+      return '<div class="' + classAttr + '" style="display:flex;gap:' + gapPx + ';overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch">' + cells2 + '</div>';
+    }
+
+    // mixed (default)
+    var mixedCells = valid.map(function (img, i) {
+      var spanStyle = i === 0 ? 'grid-column:span 2;grid-row:span 2;aspect-ratio:' + ar + ';' : 'aspect-ratio:' + ar + ';';
+      return wrapCell(img, i, spanStyle);
+    }).join('');
+    return '<div class="' + classAttr + '" style="display:grid;grid-template-columns:repeat(3,1fr);gap:' + gapPx + '">' + mixedCells + '</div>';
+  }
+
+  // ── ProgressBar ─────────────────────────────────────────────────────────────
+
+  function ProgressBar(p) {
+    var pbType    = p.pbType || 'line';
+    var label     = p.label || '';
+    var pct       = Math.min(100, Math.max(0, p.value != null ? p.value : 75));
+    var showPct   = p.showPercentage !== false;
+    var fillStyle = p.fillStyle || 'solid';
+    var fc        = p.fillColor  || '#0158ad';
+    var tc        = p.trackColor || '#e5e7eb';
+    var gradEnd   = p.gradientEnd || '#60a5fa';
+    var lineH     = Number(p.lineHeight != null ? p.lineHeight : 12);
+    var lineR     = Number(p.lineRadius  != null ? p.lineRadius  : 6);
+    var lfs       = Number(p.labelFontSize  != null ? p.labelFontSize  : 14);
+    var lc        = p.labelColor  || 'var(--text-color)';
+    var pfs       = Number(p.pctFontSize != null ? p.pctFontSize : 13);
+    var pc        = p.pctColor || 'var(--text-color)';
+    var alignment = p.alignment || 'left';
+    var alignCss  = alignment === 'center' ? 'text-align:center;' : alignment === 'right' ? 'text-align:right;' : '';
+    var hideClass = [p.hideDesktop ? 'puck-hide-desktop' : '', p.hideTablet ? 'puck-hide-tablet' : '', p.hideMobile ? 'puck-hide-mobile' : ''].filter(Boolean).join(' ');
+    var classAttr = ['', p.cssClass, hideClass].filter(Boolean).join(' ').trim();
+
+    var fillBg = fillStyle === 'gradient'
+      ? 'linear-gradient(90deg,' + esc(fc) + ',' + esc(gradEnd) + ')'
+      : esc(fc);
+    var stripedOverlay = fillStyle === 'striped'
+      ? ';background-image:repeating-linear-gradient(45deg,transparent,transparent 8px,rgba(255,255,255,0.2) 8px,rgba(255,255,255,0.2) 16px)'
+      : '';
+
+    function buildLine(rowLabel, rowPct, mb) {
+      var hdrLabel = rowLabel ? '<span style="font-size:' + lfs + 'px;color:' + esc(lc) + ';display:inline-block;flex:1">' + esc(rowLabel) + '</span>' : '';
+      var hdrPct   = showPct ? '<span style="font-size:' + pfs + 'px;color:' + esc(pc) + ';font-weight:600;display:inline-block;flex-shrink:0">' + rowPct + '%</span>' : '';
+      var header   = (rowLabel || showPct) ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;line-height:1.4">' + hdrLabel + hdrPct + '</div>' : '';
+      var fill  = '<div class="pb-bar-fill" style="display:block;height:' + lineH + 'px;min-height:' + lineH + 'px;width:' + rowPct + '%;max-width:100%;background:' + fillBg + stripedOverlay + ';border-radius:' + lineR + 'px;box-sizing:border-box"></div>';
+      var track = '<div class="pb-bar-track" style="display:block;position:relative;height:' + lineH + 'px;min-height:' + lineH + 'px;width:100%;background:' + esc(tc) + ';border-radius:' + lineR + 'px;overflow:hidden;box-sizing:border-box;line-height:0;font-size:0">' + fill + '</div>';
+      var mbS = mb ? 'margin-bottom:' + mb + 'px;' : '';
+      return '<div style="' + mbS + 'display:block">' + header + track + '</div>';
+    }
+
+    function buildCircleSvg(sz, thick, disp) {
+      var r = (sz - thick) / 2, cx = sz / 2, cy = sz / 2;
+      var circ = 2 * Math.PI * r, dash = (disp / 100) * circ, rest = circ - dash;
+      return '<svg width="' + sz + '" height="' + sz + '" viewBox="0 0 ' + sz + ' ' + sz + '" style="transform:rotate(-90deg)">' +
+        '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + esc(tc) + '" stroke-width="' + thick + '"/>' +
+        '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + esc(fc) + '" stroke-width="' + thick + '" stroke-linecap="round" stroke-dasharray="' + dash + ' ' + rest + '"/>' +
+        '</svg>';
+    }
+
+    function buildSemiCircleSvg(sz, thick, disp) {
+      var r = (sz - thick) / 2;
+      var halfCirc = Math.PI * r, dash = (disp / 100) * halfCirc;
+      var halfH = sz / 2 + thick, x1 = thick / 2, x2 = sz - thick / 2, cy = sz / 2;
+      return '<svg width="' + sz + '" height="' + halfH + '" viewBox="0 0 ' + sz + ' ' + halfH + '" style="overflow:visible;display:block">' +
+        '<path d="M ' + x1 + ' ' + cy + ' A ' + r + ' ' + r + ' 0 0 1 ' + x2 + ' ' + cy + '" fill="none" stroke="' + esc(tc) + '" stroke-width="' + thick + '" stroke-linecap="round"/>' +
+        '<path d="M ' + x1 + ' ' + cy + ' A ' + r + ' ' + r + ' 0 0 1 ' + x2 + ' ' + cy + '" fill="none" stroke="' + esc(fc) + '" stroke-width="' + thick + '" stroke-linecap="round" stroke-dasharray="' + dash + ' ' + halfCirc + '"/>' +
+        '</svg>';
+    }
+
+    function wrap(inner) {
+      return '<div' + (classAttr ? ' class="' + classAttr + '"' : '') + ' style="display:block;box-sizing:border-box;width:100%;' + alignCss + '">' + inner + '</div>';
+    }
+
+    if (pbType === 'line') return wrap(buildLine(label, pct, 0));
+
+    if (pbType === 'circle') {
+      var sz = Number(p.circleSize != null ? p.circleSize : 120);
+      var thick = Number(p.ringThickness != null ? p.ringThickness : 10);
+      var showInside = p.showLabelInside !== false;
+      var pctInner = showPct && showInside ? '<span style="font-size:' + pfs + 'px;color:' + esc(pc) + ';font-weight:700;line-height:1;display:block">' + pct + '%</span>' : '';
+      var lblInner = label && showInside ? '<span style="font-size:' + Math.round(lfs * 0.78) + 'px;color:' + esc(lc) + ';line-height:1;display:block">' + esc(label) + '</span>' : '';
+      var inside = showInside ? '<div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">' + pctInner + lblInner + '</div>' : '';
+      var below = !showInside && label ? '<span style="font-size:' + lfs + 'px;color:' + esc(lc) + ';display:block">' + esc(label) + '</span>' : '';
+      return wrap('<div style="display:inline-flex;flex-direction:column;align-items:center;gap:6px"><div style="position:relative;width:' + sz + 'px;height:' + sz + 'px;display:block;line-height:0;font-size:0">' + buildCircleSvg(sz, thick, pct) + inside + '</div>' + below + '</div>');
+    }
+
+    if (pbType === 'semicircle') {
+      var szS = Number(p.circleSize != null ? p.circleSize : 160);
+      var thickS = Number(p.ringThickness != null ? p.ringThickness : 14);
+      var halfH2 = szS / 2 + thickS;
+      var showInsideS = p.showLabelInside !== false;
+      var pctS = showPct && showInsideS ? '<span style="font-size:' + pfs + 'px;color:' + esc(pc) + ';font-weight:700;line-height:1.2;display:block">' + pct + '%</span>' : '';
+      var lblS = label && showInsideS ? '<span style="font-size:' + Math.round(lfs * 0.8) + 'px;color:' + esc(lc) + ';margin-top:2px;display:block">' + esc(label) + '</span>' : '';
+      var insideS = showInsideS ? '<div style="position:absolute;bottom:0;left:0;right:0;display:flex;flex-direction:column;align-items:center;padding-bottom:4px">' + pctS + lblS + '</div>' : '';
+      var belowS = !showInsideS && label ? '<span style="font-size:' + lfs + 'px;color:' + esc(lc) + ';display:block">' + esc(label) + '</span>' : '';
+      return wrap('<div style="display:inline-flex;flex-direction:column;align-items:center;gap:4px"><div style="position:relative;width:' + szS + 'px;height:' + halfH2 + 'px;display:block">' + buildSemiCircleSvg(szS, thickS, pct) + insideS + '</div>' + belowS + '</div>');
+    }
+
+    if (pbType === 'step') {
+      var total = Math.max(1, Number(p.totalSteps != null ? p.totalSteps : 5));
+      var active = Math.min(total, Math.max(0, Number(p.activeStep != null ? p.activeStep : 3)));
+      var showNums = !!p.showStepNumbers;
+      var labelHtml = label ? '<div style="font-size:' + lfs + 'px;color:' + esc(lc) + ';margin-bottom:8px;display:block">' + esc(label) + '</div>' : '';
+      var steps = Array.from({length: total}, function(_, i) {
+        var on = i < active;
+        var numH = showNums ? '<span style="font-size:' + Math.max(9, lineH - 3) + 'px;color:' + (on ? '#fff' : esc(lc)) + '">' + (i + 1) + '</span>' : '';
+        return '<div style="flex:1;height:' + lineH + 'px;min-height:' + lineH + 'px;border-radius:' + lineR + 'px;background:' + (on ? esc(fc) : esc(tc)) + ';display:flex;align-items:center;justify-content:center;box-sizing:border-box">' + numH + '</div>';
+      }).join('');
+      var pctStep = showPct ? '<div style="font-size:' + pfs + 'px;color:' + esc(pc) + ';margin-top:6px;display:block">' + Math.round((active / total) * 100) + '%</div>' : '';
+      return wrap(labelHtml + '<div style="display:flex;gap:6px;align-items:stretch">' + steps + '</div>' + pctStep);
+    }
+
+    if (pbType === 'multirow') {
+      var rows = Array.isArray(p.multiRows) ? p.multiRows : [{label:'Row 1', value:60}];
+      var rowsHtml = rows.map(function(row, i) {
+        return buildLine(row.label || '', Math.min(100, Math.max(0, row.value || 0)), i < rows.length - 1 ? 12 : 0);
+      }).join('');
+      return wrap(rowsHtml);
+    }
+
+    return wrap(buildLine(label, pct, 0));
   }
 
   // ── Dispatcher ──────────────────────────────────────────────────────────────
+
+  function Divider(p) {
+    var color = p.lineColor || '#e5e7eb';
+    var th = Number(p.thickness || 1);
+    var lineStyle = p.lineStyle || 'solid';
+    var width = p.lineWidthVal != null ? (p.lineWidthVal + (p.lineWidthUnit || '%')) : '100%';
+    var gap = Number(p.gap != null ? p.gap : 16) || 16;
+    var align = p.alignment || 'center';
+    var justify = align === 'left' ? 'flex-start' : align === 'right' ? 'flex-end' : 'center';
+    var br = Number(p.borderRadius || 0);
+    var brCss = br > 0 ? 'border-radius:' + br + 'px;' : '';
+    var spacing = 'margin:' + ((p.advMargin && p.advMargin.top) || 0) + 'px ' + ((p.advMargin && p.advMargin.right) || 0) + 'px ' + ((p.advMargin && p.advMargin.bottom) || 0) + 'px ' + ((p.advMargin && p.advMargin.left) || 0) + 'px;';
+    var hideClass = [p.hideDesktop ? 'puck-hide-desktop' : '', p.hideTablet ? 'puck-hide-tablet' : '', p.hideMobile ? 'puck-hide-mobile' : ''].filter(Boolean).join(' ');
+
+    function buildLine(widthStyle) {
+      var baseWrap = 'display:block;' + widthStyle + 'align-self:center;flex-shrink:' + (widthStyle.indexOf('flex:1') === 0 ? '1' : '0') + ';' + brCss;
+      if (lineStyle === 'gradient') {
+        var c1 = p.gradientStart || '#e5e7eb';
+        var c2 = p.gradientEnd   || '#e5e7eb';
+        return '<div style="' + baseWrap + 'height:' + th + 'px;min-height:' + th + 'px;background:linear-gradient(90deg,' + esc(c1) + ',' + esc(c2) + ');"></div>';
+      }
+      if (lineStyle === 'shadow') {
+        var h = th * 4;
+        return '<div style="' + baseWrap + 'height:' + h + 'px;min-height:' + h + 'px;background:radial-gradient(ellipse at 50% 0%,' + esc(color) + ' 0%,transparent 70%);"></div>';
+      }
+      if (lineStyle === 'wave') {
+        var hw = Math.max(th * 6, 12);
+        var mid = hw / 2; var amp = mid * 0.8;
+        var path = 'M0,' + mid + ' C15,' + (mid-amp) + ' 15,' + (mid+amp) + ' 30,' + mid + ' S45,' + (mid-amp) + ' 60,' + mid + ' S75,' + (mid+amp) + ' 90,' + mid + ' S105,' + (mid-amp) + ' 120,' + mid + ' S135,' + (mid+amp) + ' 150,' + mid + ' S165,' + (mid-amp) + ' 180,' + mid + ' S195,' + (mid+amp) + ' 210,' + mid + ' S225,' + (mid-amp) + ' 240,' + mid + ' S255,' + (mid+amp) + ' 270,' + mid + ' S285,' + (mid-amp) + ' 300,' + mid + ' S315,' + (mid+amp) + ' 330,' + mid + ' S345,' + (mid-amp) + ' 360,' + mid + ' S375,' + (mid+amp) + ' 390,' + mid + ' S405,' + (mid-amp) + ' 420,' + mid + ' S435,' + (mid+amp) + ' 450,' + mid + ' S465,' + (mid-amp) + ' 480,' + mid + ' S495,' + (mid+amp) + ' 510,' + mid + ' S525,' + (mid-amp) + ' 540,' + mid + ' S555,' + (mid+amp) + ' 570,' + mid + ' S585,' + (mid-amp) + ' 600,' + mid;
+        return '<div style="' + baseWrap + 'height:' + hw + 'px;min-height:' + hw + 'px;overflow:hidden;"><svg width="100%" height="' + hw + '" viewBox="0 0 600 ' + hw + '" preserveAspectRatio="none" style="display:block;overflow:visible"><path d="' + path + '" fill="none" stroke="' + esc(color) + '" stroke-width="' + th + '" vector-effect="non-scaling-stroke"/></svg></div>';
+      }
+      if (lineStyle === 'zigzag') {
+        var hz = Math.max(th * 6, 12);
+        var pts = Array.from({length:61}, function(_,i){ return i*10 + ',' + (i%2===0?hz:0); }).join(' ');
+        return '<div style="' + baseWrap + 'height:' + hz + 'px;min-height:' + hz + 'px;overflow:hidden;"><svg width="100%" height="' + hz + '" viewBox="0 0 600 ' + hz + '" preserveAspectRatio="none" style="display:block;overflow:visible"><polyline points="' + pts + '" fill="none" stroke="' + esc(color) + '" stroke-width="' + th + '" vector-effect="non-scaling-stroke"/></svg></div>';
+      }
+      if (lineStyle === 'double') {
+        var gap2 = Math.max(th, 2);
+        var lineDiv = '<div style="height:' + th + 'px;min-height:' + th + 'px;background:' + esc(color) + ';' + brCss + 'font-size:0;line-height:0;"></div>';
+        return '<div style="' + baseWrap + 'display:flex;flex-direction:column;gap:' + gap2 + 'px;">' + lineDiv + lineDiv + '</div>';
+      }
+      if (lineStyle === 'dashed' || lineStyle === 'dotted') {
+        return '<div style="' + baseWrap + 'height:' + th + 'px;min-height:' + th + 'px;border-top:' + th + 'px ' + lineStyle + ' ' + esc(color) + ';background:transparent;box-sizing:content-box;font-size:0;line-height:0;overflow:hidden;"></div>';
+      }
+      // solid
+      return '<div style="' + baseWrap + 'height:' + th + 'px;min-height:' + th + 'px;background:' + esc(color) + ';' + brCss + 'font-size:0;line-height:0;overflow:hidden;"></div>';
+    }
+
+    var inner = '';
+    if (p.showElement) {
+      var elType = p.elementType || 'icon';
+      var iconVal = String(p.elementIcon || '').trim();
+      var imgUrl  = String(p.elementImage || '').trim();
+      var hasContent = elType === 'text' ? true : elType === 'image' ? !!imgUrl : !!iconVal;
+      if (hasContent) {
+        var elSpacing = (Number(p.elementSpacing != null ? p.elementSpacing : 12)) + 'px';
+        var elContent = '';
+        if (elType === 'text') {
+          elContent = '<span style="font-size:' + (p.elementFontSize || 14) + 'px;color:' + esc(p.elementTextColor || color) + ';white-space:nowrap;line-height:1;">' + esc(p.elementText || 'OR') + '</span>';
+        } else if (elType === 'image') {
+          var imgW = Number(p.elementImageWidth || 40);
+          var imgH2 = Number(p.elementImageHeight || 40);
+          var imgR = Number(p.elementImageRadius || 0);
+          elContent = '<img src="' + esc(imgUrl) + '" alt="" style="width:' + imgW + 'px;height:' + imgH2 + 'px;object-fit:contain;display:inline-block;vertical-align:middle;' + (imgR > 0 ? 'border-radius:' + imgR + 'px;' : '') + '" />';
+        } else {
+          elContent = '<span style="font-size:' + (p.iconSize || 20) + 'px;color:' + esc(p.iconColor || color) + ';line-height:1;display:inline-block;">' + esc(iconVal) + '</span>';
+        }
+        var elPos = p.elementPosition || 'center';
+        var elDiv = '<div style="flex-shrink:0;padding:0 ' + elSpacing + ';display:flex;align-items:center;">' + elContent + '</div>';
+        var lineL = buildLine('flex:1;');
+        var lineR = buildLine('flex:1;');
+        if (elPos === 'left')       inner = '<div style="display:flex;align-items:center;width:' + width + ';">' + elDiv + lineR + '</div>';
+        else if (elPos === 'right') inner = '<div style="display:flex;align-items:center;width:' + width + ';">' + lineL + elDiv + '</div>';
+        else                        inner = '<div style="display:flex;align-items:center;width:' + width + ';">' + lineL + elDiv + lineR + '</div>';
+      } else {
+        inner = buildLine('width:' + width + ';');
+      }
+    } else {
+      inner = buildLine('width:' + width + ';');
+    }
+    return '<div class="' + (hideClass || '') + '" style="' + spacing + 'padding-top:' + gap + 'px;padding-bottom:' + gap + 'px;display:flex;justify-content:' + justify + ';align-items:center;">' + inner + '</div>';
+  }
 
   var renderers = {
     Hero: Hero,
@@ -768,6 +1007,8 @@
     MarqueeBar: MarqueeBar,
     ContactSection: ContactSection,
     PhotoCollage: PhotoCollage,
+    Divider: Divider,
+    ProgressBar: ProgressBar,
   };
 
   function renderBlock(block, zones) {

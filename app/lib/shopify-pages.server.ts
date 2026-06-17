@@ -11,7 +11,7 @@
 
 import type { PuckData, PageMetafieldValue } from "./page-schema";
 import { buildMetafieldValue, isValidPageMetafieldValue } from "./page-schema";
-import { renderChromeBundle, renderPageWithChrome, SHOPIFY_PAGE_BODY_LIMIT } from "./puck-renderer";
+import { renderChromeBundle } from "./puck-renderer";
 import type { GlobalSettings } from "./settings.defaults";
 import { DEFAULT_GLOBAL_SETTINGS } from "./settings.defaults";
 import { getGlobalSettings, settingsToCSSString } from "./settings.server";
@@ -129,39 +129,20 @@ function toHandle(slug: string): string {
 }
 
 /**
- * Fallback markup written to `page.body` when the rendered HTML is too large
- * for Shopify's 512 KB cap. Themes with the Page Builder app block enabled
- * see the real content (rendered client-side from the page metafield by
- * `extensions/page-builder-renderer/assets/builder.js`). Themes without it
- * see this notice — actionable rather than a save failure.
- */
-const PAGE_BODY_OVERFLOW_FALLBACK =
-  `<div class="pb-body-fallback" style="padding:48px 24px;text-align:center;color:#6b7280;font-family:system-ui,-apple-system,sans-serif">` +
-  `<p style="margin:0;font-size:14px">This page is rendered by the Page Builder app block.</p>` +
-  `<p style="margin:8px 0 0;font-size:13px;opacity:.7">If you see this notice on the storefront, enable the Page Builder block in your theme's page template.</p>` +
-  `</div>`;
-
-/**
- * Write rendered HTML into the Shopify page body so `{{ page.content }}` renders
- * it. When the body exceeds Shopify's 512 KB cap we degrade to a tiny notice
- * instead of failing the save — the metafield write (above this in
- * savePageToShopify) holds the full data, and the theme app block renders it.
+ * Write an empty body to the Shopify page so `{{ page.content }}` outputs
+ * nothing. All rendering is done by the Page Builder app block (storefront.js)
+ * reading from the page metafield. Writing HTML here would cause the content
+ * to appear twice — once from {{ page.content }} and once from the app block.
  */
 async function setPageBody(
   admin: AdminClient,
   pageId: string,
-  html: string,
+  _html: string,
 ): Promise<void> {
-  let body = html;
-  const byteLength = new TextEncoder().encode(html).length;
-  if (byteLength > SHOPIFY_PAGE_BODY_LIMIT) {
-    body = PAGE_BODY_OVERFLOW_FALLBACK;
-    const usedKb = Math.round(byteLength / 1024);
-    const limitKb = Math.round(SHOPIFY_PAGE_BODY_LIMIT / 1024);
-    console.warn(
-      `[page-builder] page body ${usedKb} KB exceeds ${limitKb} KB — wrote fallback to page.body; rendering will come from the page metafield via the theme app block.`,
-    );
-  }
+  // Always clear page.body so {{ page.content }} is empty.
+  // The app block (page-builder.liquid + storefront.js) renders content from
+  // the metafield — it is the single source of truth on the storefront.
+  const body = "";
 
   const res = await admin.graphql(PAGE_UPDATE_BODY_MUTATION, {
     variables: { id: pageId, page: { body } },
@@ -404,8 +385,7 @@ export async function savePageToShopify({
   } catch (err) {
     console.warn("[page-builder] block resolution failed — rendering unresolved data:", err);
   }
-  const html = renderPageWithChrome(resolvedData, effectiveSettings);
-  await setPageBody(admin, shopifyPageId, html);
+  await setPageBody(admin, shopifyPageId, "");
 
   return { shopifyPageId };
 }

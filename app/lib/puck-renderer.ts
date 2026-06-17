@@ -166,6 +166,7 @@ function s(obj: Record<string, string | number | undefined | null>): string {
     .join(";");
 }
 
+
 function zoneContent(blockId: string, zoneName: string, zones: Zones): Block[] {
   return (zones[`${blockId}:${zoneName}`] ?? []) as Block[];
 }
@@ -250,7 +251,8 @@ function Text(p: Props): string {
   const bdr = (p.advBorderWidth  as any) ?? { top: 0, right: 0, bottom: 0, left: 0 };
 
   const bgStyle = (() => {
-    if (p.advBgType === "color") return `background:${esc((p.backgroundColor as string) || "transparent")};`;
+    if (p.advBgType === "color" && p.backgroundColor)
+      return `background:${esc(p.backgroundColor as string)};`;
     if (p.advBgType === "gradient" && p.advGradientColor1 && p.advGradientColor2)
       return `background:linear-gradient(${p.advGradientAngle ?? 135}deg,${esc(p.advGradientColor1 as string)},${esc(p.advGradientColor2 as string)});`;
     return "";
@@ -264,10 +266,11 @@ function Text(p: Props): string {
     p.hideDesktop ? "puck-hide-desktop" : "",
     p.hideTablet  ? "puck-hide-tablet"  : "",
     p.hideMobile  ? "puck-hide-mobile"  : "",
+    p.cssClass    ? esc(p.cssClass as string) : "",
   ].filter(Boolean).join(" ");
 
-  const opacity   = p.opacity != null ? Number(p.opacity) / 100 : 1;
-  const zIndex    = p.zIndex  != null ? `z-index:${p.zIndex};` : "";
+  const opacity    = p.opacity != null ? Number(p.opacity) / 100 : 1;
+  const zIndex     = p.zIndex  != null ? `z-index:${p.zIndex};position:relative;` : "";
   const fontFamily = (p.fontFamily && p.fontFamily !== "inherit") ? esc(p.fontFamily as string) : "var(--font-family)";
   const fontSize   = p.fontSize ? `${p.fontSize}px` : "var(--base-font-size,1rem)";
   const fontWeight = (p.fontWeight as string) || "400";
@@ -279,14 +282,23 @@ function Text(p: Props): string {
   const textColor  = esc((p.textColor as string) || "var(--text-color,#374151)");
   const alignment  = esc((p.alignment as string) || "left");
   const linkUrl    = esc((p.linkUrl as string) || "");
+  const linkColor  = (p.linkColor as string) || "";
 
+  // CSS multi-column support
+  const cols = parseInt(String(p.columnCount ?? "1"), 10) || 1;
+  const colCss = cols > 1
+    ? `column-count:${cols};column-gap:${esc((p.columnGap as string) || "1.5rem")};`
+    : "";
+
+  const idAttr = p.cssId ? ` id="${esc(p.cssId as string)}"` : "";
   const outerStyle = `margin:${m.top}px ${m.right}px ${m.bottom}px ${m.left}px;padding:${pd.top}px ${pd.right}px ${pd.bottom}px ${pd.left}px;border-radius:${br.top}px ${br.right}px ${br.bottom}px ${br.left}px;opacity:${opacity};${zIndex}${bgStyle}${borderStyle}`;
-  const pStyle = `text-align:${alignment};font-size:${fontSize};font-weight:${fontWeight};font-family:${fontFamily};font-style:${fontStyle};line-height:${lineHeight};letter-spacing:${letterSpacing};text-decoration:${textDecoration};text-transform:${textTransform};color:${textColor};margin:0;`;
+  const pStyle = `text-align:${alignment};font-size:${fontSize};font-weight:${fontWeight};font-family:${fontFamily};font-style:${fontStyle};line-height:${lineHeight};letter-spacing:${letterSpacing};text-decoration:${textDecoration};text-transform:${textTransform};color:${textColor};margin:0;${colCss}`;
 
+  const linkColorStyle = linkColor ? `<style>${idAttr ? `#${esc(p.cssId as string)}` : ".pb-text-blk"} a{color:${linkColor}!important}</style>` : "";
   const pEl = `<p style="${pStyle}">${esc((p.title as string) || "")}</p>`;
   const inner = linkUrl ? `<a href="${linkUrl}" style="text-decoration:none;color:inherit">${pEl}</a>` : pEl;
 
-  return `<div class="${hideClass}" style="${outerStyle}">${inner}</div>`;
+  return `${linkColorStyle}<div${idAttr} class="${hideClass || "pb-text-blk"}" style="${outerStyle}">${inner}</div>`;
 }
 
 function HeadingBlock(p: Props): string {
@@ -343,8 +355,9 @@ function HeadingBlock(p: Props): string {
   const headingStyle = `font-size:${fs};font-weight:${fontWeight};font-family:${fontFamily};font-style:${fontStyle};text-transform:${textTransform};text-decoration:${textDecoration};line-height:${lineHeight};letter-spacing:${letterSpacing};color:${color};margin:0;`;
   const wrapStyle = `text-align:${align};${bgCss}${borderCss}${radiusCss}${opacityCss}${zCss}margin:${m.top}px ${m.right}px ${m.bottom}px ${m.left}px;padding:${pd.top}px ${pd.right}px ${pd.bottom}px ${pd.left}px`;
   const linkUrl = esc((p.linkUrl as string) || "");
+  const headingLinkTarget = esc((p.linkTarget as string) || "_blank");
   const headingHtml = linkUrl
-    ? `<a href="${linkUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;color:inherit"><${tag} style="${headingStyle}">${esc(p.title)}</${tag}></a>`
+    ? `<a href="${linkUrl}" target="${headingLinkTarget}" rel="noopener noreferrer" style="text-decoration:none;color:inherit"><${tag} style="${headingStyle}">${esc(p.title)}</${tag}></a>`
     : `<${tag} style="${headingStyle}">${esc(p.title)}</${tag}>`;
 
   // Divider rendering — uses border-top instead of height+background so Shopify
@@ -653,6 +666,7 @@ function CardBlock(p: Props): string {
 function Button(p: Props): string {
   const label        = esc((p.label as string) || (p.text as string) || "Click Me");
   const linkUrl      = esc((p.linkUrl as string) || "");
+  const linkTarget   = (p.linkTarget as string) || "_blank";
   const iconType     = (p.iconType as string) || "none";
   const icon         = (p.icon as string) || "";
   const iconPos      = (p.iconPosition as string) || "before";
@@ -761,7 +775,7 @@ ${iconType === "svg" && iconHoverColor ? `.pb-btn-${uid}:hover svg{color:${iconH
 
   const btnEl = `<button class="pb-btn pb-btn-${uid}" style="${btnStyle}">${inner}</button>`;
   const linked = linkUrl
-    ? `<a href="${linkUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;${fullWidth ? "display:block" : "display:inline-block"}">${btnEl}</a>`
+    ? `<a href="${linkUrl}" target="${esc(linkTarget)}" rel="noopener noreferrer" style="text-decoration:none;${fullWidth ? "display:block" : "display:inline-block"}">${btnEl}</a>`
     : btnEl;
   const wrapped = `<div class="pb-btn-wrap-${uid}" style="${fullWidth ? "display:block" : "display:inline-block"}">${linked}</div>`;
 
@@ -804,7 +818,7 @@ function PhotoCollage(p: Props): string {
   const valid = images.filter((img) => img.url);
   const gap = Number(p.gap) || 8;
   const gapPx = `${gap}px`;
-  const brVal = Number(p.borderRadius ?? 0);
+  const brVal = Number(p.borderRadius ?? 8);
   const br = `${brVal}px`;
   const fit = (p.objectFit as string) || "cover";
   const layout = (p.layout as string) || "mixed";
@@ -837,10 +851,10 @@ function PhotoCollage(p: Props): string {
         : "";
 
   const imgTag = (img: { url?: string; alt?: string }, i: number, fitVal: string = fit) =>
-    `<img src="${esc(img.url ?? "")}" alt="${esc(img.alt || `Photo ${i + 1}`)}" loading="lazy" style="width:100%;height:100%;object-fit:${esc(fitVal)};display:block;transition:transform 0.3s ease,filter 0.3s ease">`;
+    `<img src="${esc(img.url ?? "")}" alt="${esc(img.alt || `Photo ${i + 1}`)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:${esc(fitVal)};display:block;transition:transform 0.3s ease,filter 0.3s ease">`;
 
   const wrapCell = (content: string, extraStyle: string) =>
-    `<div class="pb-collage-item" style="overflow:hidden;border-radius:${br}!important;box-shadow:${shadow};${extraStyle}">${content}</div>`;
+    `<div class="pb-collage-item" style="overflow:hidden;border-radius:${br}!important;box-shadow:${shadow};position:relative;${extraStyle}">${content}</div>`;
 
   const wrapClass = ["pb-collage-wrap", hideClasses].filter(Boolean).join(" ");
 
@@ -897,7 +911,7 @@ function PhotoCollage(p: Props): string {
 
   // ── MIXED SIZES (default): first image spans 2 cols + 2 rows ──
   const cells = valid.map((img, i) => {
-    const spanStyle = i === 0 ? "grid-column:span 2;grid-row:span 2;" : `aspect-ratio:${ar};`;
+    const spanStyle = i === 0 ? `grid-column:span 2;grid-row:span 2;aspect-ratio:${ar};` : `aspect-ratio:${ar};`;
     return wrapCell(imgTag(img, i), spanStyle);
   }).join("");
   return `${hoverStyle}<div class="${wrapClass}" style="display:grid;grid-template-columns:repeat(3,1fr);gap:${gapPx}">${cells}</div>`;
@@ -1123,11 +1137,14 @@ function renderDivider(p: Props): string {
   const align = (p.alignment as string) || "center";
   const justify = flexJustify(align);
 
+  const br = Number(p.borderRadius ?? 0);
+  const brCss = br > 0 ? `border-radius:${br}px;` : "";
+
   // Build one line segment. widthStyle is either "flex:1;" (inside icon row) or "width:Xunit;" (standalone).
   // We use display:block on the wrapper and an inner <hr>-style element so Shopify theme resets
   // (e.g. *{display:block}, *{height:0}, *{border:0}) cannot hide both wrappers simultaneously.
   const buildLine = (widthStyle: string): string => {
-    const baseWrap = `display:block;${widthStyle}overflow:visible;align-self:center;flex-shrink:${widthStyle.startsWith("flex:1") ? "1" : "0"};`;
+    const baseWrap = `display:block;${widthStyle}overflow:visible;align-self:center;flex-shrink:${widthStyle.startsWith("flex:1") ? "1" : "0"};${brCss}`;
     if (lineStyle === "gradient") {
       const c1 = esc((p.gradientStart as string) || "#e5e7eb");
       const c2 = esc((p.gradientEnd   as string) || "#e5e7eb");
@@ -1142,17 +1159,23 @@ function renderDivider(p: Props): string {
       const mid = h / 2;
       const amp = mid * 0.8;
       const path = `M0,${mid} C15,${mid - amp} 15,${mid + amp} 30,${mid} S45,${mid - amp} 60,${mid} S75,${mid + amp} 90,${mid} S105,${mid - amp} 120,${mid} S135,${mid + amp} 150,${mid} S165,${mid - amp} 180,${mid} S195,${mid + amp} 210,${mid} S225,${mid - amp} 240,${mid} S255,${mid + amp} 270,${mid} S285,${mid - amp} 300,${mid} S315,${mid + amp} 330,${mid} S345,${mid - amp} 360,${mid} S375,${mid + amp} 390,${mid} S405,${mid - amp} 420,${mid} S435,${mid + amp} 450,${mid} S465,${mid - amp} 480,${mid} S495,${mid + amp} 510,${mid} S525,${mid - amp} 540,${mid} S555,${mid + amp} 570,${mid} S585,${mid - amp} 600,${mid}`;
-      return `<div style="${baseWrap}height:${h}px;min-height:${h}px;"><svg width="100%" height="${h}" viewBox="0 0 600 ${h}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible"><path d="${path}" fill="none" stroke="${color}" stroke-width="${th}" vector-effect="non-scaling-stroke"/></svg></div>`;
+      return `<div style="${baseWrap}height:${h}px;min-height:${h}px;overflow:hidden;"><svg width="100%" height="${h}" viewBox="0 0 600 ${h}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible"><path d="${path}" fill="none" stroke="${color}" stroke-width="${th}" vector-effect="non-scaling-stroke"/></svg></div>`;
     }
     if (lineStyle === "zigzag") {
       const h = Math.max(th * 6, 12);
       const pts = Array.from({ length: 61 }, (_, i) => `${i * 10},${i % 2 === 0 ? h : 0}`).join(" ");
-      return `<div style="${baseWrap}height:${h}px;min-height:${h}px;"><svg width="100%" height="${h}" viewBox="0 0 600 ${h}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="${th}" vector-effect="non-scaling-stroke"/></svg></div>`;
+      return `<div style="${baseWrap}height:${h}px;min-height:${h}px;overflow:hidden;"><svg width="100%" height="${h}" viewBox="0 0 600 ${h}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="${th}" vector-effect="non-scaling-stroke"/></svg></div>`;
     }
-    // solid / dashed / dotted / double — use both height+background AND border-top so at least
-    // one survives any Shopify theme reset. The outer div gives height; border-top draws the line.
-    const bStyle = lineStyle === "dashed" || lineStyle === "dotted" || lineStyle === "double" ? lineStyle : "solid";
-    return `<div style="${baseWrap}height:${th}px;min-height:${th}px;border-top:${th}px ${bStyle} ${color};background:${color};box-sizing:content-box;font-size:0;line-height:0;"></div>`;
+    if (lineStyle === "double") {
+      const gap2 = Math.max(th, 2);
+      const lineDiv = `<div style="height:${th}px;min-height:${th}px;background:${color};${brCss}font-size:0;line-height:0;"></div>`;
+      return `<div style="${baseWrap}display:flex!important;flex-direction:column!important;gap:${gap2}px;">${lineDiv}${lineDiv}</div>`;
+    }
+    if (lineStyle === "dashed" || lineStyle === "dotted") {
+      return `<div style="${baseWrap}height:${th}px;min-height:${th}px;border-top:${th}px ${lineStyle} ${color};background:transparent;box-sizing:content-box;font-size:0;line-height:0;overflow:hidden;"></div>`;
+    }
+    // solid
+    return `<div style="${baseWrap}height:${th}px;min-height:${th}px;background:${color};${brCss}font-size:0;line-height:0;overflow:hidden;"></div>`;
   };
 
   let inner = "";
@@ -1189,7 +1212,14 @@ function renderDivider(p: Props): string {
     inner = buildLine(`width:${width};`);
   }
 
-  return `<div style="${spacing}padding-top:${gap}px;padding-bottom:${gap}px;display:flex;justify-content:${justify};align-items:center;${advBgStyle(p)}">${inner}</div>`;
+  const hideClass = [
+    p.hideDesktop ? "puck-hide-desktop" : "",
+    p.hideTablet  ? "puck-hide-tablet"  : "",
+    p.hideMobile  ? "puck-hide-mobile"  : "",
+  ].filter(Boolean).join(" ");
+  const classAttr = hideClass ? ` class="${hideClass}"` : "";
+
+  return `<div${classAttr} style="${spacing}padding-top:${gap}px;padding-bottom:${gap}px;display:flex;justify-content:${justify};align-items:center;${advBgStyle(p)}">${inner}</div>`;
 }
 
 function renderVideo(p: Props): string {
@@ -1489,10 +1519,10 @@ function renderProgressBar(p: Props): string {
   // min-height + a guard class so Shopify themes that reset `height:auto` on
   // divs can't collapse the bar to invisibility.
   const buildLine = (rowLabel: string, rowPct: number, mb = 0): string => {
-    const headerLabel = rowLabel ? `<span style="font-size:${lfs}px;color:${lc};display:inline-block">${esc(rowLabel)}</span>` : "";
-    const headerPct   = showPct   ? `<span style="font-size:${pfs}px;color:${pc};font-weight:600;display:inline-block">${rowPct}%</span>` : "";
+    const headerLabel = rowLabel ? `<span style="font-size:${lfs}px;color:${lc};display:inline-block;flex:1">${esc(rowLabel)}</span>` : "";
+    const headerPct   = showPct   ? `<span style="font-size:${pfs}px;color:${pc};font-weight:600;display:inline-block;flex-shrink:0">${rowPct}%</span>` : "";
     const header = (rowLabel || showPct)
-      ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;line-height:1.4">${headerLabel}${headerPct}</div>`
+      ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;line-height:1.4">${headerLabel}${headerPct}</div>`
       : "";
     const fillDiv = `<div class="pb-bar-fill" style="display:block;height:${lineH}px;min-height:${lineH}px;width:${rowPct}%;max-width:100%;background:${fillBg}${stripedOverlay};border-radius:${lineR}px;box-sizing:border-box"></div>`;
     const track   = `<div class="pb-bar-track" style="display:block;position:relative;height:${lineH}px;min-height:${lineH}px;width:100%;background:${tc};border-radius:${lineR}px;overflow:hidden;box-sizing:border-box;line-height:0;font-size:0">${fillDiv}</div>`;
@@ -1501,20 +1531,38 @@ function renderProgressBar(p: Props): string {
   };
 
   // ── circle SVG helper ────────────────────────────────────────────────────────
-  const buildCircleSvg = (sz: number, thick: number, disp: number, cardFill = "none"): string => {
+  const buildCircleSvg = (sz: number, thick: number, disp: number): string => {
     const r    = (sz - thick) / 2;
     const cx   = sz / 2;
     const cy   = sz / 2;
     const circ = 2 * Math.PI * r;
     const dash = (disp / 100) * circ;
     const rest = circ - dash;
-    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" style="transform:rotate(-90deg)"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${cardFill}" stroke="${tc}" stroke-width="${thick}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${fc}" stroke-width="${thick}" stroke-linecap="round" stroke-dasharray="${dash} ${rest}"/></svg>`;
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" style="transform:rotate(-90deg)"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${tc}" stroke-width="${thick}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${fc}" stroke-width="${thick}" stroke-linecap="round" stroke-dasharray="${dash} ${rest}"/></svg>`;
   };
 
-  // Every type shares this outer wrapper. display:block + box-sizing guard against
-  // themes that float or reset the content wrapper's children.
+  // ── semi-circle SVG helper (top half arc) ────────────────────────────────────
+  const buildSemiCircleSvg = (sz: number, thick: number, disp: number): string => {
+    const r = (sz - thick) / 2;
+    const halfCirc = Math.PI * r;
+    const dash = (disp / 100) * halfCirc;
+    const halfH = sz / 2 + thick;
+    const x1 = thick / 2, x2 = sz - thick / 2, cy = sz / 2;
+    return `<svg width="${sz}" height="${halfH}" viewBox="0 0 ${sz} ${halfH}" style="overflow:visible;display:block"><path d="M ${x1} ${cy} A ${r} ${r} 0 0 1 ${x2} ${cy}" fill="none" stroke="${tc}" stroke-width="${thick}" stroke-linecap="round"/><path d="M ${x1} ${cy} A ${r} ${r} 0 0 1 ${x2} ${cy}" fill="none" stroke="${fc}" stroke-width="${thick}" stroke-linecap="round" stroke-dasharray="${dash} ${halfCirc}"/></svg>`;
+  };
+
+  // hide classes
+  const hideClass = [
+    p.hideDesktop ? "puck-hide-desktop" : "",
+    p.hideTablet  ? "puck-hide-tablet"  : "",
+    p.hideMobile  ? "puck-hide-mobile"  : "",
+    p.cssClass ? String(p.cssClass) : "",
+  ].filter(Boolean).join(" ");
+  const classAttr = hideClass ? ` class="${hideClass}"` : "";
+
+  // Every type shares this outer wrapper.
   const wrap = (inner: string) =>
-    `<div style="display:block;box-sizing:border-box;width:100%;${spacing}${alignCss}${advBgStyle(p)}">${inner}</div>`;
+    `<div${classAttr} style="display:block;box-sizing:border-box;width:100%;${spacing}${alignCss}${advBgStyle(p)}">${inner}</div>`;
 
   // ── type: line ───────────────────────────────────────────────────────────────
   if (pbType === "line") {
@@ -1526,11 +1574,24 @@ function renderProgressBar(p: Props): string {
     const sz    = Number(p.circleSize ?? 120);
     const thick = Number(p.ringThickness ?? 10);
     const showInside = p.showLabelInside !== false;
-    const pctHtml   = showPct && showInside ? `<span style="font-size:${pfs}px;color:${pc};font-weight:700;line-height:1.1;display:block">${pct}%</span>` : "";
-    const lblHtml   = label && showInside ? `<span style="font-size:${Math.round(lfs * 0.78)}px;color:${lc};margin-top:2px;display:block">${label}</span>` : "";
-    const inner     = showInside ? `<div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center">${pctHtml}${lblHtml}</div>` : "";
+    const pctHtml   = showPct && showInside ? `<span style="font-size:${pfs}px;color:${pc};font-weight:700;line-height:1;display:block">${pct}%</span>` : "";
+    const lblHtml   = label && showInside ? `<span style="font-size:${Math.round(lfs * 0.78)}px;color:${lc};line-height:1;display:block">${label}</span>` : "";
+    const inner     = showInside ? `<div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">${pctHtml}${lblHtml}</div>` : "";
     const below     = !showInside && label ? `<span style="font-size:${lfs}px;color:${lc};display:block">${label}</span>` : "";
     return wrap(`<div style="display:inline-flex;flex-direction:column;align-items:center;gap:6px"><div style="position:relative;width:${sz}px;height:${sz}px;display:block;line-height:0;font-size:0">${buildCircleSvg(sz, thick, pct)}${inner}</div>${below}</div>`);
+  }
+
+  // ── type: semicircle ─────────────────────────────────────────────────────────
+  if (pbType === "semicircle") {
+    const sz    = Number(p.circleSize ?? 160);
+    const thick = Number(p.ringThickness ?? 14);
+    const halfH = sz / 2 + thick;
+    const showInside = p.showLabelInside !== false;
+    const pctHtml = showPct && showInside ? `<span style="font-size:${pfs}px;color:${pc};font-weight:700;line-height:1.2;display:block">${pct}%</span>` : "";
+    const lblHtml = label && showInside ? `<span style="font-size:${Math.round(lfs * 0.8)}px;color:${lc};margin-top:2px;display:block">${label}</span>` : "";
+    const inside  = showInside ? `<div style="position:absolute;bottom:0;left:0;right:0;display:flex;flex-direction:column;align-items:center;padding-bottom:4px">${pctHtml}${lblHtml}</div>` : "";
+    const below   = !showInside && label ? `<span style="font-size:${lfs}px;color:${lc};display:block">${label}</span>` : "";
+    return wrap(`<div style="display:inline-flex;flex-direction:column;align-items:center;gap:4px"><div style="position:relative;width:${sz}px;height:${halfH}px;display:block">${buildSemiCircleSvg(sz, thick, pct)}${inside}</div>${below}</div>`);
   }
 
   // ── type: step ───────────────────────────────────────────────────────────────
@@ -1551,20 +1612,8 @@ function renderProgressBar(p: Props): string {
   // ── type: multirow ───────────────────────────────────────────────────────────
   if (pbType === "multirow") {
     const rows: Array<{ label: string; value: number }> = (p.multiRows as Array<{ label: string; value: number }>) ?? [{ label: "Row 1", value: 60 }];
-    const rowsHtml = rows.map((row, i) => buildLine(row.label, Math.min(100, Math.max(0, row.value)), i < rows.length - 1 ? 10 : 0)).join("");
+    const rowsHtml = rows.map((row, i) => buildLine(row.label, Math.min(100, Math.max(0, row.value)), i < rows.length - 1 ? 12 : 0)).join("");
     return wrap(rowsHtml);
-  }
-
-  // ── type: circlecard ─────────────────────────────────────────────────────────
-  if (pbType === "circlecard") {
-    const sz      = Number(p.circleSize ?? 120);
-    const thick   = Number(p.ringThickness ?? 10);
-    const cardBg  = esc((p.cardBg as string) || "#ffffff");
-    const showBelow = p.showLabelBelow !== false;
-    const pctHtml   = showPct ? `<span style="font-size:${pfs}px;color:${pc};font-weight:700;display:block">${pct}%</span>` : "";
-    const inner     = `<div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center">${pctHtml}</div>`;
-    const belowLbl  = showBelow && label ? `<span style="font-size:${lfs}px;color:${lc};font-weight:600;display:block">${label}</span>` : "";
-    return wrap(`<div style="display:inline-flex;flex-direction:column;align-items:center;gap:10px;padding:16px;background:${cardBg};border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08)"><div style="position:relative;width:${sz}px;height:${sz}px;display:block;line-height:0;font-size:0">${buildCircleSvg(sz, thick, pct, cardBg)}${inner}</div>${belowLbl}</div>`);
   }
 
   // fallback → line
@@ -1709,6 +1758,15 @@ function applyHideClasses(html: string, p: Props): string {
   return `<div class="${classes}">${html}</div>`;
 }
 
+// Blocks that embed puck-hide-* classes on their own outermost element.
+// These must NOT be wrapped by applyHideClasses — it would add a redundant
+// wrapper div that breaks layout (e.g. flexbox children, full-width spacers).
+const SELF_HIDE_BLOCKS = new Set([
+  "TextBlock", "Text", "HeadingBlock", "Space", "MarqueeBar",
+  "Button", "StarRating", "ProgressBar", "SocialIcons", "ShareButtons",
+  "PhotoCollage", "LayoutBlock", "GridBlock", "Section",
+]);
+
 function renderBlock(block: Block, zones: Zones): string {
   const p = block.props ?? {};
   try {
@@ -1740,7 +1798,8 @@ function renderBlock(block: Block, zones: Zones): string {
       // GlobalHeader/Footer are theme concerns; GlobalBlock needs DB lookup (skip)
       default: return "";
     }
-    return applyHideClasses(html, p);
+    // Only wrap with hide classes for blocks that don't handle them internally
+    return SELF_HIDE_BLOCKS.has(block.type) ? html : applyHideClasses(html, p);
   } catch {
     return "";
   }
