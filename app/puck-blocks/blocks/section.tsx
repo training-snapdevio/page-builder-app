@@ -644,6 +644,69 @@ const miniBtn: React.CSSProperties = {
 // so users customise it from the settings panel instead of dragging blocks in.
 // The storefront equivalent lives in puck-renderer.ts (renderSectionAbout) and
 // must be kept visually in sync with this component.
+
+// Card-grid sections (Services / Features / Team / Pricing) — heading + a
+// responsive grid of editable cards. Storefront equivalent: renderSectionCards.
+function SectionCardsContent({ p, variant }: { p: any; variant: "services" | "features" | "team" | "pricing" }) {
+  const items: any[] = Array.isArray(p.items) ? p.items : [];
+  const accent = p.accentColor || "#005bd3";
+  const cols = variant === "team" ? (p.memberCount ?? 4)
+    : variant === "pricing" ? (p.tierCount ?? 3)
+    : variant === "features" ? (p.featureCount ?? 3)
+    : (p.serviceCount ?? 3);
+  const gap = variant === "features" ? 32 : variant === "team" ? 24 : variant === "pricing" ? 24 : 28;
+
+  const card = (it: any, i: number) => {
+    if (variant === "team") {
+      return (
+        <div key={i} style={{ textAlign: "center" }}>
+          {it.imageUrl
+            ? <img src={it.imageUrl} alt={it.name || ""} style={{ width: 120, height: 120, borderRadius: "50%", objectFit: "cover", margin: "0 auto 14px", display: "block" }} />
+            : <div style={{ width: 120, height: 120, borderRadius: "50%", background: "#e5e7eb", margin: "0 auto 14px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36 }}>👤</div>}
+          <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>{it.name || "Name"}</div>
+          <div style={{ fontSize: 14, color: accent, fontWeight: 600, marginTop: 2 }}>{it.role || "Role"}</div>
+          {it.bio && <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.6, margin: "8px 0 0" }}>{it.bio}</p>}
+        </div>
+      );
+    }
+    if (variant === "pricing") {
+      const featured = !!it.featured && String(it.featured).trim() !== "";
+      const features = String(it.features || "").split("\n").filter(Boolean);
+      return (
+        <div key={i} style={{ border: featured ? `2px solid ${accent}` : "1px solid #e5e7eb", borderRadius: 12, padding: 28, background: "#fff", position: "relative", boxShadow: featured ? "0 10px 30px rgba(0,0,0,0.08)" : "none" }}>
+          {featured && <span style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: accent, color: "#fff", fontSize: 11, fontWeight: 700, padding: "3px 12px", borderRadius: 999 }}>POPULAR</span>}
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#111827", marginBottom: 8 }}>{it.name || "Plan"}</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 2, marginBottom: 16 }}>
+            <span style={{ fontSize: 18, color: "#6b7280" }}>{p.currency || "$"}</span>
+            <span style={{ fontSize: 40, fontWeight: 800, color: "#111827", lineHeight: 1 }}>{it.price || "0"}</span>
+            <span style={{ fontSize: 14, color: "#6b7280" }}>{it.period || "/mo"}</span>
+          </div>
+          <ul style={{ listStyle: "none", padding: 0, margin: "0 0 20px", display: "flex", flexDirection: "column", gap: 8 }}>
+            {features.map((f, fi) => <li key={fi} style={{ fontSize: 14, color: "#374151", display: "flex", gap: 8 }}><span style={{ color: accent }}>✓</span>{f}</li>)}
+          </ul>
+          {it.buttonLabel && <a href={it.buttonUrl || "#"} style={{ display: "block", textAlign: "center", background: featured ? accent : "transparent", color: featured ? "#fff" : accent, border: `2px solid ${accent}`, padding: "10px 0", borderRadius: 6, fontWeight: 700, fontSize: 14, textDecoration: "none" }}>{it.buttonLabel}</a>}
+        </div>
+      );
+    }
+    return (
+      <div key={i} style={{ background: "#fff", border: "1px solid #eef2f7", borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+        <div style={{ width: 48, height: 48, borderRadius: 10, background: `${accent}1a`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 14 }}>{it.icon || "⭐"}</div>
+        <div style={{ fontSize: 17, fontWeight: 700, color: "#111827", marginBottom: 6 }}>{it.title || "Title"}</div>
+        {it.text && <p style={{ fontSize: 14, color: "#6b7280", lineHeight: 1.6, margin: 0 }}>{it.text}</p>}
+      </div>
+    );
+  };
+
+  return (
+    <SectionCanvasWrap props={p}>
+      <SectionHeading title={p.sectionTitle} subtitle={p.sectionSubtitle} />
+      <SecGrid cols={cols} gap={gap}>
+        {items.length ? items.map(card) : <div style={{ gridColumn: "1/-1", textAlign: "center", color: "#9ca3af", fontSize: 13, padding: 24 }}>Add items in the settings panel →</div>}
+      </SecGrid>
+    </SectionCanvasWrap>
+  );
+}
+
 function SectionAboutContent({ p }: { p: any }) {
   const imageRight = p.imagePosition === "right";
 
@@ -1104,18 +1167,22 @@ export const sectionTemplateConfig: Record<string, any> = {
         <TabSection title="Heading" />
         <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Our Services" />
         <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="What we offer" />
-        <TabSection title="Grid" />
+        <TabSection title="Services" />
+        <SectionItemsField label="Services" items={p.items} onChange={(v) => set("items", v)}
+          newItem={() => ({ icon: "⭐", title: "New Service", text: "Describe this service." })}
+          fields={[{ key: "icon", label: "Icon (emoji)", placeholder: "🔧" }, { key: "title", label: "Title", placeholder: "Service name" }, { key: "text", label: "Description", type: "textarea", placeholder: "Short description" }]} />
+        <TabSection title="Layout" />
         <InlineSelect label="Per Row" value={String(p.serviceCount ?? 3)} onChange={(v) => set("serviceCount", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
         <ColorPickerField label="Accent Color" value={p.accentColor ?? "#005bd3"} onChange={(v) => set("accentColor", v)} />
       </>
     )),
-    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 1, advPadding: { top: 70, right: 0, bottom: 70, left: 0 }, sectionTitle: "Our Services", sectionSubtitle: "", serviceCount: 3, accentColor: "#005bd3" }),
-    render: (p: any) => (
-      <SectionCanvasWrap props={p}>
-        <SectionDZ slot={0} label={p.sectionTitle || "Services heading"} icon="H" minH={60} hint="Drop Heading block" />
-        <div style={{ marginTop: 28 }}><SecGrid cols={p.serviceCount ?? 3} gap={28}>{Array.from({ length: p.serviceCount ?? 3 }).map((_, i) => <SectionDZ key={i} slot={i + 1} label={`Service ${i + 1} — icon, title, description`} icon="🔧" minH={140} hint="Drop Icon + Heading + Text" />)}</SecGrid></div>
-      </SectionCanvasWrap>
-    ),
+    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 1, advPadding: { top: 70, right: 0, bottom: 70, left: 0 }, sectionTitle: "Our Services", sectionSubtitle: "What we offer", serviceCount: 3, accentColor: "#005bd3",
+      items: [
+        { icon: "🚀", title: "Fast Delivery", text: "Get your products delivered quickly and reliably." },
+        { icon: "🛡️", title: "Secure Payments", text: "Your transactions are protected with bank-level security." },
+        { icon: "💬", title: "24/7 Support", text: "Our team is here to help you any time, any day." },
+      ] }),
+    render: (p: any) => <SectionCardsContent p={p} variant="services" />,
   },
 
   // ── Pricing ───────────────────────────────────────────────────────────────
@@ -1127,18 +1194,22 @@ export const sectionTemplateConfig: Record<string, any> = {
         <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Simple, Transparent Pricing" />
         <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="No hidden fees" />
         <TabSection title="Tiers" />
-        <InlineSelect label="Number of Tiers" value={String(p.tierCount ?? 3)} onChange={(v) => set("tierCount", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
+        <SectionItemsField label="Tiers" items={p.items} onChange={(v) => set("items", v)}
+          newItem={() => ({ name: "New Plan", price: "0", period: "/mo", features: "Feature one\nFeature two", buttonLabel: "Choose Plan", buttonUrl: "#", featured: "" })}
+          fields={[{ key: "name", label: "Plan Name", placeholder: "Pro" }, { key: "price", label: "Price (number)", placeholder: "29" }, { key: "period", label: "Period", placeholder: "/mo" }, { key: "features", label: "Features (one per line)", type: "textarea", placeholder: "Feature one\nFeature two" }, { key: "buttonLabel", label: "Button Label", placeholder: "Choose Plan" }, { key: "buttonUrl", label: "Button URL", type: "url" }, { key: "featured", label: "Featured? (yes/blank)", placeholder: "yes" }]} />
+        <TabSection title="Layout" />
+        <InlineSelect label="Per Row" value={String(p.tierCount ?? 3)} onChange={(v) => set("tierCount", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
         <StackedTextField label="Currency" value={p.currency ?? "$"} onChange={(v) => set("currency", v)} placeholder="$" />
         <ColorPickerField label="Accent Color" value={p.accentColor ?? "#005bd3"} onChange={(v) => set("accentColor", v)} />
       </>
     )),
-    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 1, advPadding: { top: 80, right: 0, bottom: 80, left: 0 }, sectionTitle: "Simple, Transparent Pricing", sectionSubtitle: "", tierCount: 3, currency: "$", accentColor: "#005bd3" }),
-    render: (p: any) => (
-      <SectionCanvasWrap props={p}>
-        <SectionDZ slot={0} label={p.sectionTitle || "Pricing heading"} icon="H" minH={60} hint="Drop Heading block" />
-        <div style={{ marginTop: 28 }}><SecGrid cols={p.tierCount ?? 3} gap={24}>{Array.from({ length: p.tierCount ?? 3 }).map((_, i) => <SectionDZ key={i} slot={i + 1} label={i === 1 ? "Tier 2 — recommended / featured" : `Tier ${i + 1} — name, price, features, CTA`} icon={i === 1 ? "⭐" : "💳"} minH={200} hint="Drop Heading + Text + Button blocks" />)}</SecGrid></div>
-      </SectionCanvasWrap>
-    ),
+    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 1, advPadding: { top: 80, right: 0, bottom: 80, left: 0 }, sectionTitle: "Simple, Transparent Pricing", sectionSubtitle: "No hidden fees, cancel anytime", tierCount: 3, currency: "$", accentColor: "#005bd3",
+      items: [
+        { name: "Starter", price: "9", period: "/mo", features: "1 user\n10 projects\nEmail support", buttonLabel: "Get Started", buttonUrl: "#", featured: "" },
+        { name: "Pro", price: "29", period: "/mo", features: "5 users\nUnlimited projects\nPriority support\nAdvanced analytics", buttonLabel: "Get Started", buttonUrl: "#", featured: "yes" },
+        { name: "Enterprise", price: "99", period: "/mo", features: "Unlimited users\nDedicated manager\n24/7 phone support\nCustom integrations", buttonLabel: "Contact Sales", buttonUrl: "#", featured: "" },
+      ] }),
+    render: (p: any) => <SectionCardsContent p={p} variant="pricing" />,
   },
 
   // ── CTA ───────────────────────────────────────────────────────────────────
@@ -1211,17 +1282,22 @@ export const sectionTemplateConfig: Record<string, any> = {
         <TabSection title="Heading" />
         <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Meet Our Team" />
         <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="The people behind the product" />
-        <TabSection title="Grid" />
+        <TabSection title="Members" />
+        <SectionItemsField label="Members" items={p.items} onChange={(v) => set("items", v)}
+          newItem={() => ({ imageUrl: "", name: "New Member", role: "Role", bio: "" })}
+          fields={[{ key: "imageUrl", label: "Photo", type: "image" }, { key: "name", label: "Name", placeholder: "Jane Doe" }, { key: "role", label: "Role", placeholder: "Founder" }, { key: "bio", label: "Bio", type: "textarea", placeholder: "Short bio (optional)" }]} />
+        <TabSection title="Layout" />
         <InlineSelect label="Members Per Row" value={String(p.memberCount ?? 4)} onChange={(v) => set("memberCount", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
       </>
     )),
-    defaultProps: baseSectionProps({ columns: 4, columnsTablet: 2, advPadding: { top: 70, right: 0, bottom: 70, left: 0 }, sectionTitle: "Meet Our Team", sectionSubtitle: "", memberCount: 4 }),
-    render: (p: any) => (
-      <SectionCanvasWrap props={p}>
-        <SectionDZ slot={0} label={p.sectionTitle || "Team heading"} icon="H" minH={60} hint="Drop Heading block" />
-        <div style={{ marginTop: 28 }}><SecGrid cols={p.memberCount ?? 4} gap={24}>{Array.from({ length: p.memberCount ?? 4 }).map((_, i) => <SectionDZ key={i} slot={i + 1} label={`Member ${i + 1} — photo, name, role, bio`} icon="👤" minH={160} hint="Drop Image + Heading + Text" />)}</SecGrid></div>
-      </SectionCanvasWrap>
-    ),
+    defaultProps: baseSectionProps({ columns: 4, columnsTablet: 2, advPadding: { top: 70, right: 0, bottom: 70, left: 0 }, sectionTitle: "Meet Our Team", sectionSubtitle: "The people behind the product", memberCount: 4,
+      items: [
+        { imageUrl: "", name: "Alex Morgan", role: "Founder & CEO", bio: "" },
+        { imageUrl: "", name: "Sam Rivera", role: "Head of Product", bio: "" },
+        { imageUrl: "", name: "Jordan Lee", role: "Lead Designer", bio: "" },
+        { imageUrl: "", name: "Taylor Kim", role: "Engineering", bio: "" },
+      ] }),
+    render: (p: any) => <SectionCardsContent p={p} variant="team" />,
   },
 
   // ── Logo Row ──────────────────────────────────────────────────────────────
@@ -1253,18 +1329,22 @@ export const sectionTemplateConfig: Record<string, any> = {
         <TabSection title="Heading" />
         <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Why Choose Us" />
         <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="What makes us different" />
-        <TabSection title="Grid" />
+        <TabSection title="Features" />
+        <SectionItemsField label="Features" items={p.items} onChange={(v) => set("items", v)}
+          newItem={() => ({ icon: "✅", title: "New Feature", text: "Describe this feature." })}
+          fields={[{ key: "icon", label: "Icon (emoji)", placeholder: "✅" }, { key: "title", label: "Title", placeholder: "Feature name" }, { key: "text", label: "Description", type: "textarea", placeholder: "Short description" }]} />
+        <TabSection title="Layout" />
         <InlineSelect label="Per Row" value={String(p.featureCount ?? 3)} onChange={(v) => set("featureCount", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
         <ColorPickerField label="Accent Color" value={p.accentColor ?? "#005bd3"} onChange={(v) => set("accentColor", v)} />
       </>
     )),
-    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 1, bgType: "color", bgColor: "#f8fafc", advPadding: { top: 70, right: 0, bottom: 70, left: 0 }, sectionTitle: "Why Choose Us", sectionSubtitle: "", featureCount: 3, accentColor: "#005bd3" }),
-    render: (p: any) => (
-      <SectionCanvasWrap props={p}>
-        <SectionDZ slot={0} label={p.sectionTitle || "Features heading"} icon="H" minH={60} hint="Drop Heading block" />
-        <div style={{ marginTop: 28 }}><SecGrid cols={p.featureCount ?? 3} gap={32}>{Array.from({ length: p.featureCount ?? 3 }).map((_, i) => <SectionDZ key={i} slot={i + 1} label={`Feature ${i + 1} — icon, title, description`} icon="✅" minH={130} hint="Drop Icon + Heading + Text" />)}</SecGrid></div>
-      </SectionCanvasWrap>
-    ),
+    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 1, bgType: "color", bgColor: "#f8fafc", advPadding: { top: 70, right: 0, bottom: 70, left: 0 }, sectionTitle: "Why Choose Us", sectionSubtitle: "What makes us different", featureCount: 3, accentColor: "#005bd3",
+      items: [
+        { icon: "⚡", title: "Lightning Fast", text: "Built for speed so your customers never wait." },
+        { icon: "🎨", title: "Fully Customizable", text: "Tailor every detail to match your brand." },
+        { icon: "📱", title: "Mobile Ready", text: "Looks perfect on every screen size." },
+      ] }),
+    render: (p: any) => <SectionCardsContent p={p} variant="features" />,
   },
 
   // ── Newsletter ────────────────────────────────────────────────────────────

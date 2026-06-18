@@ -1247,6 +1247,49 @@ function renderSectionVideo(p: Props): string {
   return sectionShell(p, heading + media);
 }
 
+// Card-grid sections (Services / Features / Team / Pricing). Mirrors the editor
+// component SectionCardsContent in section.tsx.
+function renderSectionCards(p: Props, variant: "services" | "features" | "team" | "pricing"): string {
+  const items: any[] = Array.isArray(p.items) ? (p.items as any[]) : [];
+  const accent = esc((p.accentColor as string) || "#005bd3");
+  const cols = variant === "team" ? Number(p.memberCount ?? 4)
+    : variant === "pricing" ? Number(p.tierCount ?? 3)
+    : variant === "features" ? Number(p.featureCount ?? 3)
+    : Number(p.serviceCount ?? 3);
+  const gap = variant === "features" ? 32 : variant === "team" ? 24 : variant === "pricing" ? 24 : 28;
+  const currency = esc((p.currency as string) || "$");
+
+  const card = (it: any): string => {
+    if (variant === "team") {
+      const img = it.imageUrl
+        ? `<img src="${esc(it.imageUrl)}" alt="${esc(it.name || "")}" style="width:120px;height:120px;border-radius:50%;object-fit:cover;margin:0 auto 14px;display:block" />`
+        : `<div style="width:120px;height:120px;border-radius:50%;background:#e5e7eb;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:36px">👤</div>`;
+      return `<div style="text-align:center">${img}<div style="font-size:17px;font-weight:700;color:#111827">${esc(it.name || "Name")}</div><div style="font-size:14px;color:${accent};font-weight:600;margin-top:2px">${esc(it.role || "Role")}</div>${it.bio ? `<p style="font-size:13px;color:#6b7280;line-height:1.6;margin:8px 0 0">${esc(it.bio)}</p>` : ""}</div>`;
+    }
+    if (variant === "pricing") {
+      const featured = !!it.featured && String(it.featured).trim() !== "";
+      const features = String(it.features || "").split("\n").filter(Boolean);
+      const feats = features.map((f) => `<li style="font-size:14px;color:#374151;display:flex;gap:8px"><span style="color:${accent}">✓</span>${esc(f)}</li>`).join("");
+      return `<div style="border:${featured ? `2px solid ${accent}` : "1px solid #e5e7eb"};border-radius:12px;padding:28px;background:#fff;position:relative;${featured ? "box-shadow:0 10px 30px rgba(0,0,0,0.08)" : ""}">`
+        + (featured ? `<span style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:${accent};color:#fff;font-size:11px;font-weight:700;padding:3px 12px;border-radius:999px">POPULAR</span>` : "")
+        + `<div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:8px">${esc(it.name || "Plan")}</div>`
+        + `<div style="display:flex;align-items:baseline;gap:2px;margin-bottom:16px"><span style="font-size:18px;color:#6b7280">${currency}</span><span style="font-size:40px;font-weight:800;color:#111827;line-height:1">${esc(it.price || "0")}</span><span style="font-size:14px;color:#6b7280">${esc(it.period || "/mo")}</span></div>`
+        + `<ul style="list-style:none;padding:0;margin:0 0 20px;display:flex;flex-direction:column;gap:8px">${feats}</ul>`
+        + (it.buttonLabel ? `<a href="${esc(it.buttonUrl || "#")}" style="display:block;text-align:center;background:${featured ? accent : "transparent"};color:${featured ? "#fff" : accent};border:2px solid ${accent};padding:10px 0;border-radius:6px;font-weight:700;font-size:14px;text-decoration:none">${esc(it.buttonLabel)}</a>` : "")
+        + `</div>`;
+    }
+    return `<div style="background:#fff;border:1px solid #eef2f7;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">`
+      + `<div style="width:48px;height:48px;border-radius:10px;background:${accent}1a;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:14px">${esc(it.icon || "⭐")}</div>`
+      + `<div style="font-size:17px;font-weight:700;color:#111827;margin-bottom:6px">${esc(it.title || "Title")}</div>`
+      + (it.text ? `<p style="font-size:14px;color:#6b7280;line-height:1.6;margin:0">${esc(it.text)}</p>` : "")
+      + `</div>`;
+  };
+
+  const cards = items.map(card).join("");
+  const grid = `<div class="pb-sec-cards" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${gap}px;align-items:${variant === "pricing" ? "stretch" : "start"}">${cards}</div>`;
+  return sectionShell(p, sectionHeadingHtml(p.sectionTitle as string, p.sectionSubtitle as string) + grid);
+}
+
 // ─── New block renderers ──────────────────────────────────────────────────────
 
 function advSpacing(p: Props): string {
@@ -1943,6 +1986,10 @@ function renderBlock(block: Block, zones: Zones): string {
       case "Section_Newsletter": html = renderSectionNewsletter(p); break;
       case "Section_Form":     html = renderSectionForm(p); break;
       case "Section_Video":    html = renderSectionVideo(p); break;
+      case "Section_Services": html = renderSectionCards(p, "services"); break;
+      case "Section_Features": html = renderSectionCards(p, "features"); break;
+      case "Section_Team":     html = renderSectionCards(p, "team"); break;
+      case "Section_Pricing":  html = renderSectionCards(p, "pricing"); break;
       // GlobalHeader/Footer are theme concerns; GlobalBlock needs DB lookup (skip)
       default: return "";
     }
@@ -1969,6 +2016,7 @@ img{max-width:100%;height:auto}
 @media(max-width:767px){
 .pb-grid-2col{grid-template-columns:1fr!important;gap:32px!important}
 .pb-sec-about-grid{grid-template-columns:1fr!important;gap:32px!important}
+.pb-sec-cards{grid-template-columns:1fr!important}
 .pb-grid-ncol{grid-template-columns:1fr!important}
 .pb-grid-stats{grid-template-columns:repeat(2,1fr)!important;gap:12px!important}
 .pb-collage{grid-template-columns:repeat(2,1fr)!important;grid-template-rows:auto!important}
@@ -1979,6 +2027,7 @@ img{max-width:100%;height:auto}
 }
 @media(min-width:768px) and (max-width:1023px){
 .pb-grid-ncol{grid-template-columns:repeat(2,1fr)!important}
+.pb-sec-cards{grid-template-columns:repeat(2,1fr)!important}
 .puck-hide-tablet{display:none!important}
 }
 @media(min-width:1024px){
