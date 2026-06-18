@@ -9,6 +9,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { DropZone, FieldLabel, usePuck } from "@my-app/puck-editor";
 
+import { StackedField } from "@/puck-blocks/shared";
+
 // ─── Image upload field + wrapper component ──────────────────────────────────
 
 const imageUploadField = {
