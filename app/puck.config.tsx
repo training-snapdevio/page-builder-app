@@ -706,6 +706,16 @@ function ColorPickerField({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // A stored value may be a CSS variable with a hex fallback, e.g.
+  // "var(--primary-color, #0158ad)". Show the human-friendly hex in the text
+  // input/swatch instead of the raw var() string.
+  const extractHex = (val: string): string => {
+    if (!val) return "";
+    const m = val.match(/var\(\s*[^,]+,\s*([^)]+)\)/);
+    return (m ? m[1] : val).trim();
+  };
+  const displayValue = extractHex(value);
+
   // Close picker when clicking outside
 
   useEffect(() => {
@@ -846,7 +856,7 @@ function ColorPickerField({
               margin: 2,
               borderRadius: "var(--p-border-radius-100, 4px)",
               border: "1px solid var(--p-color-border-subdued)",
-              backgroundColor: value || "#ffffff",
+              backgroundColor: displayValue || "#ffffff",
               cursor: "pointer",
               flexShrink: 0,
               padding: 0,
@@ -857,7 +867,7 @@ function ColorPickerField({
           {/* Hex value input — borderless, fills remaining width */}
           <input
             type="text"
-            value={value ?? ""}
+            value={displayValue}
             onChange={(e) => onChange(e.target.value)}
             placeholder="#000000"
             style={{
@@ -914,7 +924,7 @@ function ColorPickerField({
                     borderRadius: 3,
                     backgroundColor: color,
                     border:
-                      value === color
+                      displayValue.toLowerCase() === color
                         ? "2px solid var(--p-color-text-emphasis, #0070f3)"
                         : "1px solid var(--p-color-border-subdued, #e1e3e5)",
                     cursor: "pointer",
@@ -945,7 +955,7 @@ function ColorPickerField({
               </label>
               <input
                 type="color"
-                value={value || "#000000"}
+                value={/^#[0-9a-fA-F]{6}$/.test(displayValue) ? displayValue : "#000000"}
                 onChange={(e) => onChange(e.target.value)}
                 style={{
                   width: "100%",
@@ -5220,14 +5230,11 @@ const ImageComponent = {
                 {tab === "style" && (
                   <>
                     <TabSection title="Sizing" />
-                    <NumberUnitField
+                    <SliderNumberField
                       label="Width"
                       value={imgWidthVal}
-                      unit={imgWidthUnit}
-                      onValueChange={(v) => set("imgWidth", imgWidthUnit === "%" ? Math.min(v, 100) : v)}
-                      onUnitChange={(u) => { set("imgWidthUnit", u); if (u === "%" && imgWidthVal > 100) set("imgWidth", 100); }}
-                      units={["%", "px", "vw"]}
-                      min={0} max={imgWidthUnit === "%" ? 100 : 9999} step={1}
+                      onChange={(v) => { set("imgWidth", v); if (imgWidthUnit !== "px") set("imgWidthUnit", "px"); }}
+                      min={0} max={2000} step={1} unit="px"
                     />
                     <InlineSelect
                       label="Height"
@@ -5689,8 +5696,14 @@ const SpaceComponent = {
     zIndex: null,
   },
 
-  render: ({ id, heightDesktop, heightDesktopUnit, heightTablet, heightTabletUnit, heightMobile, heightMobileUnit, backgroundColor, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex }: any) => {
-    const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
+  render: ({ id, heightDesktop, heightDesktopUnit, heightTablet, heightTabletUnit, heightMobile, heightMobileUnit, backgroundColor, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex, puck }: any) => {
+    // "Hide on desktop/tablet/mobile" must only affect the storefront and page
+    // preview — inside the editor canvas the spacer should always be visible so
+    // it remains selectable/editable. Puck's preview iframe doesn't carry the
+    // outer canvas-override CSS, so gate the classes on edit mode here.
+    const hideClasses = puck?.isEditing
+      ? ""
+      : [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
     const toCssLen = (val: any, unit: any, fallback: string): string => {
       if (val == null || val === "") return fallback;
       const s = String(val);
@@ -5968,18 +5981,24 @@ const ButtonComponent = {
                     <TabSection title="Spacing" />
                     <FourSideField label="Margin (px)" value={props.advMargin} onChange={(v) => set("advMargin", v)} />
 
-                    <TabSection title="Background" />
-                    <InlineSelect
-                      label="Wrapper BG Type"
-                      value={bgType}
-                      onChange={(v) => set("advBgType", v)}
-                      options={[
-                        { value: "none", label: "None" },
-                        { value: "color", label: "Color" },
-                      ]}
-                    />
-                    {bgType === "color" && (
-                      <ColorPickerField label="Wrapper BG Color" value={props.advBgColor ?? ""} onChange={(v) => set("advBgColor", v)} />
+                    {/* Wrapper background is meaningless for a full-width button
+                        (the button fills the wrapper), so hide it in that case. */}
+                    {!props.fullWidth && (
+                      <>
+                        <TabSection title="Background" />
+                        <InlineSelect
+                          label="Wrapper BG Type"
+                          value={bgType}
+                          onChange={(v) => set("advBgType", v)}
+                          options={[
+                            { value: "none", label: "None" },
+                            { value: "color", label: "Color" },
+                          ]}
+                        />
+                        {bgType === "color" && (
+                          <ColorPickerField label="Wrapper BG Color" value={props.advBgColor ?? ""} onChange={(v) => set("advBgColor", v)} />
+                        )}
+                      </>
                     )}
 
                     <TabSection title="Responsive" />
