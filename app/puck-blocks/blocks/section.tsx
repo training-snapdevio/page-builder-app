@@ -558,6 +558,87 @@ function SecGrid({ cols, gap = 32, children }: { cols: number; gap?: number; chi
   return <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap, alignItems: "stretch" }}>{children}</div>;
 }
 
+// ─── Reusable section content helpers ────────────────────────────────────────
+
+// Centered section heading (badge / title / subtitle) used by most templates.
+function SectionHeading({ title, subtitle, titleColor, subtitleColor, align = "center" }: {
+  title?: string; subtitle?: string; titleColor?: string; subtitleColor?: string; align?: "left" | "center";
+}) {
+  if (!title && !subtitle) return null;
+  return (
+    <div style={{ textAlign: align, maxWidth: align === "center" ? 720 : undefined, margin: align === "center" ? "0 auto 40px" : "0 0 32px" }}>
+      {title && <h2 style={{ fontSize: "clamp(1.5rem,3vw,2.25rem)", fontWeight: 800, color: titleColor || "#111827", lineHeight: 1.2, margin: "0 0 12px" }}>{title}</h2>}
+      {subtitle && <p style={{ fontSize: "1.05rem", color: subtitleColor || "#6b7280", lineHeight: 1.6, margin: 0 }}>{subtitle}</p>}
+    </div>
+  );
+}
+
+// SectionItemsField — a lightweight repeatable-list editor for use INSIDE a
+// section's custom `_tabs` render (where native Puck array fields can't be
+// nested). `items` is the current array; `onChange` replaces the whole array.
+// `fields` describes each editable property of an item.
+function SectionItemsField({ label, items, onChange, fields, newItem, max = 12 }: {
+  label: string;
+  items: any[];
+  onChange: (next: any[]) => void;
+  fields: { key: string; label: string; type?: "text" | "textarea" | "image" | "url"; placeholder?: string }[];
+  newItem: () => any;
+  max?: number;
+}) {
+  const list = Array.isArray(items) ? items : [];
+  const update = (i: number, key: string, val: any) => {
+    const next = list.map((it, idx) => (idx === i ? { ...it, [key]: val } : it));
+    onChange(next);
+  };
+  const remove = (i: number) => onChange(list.filter((_, idx) => idx !== i));
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= list.length) return;
+    const next = [...list];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+  const add = () => onChange([...list, newItem()]);
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--p-color-text)", marginBottom: 8 }}>{label}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {list.map((item, i) => (
+          <div key={i} style={{ border: "1px solid var(--p-color-border)", borderRadius: 8, padding: 10, background: "var(--p-color-bg-surface-secondary, #f6f6f7)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--p-color-text-secondary)" }}>#{i + 1}</span>
+              <div style={{ display: "flex", gap: 4 }}>
+                <button onClick={() => move(i, -1)} disabled={i === 0} title="Move up" style={miniBtn}>↑</button>
+                <button onClick={() => move(i, 1)} disabled={i === list.length - 1} title="Move down" style={miniBtn}>↓</button>
+                <button onClick={() => remove(i)} title="Remove" style={{ ...miniBtn, color: "#d72c0d" }}>✕</button>
+              </div>
+            </div>
+            {fields.map((f) => {
+              const v = item[f.key] ?? "";
+              if (f.type === "image") return <ImageField key={f.key} label={f.label} value={v} onChange={(val) => update(i, f.key, val)} />;
+              if (f.type === "url") return <LinkUrlField key={f.key} label={f.label} value={v} onChange={(val) => update(i, f.key, val)} />;
+              if (f.type === "textarea") return <StackedTextareaField key={f.key} label={f.label} value={v} onChange={(val) => update(i, f.key, val)} placeholder={f.placeholder} />;
+              return <StackedTextField key={f.key} label={f.label} value={v} onChange={(val) => update(i, f.key, val)} placeholder={f.placeholder} />;
+            })}
+          </div>
+        ))}
+      </div>
+      {list.length < max && (
+        <button onClick={add} style={{ marginTop: 8, width: "100%", padding: "8px 10px", fontSize: 12, fontWeight: 600, border: "1px dashed var(--p-color-border)", borderRadius: 8, background: "var(--p-color-bg-surface)", color: "var(--p-color-text)", cursor: "pointer" }}>
+          + Add {label.replace(/s$/, "")}
+        </button>
+      )}
+    </div>
+  );
+}
+
+const miniBtn: React.CSSProperties = {
+  width: 24, height: 24, border: "1px solid var(--p-color-border)", borderRadius: 4,
+  background: "var(--p-color-bg-surface)", cursor: "pointer", fontSize: 12, lineHeight: 1,
+  display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--p-color-text)",
+};
+
 // ─── About section — pre-filled, directly editable content ───────────────────
 // Renders the section's own fields (heading/text/button/image) as real content,
 // so users customise it from the settings panel instead of dragging blocks in.
@@ -917,17 +998,27 @@ export const sectionTemplateConfig: Record<string, any> = {
       </>
     )),
     defaultProps: baseSectionProps({ columns: 2, columnsTablet: 1, advPadding: { top: 80, right: 0, bottom: 80, left: 0 }, sectionTitle: "Get In Touch", sectionSubtitle: "", address: "", phone: "", email: "", submitLabel: "Send Message", successMessage: "Thanks! We'll be in touch shortly." }),
-    render: (p: any) => (
-      <SectionCanvasWrap props={p}>
-        <SectionDZ slot={0} label={p.sectionTitle || "Contact heading"} icon="H" minH={60} hint="Drop Heading block" />
-        <div style={{ marginTop: 28 }}>
+    render: (p: any) => {
+      const inputStyle: React.CSSProperties = { width: "100%", padding: "11px 13px", fontSize: 14, border: "1px solid #d1d5db", borderRadius: 6, outline: "none", boxSizing: "border-box", marginBottom: 12, background: "#fff" };
+      return (
+        <SectionCanvasWrap props={p}>
+          <SectionHeading title={p.sectionTitle || "Get In Touch"} subtitle={p.sectionSubtitle} />
           <SecGrid cols={2} gap={48}>
-            <SectionDZ slot={1} label={`Contact info — ${p.address || "address"}, ${p.phone || "phone"}, ${p.email || "email"}`} icon="📍" minH={180} hint="Drop Text, Icon, SocialIcons blocks" />
-            <SectionDZ slot={2} label={`Form → "${p.submitLabel || "Send Message"}"`} icon="📋" minH={180} hint="Drop Button block" />
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, justifyContent: "center" }}>
+              {p.address && <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}><span style={{ fontSize: 18 }}>📍</span><span style={{ color: "#374151", fontSize: 15 }}>{p.address}</span></div>}
+              {p.phone && <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}><span style={{ fontSize: 18 }}>📞</span><a href={`tel:${p.phone}`} style={{ color: "#374151", fontSize: 15, textDecoration: "none" }}>{p.phone}</a></div>}
+              {p.email && <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}><span style={{ fontSize: 18 }}>✉️</span><a href={`mailto:${p.email}`} style={{ color: "#374151", fontSize: 15, textDecoration: "none" }}>{p.email}</a></div>}
+            </div>
+            <form onSubmit={(e) => e.preventDefault()}>
+              <input type="text" placeholder="Your name" style={inputStyle} />
+              <input type="email" placeholder="Your email" style={inputStyle} />
+              <textarea placeholder="Your message" rows={4} style={{ ...inputStyle, resize: "vertical" }} />
+              <button type="submit" style={{ background: "#005bd3", color: "#fff", padding: "12px 28px", borderRadius: 6, fontWeight: 700, fontSize: 15, border: "none", cursor: "pointer" }}>{p.submitLabel || "Send Message"}</button>
+            </form>
           </SecGrid>
-        </div>
-      </SectionCanvasWrap>
-    ),
+        </SectionCanvasWrap>
+      );
+    },
   },
 
   // ── Countdown ─────────────────────────────────────────────────────────────
@@ -951,16 +1042,32 @@ export const sectionTemplateConfig: Record<string, any> = {
       </>
     )),
     defaultProps: baseSectionProps({ columns: 1, bgType: "color", bgColor: "#0f172a", advPadding: { top: 80, right: 0, bottom: 80, left: 0 }, sectionTitle: "Sale Ends In", subtext: "Don't miss our biggest sale of the year", ctaLabel: "Shop Now", ctaUrl: "#", showProgress: true, progressLabel: "73% sold — only 27 left", progressValue: 73, progressColor: "#ef4444" }),
-    render: (p: any) => (
-      <SectionCanvasWrap props={p}>
-        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 20 }}>
-          <SectionDZ slot={0} label={`${p.sectionTitle || "Countdown headline"} — ${p.subtext || "subtext"}`} icon="⏱" minH={70} hint="Drop Heading & Text blocks" />
-          <SecGrid cols={4} gap={12}><SectionDZ slot={1} label="Days" icon="📅" minH={80} hint="Number + label" /><SectionDZ slot={2} label="Hours" icon="🕐" minH={80} hint="Number + label" /><SectionDZ slot={3} label="Minutes" icon="⏰" minH={80} hint="Number + label" /><SectionDZ slot={4} label="Seconds" icon="⚡" minH={80} hint="Number + label" /></SecGrid>
-          <SectionDZ slot={5} label={`"${p.ctaLabel || "Shop Now"}" button`} icon="⚡" minH={50} hint="Drop Button block" />
-          {p.showProgress !== false && <div style={{ background: "rgba(255,255,255,0.1)", borderRadius: 8, padding: "12px 16px" }}><div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 6 }}>{p.progressLabel || "73% sold"}</div><div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 999, height: 8, overflow: "hidden" }}><div style={{ height: "100%", width: `${p.progressValue ?? 73}%`, background: p.progressColor || "#ef4444", borderRadius: 999 }} /></div></div>}
-        </div>
-      </SectionCanvasWrap>
-    ),
+    render: (p: any) => {
+      const onDark = p.bgType !== "color" || !p.bgColor || /^#(0|1|2|3)/.test(String(p.bgColor));
+      const titleC = onDark ? "#ffffff" : "#111827";
+      const subC = onDark ? "rgba(255,255,255,0.8)" : "#6b7280";
+      const boxes = [["12", "Days"], ["08", "Hours"], ["45", "Mins"], ["30", "Secs"]];
+      return (
+        <SectionCanvasWrap props={p}>
+          <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 24, alignItems: "center" }}>
+            <div>
+              <h2 style={{ fontSize: "clamp(1.6rem,3vw,2.25rem)", fontWeight: 800, color: titleC, margin: "0 0 8px" }}>{p.sectionTitle || "Sale Ends In"}</h2>
+              {p.subtext && <p style={{ fontSize: "1.05rem", color: subC, margin: 0 }}>{p.subtext}</p>}
+            </div>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+              {boxes.map(([n, l]) => (
+                <div key={l} style={{ minWidth: 78, background: onDark ? "rgba(255,255,255,0.1)" : "#f1f5f9", borderRadius: 10, padding: "14px 18px" }}>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: titleC, lineHeight: 1 }}>{n}</div>
+                  <div style={{ fontSize: 12, color: subC, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>{l}</div>
+                </div>
+              ))}
+            </div>
+            {p.ctaLabel && <a href={p.ctaUrl || "#"} style={{ display: "inline-block", background: p.progressColor || "#ef4444", color: "#fff", padding: "12px 32px", borderRadius: 6, fontWeight: 700, fontSize: 15, textDecoration: "none" }}>{p.ctaLabel}</a>}
+            {p.showProgress !== false && <div style={{ width: "100%", maxWidth: 420, background: onDark ? "rgba(255,255,255,0.1)" : "#f1f5f9", borderRadius: 8, padding: "12px 16px" }}><div style={{ fontSize: 12, color: subC, marginBottom: 6 }}>{p.progressLabel || "73% sold"}</div><div style={{ background: onDark ? "rgba(255,255,255,0.15)" : "#e2e8f0", borderRadius: 999, height: 8, overflow: "hidden" }}><div style={{ height: "100%", width: `${p.progressValue ?? 73}%`, background: p.progressColor || "#ef4444", borderRadius: 999 }} /></div></div>}
+          </div>
+        </SectionCanvasWrap>
+      );
+    },
   },
 
   // ── Media Carousel ────────────────────────────────────────────────────────
@@ -1053,14 +1160,25 @@ export const sectionTemplateConfig: Record<string, any> = {
       </>
     )),
     defaultProps: baseSectionProps({ columns: 1, bgType: "color", bgColor: "#005bd3", advPadding: { top: 80, right: 0, bottom: 80, left: 0 }, headline: "Ready to Get Started?", subtext: "Join thousands of happy customers today.", primaryLabel: "Start Free Trial", primaryUrl: "#", secondaryLabel: "Learn More", secondaryUrl: "#", alignment: "text-center" }),
-    render: (p: any) => (
-      <SectionCanvasWrap props={p}>
-        <div style={{ textAlign: p.alignment?.replace("text-", "") as any || "center", display: "flex", flexDirection: "column", gap: 16 }}>
-          <SectionDZ slot={0} label={`"${p.headline || "CTA Headline"}" — heading & subtext`} icon="⚡" minH={80} hint="Drop Heading & Text blocks" />
-          <SectionDZ slot={1} label={`Buttons — "${p.primaryLabel || "Primary"}" & "${p.secondaryLabel || "Secondary"}"`} icon="⊡" minH={50} hint="Drop Button blocks" />
-        </div>
-      </SectionCanvasWrap>
-    ),
+    render: (p: any) => {
+      const align = (p.alignment ?? "text-center").replace("text-", "") as "left" | "center" | "right";
+      const justify = align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
+      const onColor = p.bgType === "color" && p.bgColor && p.bgColor !== "#ffffff";
+      const titleC = onColor ? "#ffffff" : "#111827";
+      const subC = onColor ? "rgba(255,255,255,0.9)" : "#6b7280";
+      return (
+        <SectionCanvasWrap props={p}>
+          <div style={{ textAlign: align }}>
+            <h2 style={{ fontSize: "clamp(1.6rem,3.2vw,2.4rem)", fontWeight: 800, color: titleC, lineHeight: 1.2, margin: "0 0 12px" }}>{p.headline || "Ready to Get Started?"}</h2>
+            {p.subtext && <p style={{ fontSize: "1.1rem", color: subC, lineHeight: 1.6, margin: "0 0 28px" }}>{p.subtext}</p>}
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: justify }}>
+              {p.primaryLabel && <a href={p.primaryUrl || "#"} style={{ display: "inline-block", background: onColor ? "#ffffff" : "#005bd3", color: onColor ? (p.bgColor || "#005bd3") : "#ffffff", padding: "12px 28px", borderRadius: 6, fontWeight: 700, fontSize: 15, textDecoration: "none" }}>{p.primaryLabel}</a>}
+              {p.secondaryLabel && <a href={p.secondaryUrl || "#"} style={{ display: "inline-block", background: "transparent", color: onColor ? "#ffffff" : "#005bd3", padding: "12px 28px", borderRadius: 6, fontWeight: 600, fontSize: 15, textDecoration: "none", border: `2px solid ${onColor ? "rgba(255,255,255,0.6)" : "#005bd3"}` }}>{p.secondaryLabel}</a>}
+            </div>
+          </div>
+        </SectionCanvasWrap>
+      );
+    },
   },
 
   // ── FAQ ───────────────────────────────────────────────────────────────────
@@ -1166,10 +1284,16 @@ export const sectionTemplateConfig: Record<string, any> = {
     defaultProps: baseSectionProps({ columns: 1, bgType: "color", bgColor: "#eff6ff", advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "Stay in the Loop", sectionSubtitle: "Get the latest updates delivered to your inbox.", placeholder: "Enter your email address", buttonLabel: "Subscribe", disclaimer: "" }),
     render: (p: any) => (
       <SectionCanvasWrap props={p}>
-        <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", display: "flex", flexDirection: "column", gap: 12 }}>
-          <SectionDZ slot={0} label={p.sectionTitle || "Newsletter heading"} icon="✉" minH={70} hint="Drop Heading block" />
-          <SectionDZ slot={1} label={`Email input: "${p.placeholder || "Enter email"}" + "${p.buttonLabel || "Subscribe"}" button`} icon="⊡" minH={50} hint="Drop Button block" />
-          {p.disclaimer && <div style={{ fontSize: 11, color: "#6b7280" }}>{p.disclaimer}</div>}
+        <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", display: "flex", flexDirection: "column", gap: 16 }}>
+          <div>
+            <h2 style={{ fontSize: "clamp(1.4rem,2.8vw,2rem)", fontWeight: 800, color: "#111827", margin: "0 0 8px" }}>{p.sectionTitle || "Stay in the Loop"}</h2>
+            {p.sectionSubtitle && <p style={{ fontSize: "1rem", color: "#6b7280", margin: 0 }}>{p.sectionSubtitle}</p>}
+          </div>
+          <form onSubmit={(e) => e.preventDefault()} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <input type="email" placeholder={p.placeholder || "Enter your email address"} style={{ flex: "1 1 200px", minWidth: 0, padding: "12px 14px", fontSize: 14, border: "1px solid #d1d5db", borderRadius: 6, outline: "none" }} />
+            <button type="submit" style={{ background: "#005bd3", color: "#fff", padding: "12px 24px", borderRadius: 6, fontWeight: 700, fontSize: 14, border: "none", cursor: "pointer" }}>{p.buttonLabel || "Subscribe"}</button>
+          </form>
+          {p.disclaimer && <div style={{ fontSize: 12, color: "#6b7280" }}>{p.disclaimer}</div>}
         </div>
       </SectionCanvasWrap>
     ),
@@ -1191,16 +1315,19 @@ export const sectionTemplateConfig: Record<string, any> = {
       </>
     )),
     defaultProps: baseSectionProps({ columns: 1, advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "See It In Action", sectionSubtitle: "", videoUrl: "", sourceType: "youtube", thumbnailUrl: "", autoplay: false, showHeading: true }),
-    render: (p: any) => (
-      <SectionCanvasWrap props={p}>
-        {p.showHeading !== false && <SectionDZ slot={0} label={p.sectionTitle || "Video section heading"} icon="H" minH={60} hint="Drop Heading block" />}
-        <div style={{ marginTop: 20 }}>
-          {p.videoUrl
-            ? <div style={{ aspectRatio: "16/9", background: "#000", borderRadius: 8, overflow: "hidden" }}><iframe src={`https://www.youtube.com/embed/${p.videoUrl.match(/(?:v=|youtu\.be\/)([^&?/]+)/)?.[1] ?? ""}`} style={{ width: "100%", height: "100%", border: "none" }} allowFullScreen /></div>
-            : <SectionDZ slot={1} label={`Video block — paste ${p.sourceType || "YouTube"} URL or upload`} icon="🎬" minH={300} hint="Drop Video block" />}
-        </div>
-      </SectionCanvasWrap>
-    ),
+    render: (p: any) => {
+      const ytId = p.videoUrl ? (String(p.videoUrl).match(/(?:v=|youtu\.be\/|embed\/)([^&?/]+)/)?.[1] ?? "") : "";
+      return (
+        <SectionCanvasWrap props={p}>
+          {p.showHeading !== false && <SectionHeading title={p.sectionTitle || "See It In Action"} subtitle={p.sectionSubtitle} />}
+          <div style={{ maxWidth: 900, margin: "0 auto" }}>
+            {p.videoUrl
+              ? <div style={{ aspectRatio: "16/9", background: "#000", borderRadius: 12, overflow: "hidden" }}><iframe title="Video" src={p.sourceType === "vimeo" ? `https://player.vimeo.com/video/${String(p.videoUrl).match(/(\d+)/)?.[1] ?? ""}` : `https://www.youtube.com/embed/${ytId}`} style={{ width: "100%", height: "100%", border: "none" }} allowFullScreen /></div>
+              : <div style={{ aspectRatio: "16/9", background: "#f1f5f9", borderRadius: 12, border: "2px dashed #cbd5e1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, color: "#94a3b8" }}><span style={{ fontSize: 40 }}>🎬</span><span style={{ fontSize: 13, fontWeight: 600 }}>Add a video</span><span style={{ fontSize: 11 }}>Set the Video URL in Content → Video</span></div>}
+          </div>
+        </SectionCanvasWrap>
+      );
+    },
   },
 
 };

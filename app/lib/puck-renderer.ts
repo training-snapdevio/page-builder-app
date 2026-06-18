@@ -1127,6 +1127,17 @@ function sectionShell(p: Props, inner: string): string {
   return `<section style="position:relative;overflow:hidden;${bg}${minH}padding:${pt}px ${pr}px ${pb}px ${pl}px;margin:${mt}px ${mr}px ${mb}px ${ml}px;box-sizing:border-box"><div style="${maxW}width:100%;padding:0 24px;box-sizing:border-box">${inner}</div></section>`;
 }
 
+// Centered section heading (title + subtitle) shared by section templates.
+function sectionHeadingHtml(title?: string, subtitle?: string, titleColor?: string, subtitleColor?: string, align: "left" | "center" = "center"): string {
+  const t = esc(title || ""), st = esc(subtitle || "");
+  if (!t && !st) return "";
+  const wrap = align === "center" ? "max-width:720px;margin:0 auto 40px;text-align:center" : "margin:0 0 32px";
+  return `<div style="${wrap}">`
+    + (t ? `<h2 style="font-size:clamp(1.5rem,3vw,2.25rem);font-weight:800;color:${esc(titleColor || "#111827")};line-height:1.2;margin:0 0 12px">${t}</h2>` : "")
+    + (st ? `<p style="font-size:1.05rem;color:${esc(subtitleColor || "#6b7280")};line-height:1.6;margin:0">${st}</p>` : "")
+    + `</div>`;
+}
+
 // About: image + heading/text/button, two-column, stacks on mobile.
 function renderSectionAbout(p: Props): string {
   const imageRight = p.imagePosition === "right";
@@ -1158,6 +1169,82 @@ function renderSectionAbout(p: Props): string {
   const cols = imageRight ? `${textCol}${imageCol}` : `${imageCol}${textCol}`;
   const grid = `<div class="pb-sec-about-grid" style="display:grid;grid-template-columns:${imageUrl ? "1fr 1fr" : "1fr"};gap:48px;align-items:center">${cols}</div>`;
   return sectionShell(p, grid);
+}
+
+// CTA: headline + subtext + two buttons, alignment-aware, color-aware.
+function renderSectionCTA(p: Props): string {
+  const align = String(p.alignment ?? "text-center").replace("text-", "");
+  const justify = align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
+  const onColor = p.bgType === "color" && p.bgColor && p.bgColor !== "#ffffff";
+  const titleC = onColor ? "#ffffff" : "#111827";
+  const subC = onColor ? "rgba(255,255,255,0.9)" : "#6b7280";
+  const headline = esc((p.headline as string) || "Ready to Get Started?");
+  const subtext = esc((p.subtext as string) || "");
+  const pl = esc((p.primaryLabel as string) || ""), pu = esc((p.primaryUrl as string) || "#");
+  const sl = esc((p.secondaryLabel as string) || ""), su = esc((p.secondaryUrl as string) || "#");
+  const inner = `<div style="text-align:${align}">`
+    + `<h2 style="font-size:clamp(1.6rem,3.2vw,2.4rem);font-weight:800;color:${titleC};line-height:1.2;margin:0 0 12px">${headline}</h2>`
+    + (subtext ? `<p style="font-size:1.1rem;color:${subC};line-height:1.6;margin:0 0 28px">${subtext}</p>` : "")
+    + `<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:${justify}">`
+    + (pl ? `<a href="${pu}" style="display:inline-block;background:${onColor ? "#ffffff" : "#005bd3"};color:${onColor ? esc((p.bgColor as string) || "#005bd3") : "#ffffff"};padding:12px 28px;border-radius:6px;font-weight:700;font-size:15px;text-decoration:none">${pl}</a>` : "")
+    + (sl ? `<a href="${su}" style="display:inline-block;background:transparent;color:${onColor ? "#ffffff" : "#005bd3"};padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;text-decoration:none;border:2px solid ${onColor ? "rgba(255,255,255,0.6)" : "#005bd3"}">${sl}</a>` : "")
+    + `</div></div>`;
+  return sectionShell(p, inner);
+}
+
+// Countdown: headline + 4 boxes + CTA + progress (static numbers; live JS optional later).
+function renderSectionCountdown(p: Props): string {
+  const onDark = p.bgType !== "color" || !p.bgColor || /^#(0|1|2|3)/.test(String(p.bgColor));
+  const titleC = onDark ? "#ffffff" : "#111827";
+  const subC = onDark ? "rgba(255,255,255,0.8)" : "#6b7280";
+  const boxes = [["12", "Days"], ["08", "Hours"], ["45", "Mins"], ["30", "Secs"]];
+  const boxesHtml = boxes.map(([n, l]) =>
+    `<div style="min-width:78px;background:${onDark ? "rgba(255,255,255,0.1)" : "#f1f5f9"};border-radius:10px;padding:14px 18px"><div style="font-size:32px;font-weight:800;color:${titleC};line-height:1">${n}</div><div style="font-size:12px;color:${subC};margin-top:4px;text-transform:uppercase;letter-spacing:0.05em">${l}</div></div>`
+  ).join("");
+  const cta = p.ctaLabel ? `<a href="${esc((p.ctaUrl as string) || "#")}" style="display:inline-block;background:${esc((p.progressColor as string) || "#ef4444")};color:#fff;padding:12px 32px;border-radius:6px;font-weight:700;font-size:15px;text-decoration:none">${esc(p.ctaLabel as string)}</a>` : "";
+  const progress = p.showProgress !== false
+    ? `<div style="width:100%;max-width:420px;background:${onDark ? "rgba(255,255,255,0.1)" : "#f1f5f9"};border-radius:8px;padding:12px 16px"><div style="font-size:12px;color:${subC};margin-bottom:6px">${esc((p.progressLabel as string) || "73% sold")}</div><div style="background:${onDark ? "rgba(255,255,255,0.15)" : "#e2e8f0"};border-radius:999px;height:8px;overflow:hidden"><div style="height:100%;width:${Number(p.progressValue ?? 73)}%;background:${esc((p.progressColor as string) || "#ef4444")};border-radius:999px"></div></div></div>`
+    : "";
+  const inner = `<div style="text-align:center;display:flex;flex-direction:column;gap:24px;align-items:center">`
+    + `<div><h2 style="font-size:clamp(1.6rem,3vw,2.25rem);font-weight:800;color:${titleC};margin:0 0 8px">${esc((p.sectionTitle as string) || "Sale Ends In")}</h2>${p.subtext ? `<p style="font-size:1.05rem;color:${subC};margin:0">${esc(p.subtext as string)}</p>` : ""}</div>`
+    + `<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">${boxesHtml}</div>${cta}${progress}</div>`;
+  return sectionShell(p, inner);
+}
+
+// Newsletter: heading + email input + subscribe button + disclaimer.
+function renderSectionNewsletter(p: Props): string {
+  const inner = `<div style="max-width:560px;margin:0 auto;text-align:center;display:flex;flex-direction:column;gap:16px">`
+    + `<div><h2 style="font-size:clamp(1.4rem,2.8vw,2rem);font-weight:800;color:#111827;margin:0 0 8px">${esc((p.sectionTitle as string) || "Stay in the Loop")}</h2>${p.sectionSubtitle ? `<p style="font-size:1rem;color:#6b7280;margin:0">${esc(p.sectionSubtitle as string)}</p>` : ""}</div>`
+    + `<form onsubmit="return false" style="display:flex;gap:8px;flex-wrap:wrap"><input type="email" placeholder="${esc((p.placeholder as string) || "Enter your email address")}" style="flex:1 1 200px;min-width:0;padding:12px 14px;font-size:14px;border:1px solid #d1d5db;border-radius:6px;outline:none" /><button type="submit" style="background:#005bd3;color:#fff;padding:12px 24px;border-radius:6px;font-weight:700;font-size:14px;border:none;cursor:pointer">${esc((p.buttonLabel as string) || "Subscribe")}</button></form>`
+    + (p.disclaimer ? `<div style="font-size:12px;color:#6b7280">${esc(p.disclaimer as string)}</div>` : "")
+    + `</div>`;
+  return sectionShell(p, inner);
+}
+
+// Contact form: contact info + a basic form, two-column.
+function renderSectionForm(p: Props): string {
+  const inputStyle = "width:100%;padding:11px 13px;font-size:14px;border:1px solid #d1d5db;border-radius:6px;outline:none;box-sizing:border-box;margin-bottom:12px;background:#fff";
+  const info = `<div style="display:flex;flex-direction:column;gap:16px;justify-content:center">`
+    + (p.address ? `<div style="display:flex;gap:10px;align-items:flex-start"><span style="font-size:18px">📍</span><span style="color:#374151;font-size:15px">${esc(p.address as string)}</span></div>` : "")
+    + (p.phone ? `<div style="display:flex;gap:10px;align-items:flex-start"><span style="font-size:18px">📞</span><a href="tel:${esc(p.phone as string)}" style="color:#374151;font-size:15px;text-decoration:none">${esc(p.phone as string)}</a></div>` : "")
+    + (p.email ? `<div style="display:flex;gap:10px;align-items:flex-start"><span style="font-size:18px">✉️</span><a href="mailto:${esc(p.email as string)}" style="color:#374151;font-size:15px;text-decoration:none">${esc(p.email as string)}</a></div>` : "")
+    + `</div>`;
+  const form = `<form onsubmit="return false"><input type="text" placeholder="Your name" style="${inputStyle}" /><input type="email" placeholder="Your email" style="${inputStyle}" /><textarea placeholder="Your message" rows="4" style="${inputStyle};resize:vertical"></textarea><button type="submit" style="background:#005bd3;color:#fff;padding:12px 28px;border-radius:6px;font-weight:700;font-size:15px;border:none;cursor:pointer">${esc((p.submitLabel as string) || "Send Message")}</button></form>`;
+  const grid = `<div class="pb-sec-about-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:48px">${info}${form}</div>`;
+  return sectionShell(p, sectionHeadingHtml(p.sectionTitle as string || "Get In Touch", p.sectionSubtitle as string) + grid);
+}
+
+// Video: heading + responsive 16:9 embed (YouTube/Vimeo).
+function renderSectionVideo(p: Props): string {
+  const url = String(p.videoUrl || "");
+  const ytId = url ? (url.match(/(?:v=|youtu\.be\/|embed\/)([^&?/]+)/)?.[1] ?? "") : "";
+  const vmId = url ? (url.match(/(\d+)/)?.[1] ?? "") : "";
+  const src = p.sourceType === "vimeo" ? `https://player.vimeo.com/video/${vmId}` : `https://www.youtube.com/embed/${ytId}`;
+  const heading = p.showHeading !== false ? sectionHeadingHtml(p.sectionTitle as string || "See It In Action", p.sectionSubtitle as string) : "";
+  const media = url
+    ? `<div style="max-width:900px;margin:0 auto"><div style="aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden"><iframe title="Video" src="${esc(src)}" style="width:100%;height:100%;border:none" allowfullscreen></iframe></div></div>`
+    : "";
+  return sectionShell(p, heading + media);
 }
 
 // ─── New block renderers ──────────────────────────────────────────────────────
@@ -1851,6 +1938,11 @@ function renderBlock(block: Block, zones: Zones): string {
       case "LayoutBlock":      html = renderLayoutBlock(p, zones); break;
       case "Section":          html = renderSectionBlock(p, zones); break;
       case "Section_About":    html = renderSectionAbout(p); break;
+      case "Section_CTA":      html = renderSectionCTA(p); break;
+      case "Section_Countdown": html = renderSectionCountdown(p); break;
+      case "Section_Newsletter": html = renderSectionNewsletter(p); break;
+      case "Section_Form":     html = renderSectionForm(p); break;
+      case "Section_Video":    html = renderSectionVideo(p); break;
       // GlobalHeader/Footer are theme concerns; GlobalBlock needs DB lookup (skip)
       default: return "";
     }
