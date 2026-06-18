@@ -662,8 +662,12 @@ function VideoUploadField({ value, onChange }: { value: string; onChange: (v: st
     try {
       const form = new FormData();
       form.append("file", file);
-      setUploadStatus("processing");
       const res = await fetch("/api/upload-asset", { method: "POST", body: form });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Server error (${res.status}): ${text.slice(0, 200)}`);
+      }
+      setUploadStatus("processing");
       const result = (await res.json()) as { ok: true; url: string } | { ok: false; error: string };
       if (!result.ok) throw new Error((result as any).error || "Upload failed");
       onChange((result as any).url);
@@ -722,9 +726,14 @@ function VideoUploadField({ value, onChange }: { value: string; onChange: (v: st
             <path d="M15 10l-3-3m0 0l-3 3m3-3v8"/><rect x="3" y="3" width="18" height="18" rx="2"/>
           </svg>
           <span style={{ fontSize: 12, fontWeight: 600 }}>
-            {uploadStatus === "uploading" || uploadStatus === "processing" ? "Uploading…" : "Click to upload video"}
+            {uploadStatus === "uploading" ? "Uploading…" : uploadStatus === "processing" ? "Processing on Shopify…" : "Click to upload video"}
           </span>
-          <span style={{ fontSize: 11, color: "var(--p-color-text-secondary)" }}>MP4 · MOV · WEBM · up to 250MB</span>
+          {uploadStatus === "processing" && (
+            <span style={{ fontSize: 11, color: "var(--p-color-text-secondary)" }}>Shopify is transcoding your video — please wait</span>
+          )}
+          {uploadStatus === "idle" && (
+            <span style={{ fontSize: 11, color: "var(--p-color-text-secondary)" }}>MP4 · MOV · WEBM · up to 250MB</span>
+          )}
           <input type="file" accept="video/*" onChange={handleFileChange} disabled={uploadStatus === "uploading" || uploadStatus === "processing"} style={{ display: "none" }} />
         </label>
       )}
