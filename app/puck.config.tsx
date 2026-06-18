@@ -43,6 +43,9 @@ import { commonComponents } from "@/puck-blocks/blocks/common";
 
 // ─── Section block + templates (extracted to ./puck-blocks/blocks/section) ───
 import { SectionBlockComponent, sectionTemplateConfig } from "@/puck-blocks/blocks/section";
+// Re-export so external callers (e.g. puck-splat/section-templates) keep
+// importing it from "@/puck.config" as before.
+export { sectionTemplateConfig };
 
 // ─── Demo content for the global header/footer preview ───────────────────────
 const headerData = {
