@@ -1290,6 +1290,91 @@ function renderSectionCards(p: Props, variant: "services" | "features" | "team" 
   return sectionShell(p, sectionHeadingHtml(p.sectionTitle as string, p.sectionSubtitle as string) + grid);
 }
 
+// Testimonial: heading + grid of quote cards.
+function renderSectionTestimonial(p: Props): string {
+  const items: any[] = Array.isArray(p.items) ? (p.items as any[]) : [];
+  const cols = Math.min(Number(p.reviewCount ?? 3), 4);
+  const cards = items.map((it) => {
+    const stars = "★".repeat(Math.max(0, Math.min(5, Number(it.rating) || 5)));
+    const avatar = it.avatar
+      ? `<img src="${esc(it.avatar)}" alt="${esc(it.author || "")}" style="width:40px;height:40px;border-radius:50%;object-fit:cover" />`
+      : `<div style="width:40px;height:40px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:16px">👤</div>`;
+    return `<div style="background:#fff;border:1px solid #eef2f7;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.04);display:flex;flex-direction:column;gap:12px">`
+      + `<div style="color:#f59e0b;font-size:15px;letter-spacing:1px">${stars}</div>`
+      + `<p style="font-size:15px;color:#374151;line-height:1.6;margin:0;font-style:italic">“${esc(it.quote || "Great experience!")}”</p>`
+      + `<div style="display:flex;align-items:center;gap:10px;margin-top:auto">${avatar}<div><div style="font-size:14px;font-weight:700;color:#111827">${esc(it.author || "Customer")}</div>${it.role ? `<div style="font-size:12px;color:#6b7280">${esc(it.role)}</div>` : ""}</div></div></div>`;
+  }).join("");
+  const grid = `<div class="pb-sec-cards" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:24px;align-items:stretch">${cards}</div>`;
+  return sectionShell(p, sectionHeadingHtml(p.sectionTitle as string, p.sectionSubtitle as string) + grid);
+}
+
+// FAQ: heading + <details> accordion list.
+function renderSectionFAQ(p: Props): string {
+  const items: any[] = Array.isArray(p.items) ? (p.items as any[]) : [];
+  const accent = esc((p.accentColor as string) || "#005bd3");
+  const rows = items.map((it) =>
+    `<details style="border:1px solid #e5e7eb;border-radius:8px;padding:14px 18px;background:#fff"><summary style="font-size:15px;font-weight:600;color:#111827;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:12px">${esc(it.q || "Question")}<span style="color:${accent}">＋</span></summary><p style="font-size:14px;color:#6b7280;line-height:1.6;margin:12px 0 0">${esc(it.a || "")}</p></details>`
+  ).join("");
+  const list = `<div style="max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:10px">${rows}</div>`;
+  return sectionShell(p, sectionHeadingHtml(p.sectionTitle as string, p.sectionSubtitle as string) + list);
+}
+
+// Gallery: heading + responsive image grid.
+function renderSectionGallery(p: Props): string {
+  const items: any[] = Array.isArray(p.items) ? (p.items as any[]) : [];
+  const cols = Number(p.galleryColumns ?? 3);
+  const cells = items.filter((it) => it.url).map((it) =>
+    `<img src="${esc(it.url)}" alt="${esc(it.alt || "")}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;display:block" />`
+  ).join("");
+  const heading = p.showHeading !== false ? sectionHeadingHtml(p.sectionTitle as string, p.sectionSubtitle as string) : "";
+  const grid = `<div class="pb-sec-cards" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${Number(p.gap ?? 12)}px">${cells}</div>`;
+  return sectionShell(p, heading + grid);
+}
+
+// Logo Row: optional label + grayscale logo grid.
+function renderSectionLogos(p: Props): string {
+  const items: any[] = Array.isArray(p.items) ? (p.items as any[]) : [];
+  const cols = Number(p.logoColumns ?? 6);
+  const gray = p.grayscale !== false;
+  const cells = items.filter((it) => it.url).map((it) =>
+    `<div style="display:flex;align-items:center;justify-content:center;min-height:50px"><img src="${esc(it.url)}" alt="${esc(it.alt || "")}" style="max-width:100%;max-height:44px;object-fit:contain;${gray ? "filter:grayscale(1);opacity:0.7" : ""}" /></div>`
+  ).join("");
+  const label = p.sectionTitle ? `<div style="text-align:center;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:24px">${esc(p.sectionTitle as string)}</div>` : "";
+  const grid = `<div class="pb-sec-cards" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:24px">${cells}</div>`;
+  return sectionShell(p, label + grid);
+}
+
+// Carousel: optional marquee bar + heading + product-style cards.
+function renderSectionCarousel(p: Props): string {
+  const items: any[] = Array.isArray(p.items) ? (p.items as any[]) : [];
+  const cols = Number(p.cardCount ?? 3);
+  const marquee = p.showMarquee !== false
+    ? `<div style="background:${esc((p.marqueeBg as string) || "#1a1a1a")};padding:10px 0;overflow:hidden"><div style="display:flex;gap:40px;color:${esc((p.marqueeColor as string) || "#fff")};font-size:13px;font-weight:500;white-space:nowrap;padding:0 24px">${[0, 1, 2].map(() => `<span>${esc((p.marqueeText as string) || "Announcement · ")}</span>`).join("")}</div></div>`
+    : "";
+  const cards = items.map((it) => {
+    const img = it.imageUrl
+      ? `<img src="${esc(it.imageUrl)}" alt="${esc(it.title || "")}" style="width:100%;aspect-ratio:4/3;object-fit:cover;display:block" />`
+      : `<div style="width:100%;aspect-ratio:4/3;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:24px">🖼</div>`;
+    return `<div style="background:#fff;border:1px solid #eef2f7;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04)">${img}<div style="padding:16px"><div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:6px">${esc(it.title || "Card title")}</div>${it.text ? `<p style="font-size:14px;color:#6b7280;line-height:1.5;margin:0 0 12px">${esc(it.text)}</p>` : ""}${it.buttonLabel ? `<a href="${esc(it.buttonUrl || "#")}" style="display:inline-block;color:#005bd3;font-weight:700;font-size:14px;text-decoration:none">${esc(it.buttonLabel)} →</a>` : ""}</div></div>`;
+  }).join("");
+  const grid = `<div class="pb-sec-cards" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:20px">${cards}</div>`;
+  return marquee + sectionShell(p, (p.sectionTitle ? sectionHeadingHtml(p.sectionTitle as string) : "") + grid);
+}
+
+// Media Carousel: heading + large main image + thumbnail strip.
+function renderSectionMediaCarousel(p: Props): string {
+  const items: any[] = Array.isArray(p.items) ? (p.items as any[]) : [];
+  const main = items.find((it) => it.url) || items[0] || {};
+  const heading = p.showHeading !== false ? sectionHeadingHtml(p.sectionTitle as string, p.sectionSubtitle as string) : "";
+  const mainHtml = main.url
+    ? `<img src="${esc(main.url)}" alt="${esc(main.alt || "")}" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;display:block" />`
+    : "";
+  const thumbs = (p.showDots !== false && items.length > 1)
+    ? `<div style="display:flex;gap:8px;margin-top:12px;justify-content:center;flex-wrap:wrap">${items.filter((it) => it.url).map((it) => `<div style="width:64px;height:44px;border-radius:6px;overflow:hidden;border:1px solid #e5e7eb;flex-shrink:0"><img src="${esc(it.url)}" alt="${esc(it.alt || "")}" style="width:100%;height:100%;object-fit:cover" /></div>`).join("")}</div>`
+    : "";
+  return sectionShell(p, heading + `<div style="max-width:900px;margin:0 auto">${mainHtml}${thumbs}</div>`);
+}
+
 // ─── New block renderers ──────────────────────────────────────────────────────
 
 function advSpacing(p: Props): string {
@@ -1990,6 +2075,12 @@ function renderBlock(block: Block, zones: Zones): string {
       case "Section_Features": html = renderSectionCards(p, "features"); break;
       case "Section_Team":     html = renderSectionCards(p, "team"); break;
       case "Section_Pricing":  html = renderSectionCards(p, "pricing"); break;
+      case "Section_Testimonial":   html = renderSectionTestimonial(p); break;
+      case "Section_FAQ":           html = renderSectionFAQ(p); break;
+      case "Section_Gallery":       html = renderSectionGallery(p); break;
+      case "Section_Logos":         html = renderSectionLogos(p); break;
+      case "Section_Carousel":      html = renderSectionCarousel(p); break;
+      case "Section_MediaCarousel": html = renderSectionMediaCarousel(p); break;
       // GlobalHeader/Footer are theme concerns; GlobalBlock needs DB lookup (skip)
       default: return "";
     }

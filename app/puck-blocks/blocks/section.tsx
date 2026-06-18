@@ -707,6 +707,144 @@ function SectionCardsContent({ p, variant }: { p: any; variant: "services" | "fe
   );
 }
 
+// Testimonial: heading + grid of quote cards (quote, author, role, rating).
+function SectionTestimonialContent({ p }: { p: any }) {
+  const items: any[] = Array.isArray(p.items) ? p.items : [];
+  const cols = Math.min(p.reviewCount ?? 3, 4);
+  return (
+    <SectionCanvasWrap props={p}>
+      <SectionHeading title={p.sectionTitle} subtitle={p.sectionSubtitle} />
+      <SecGrid cols={cols} gap={24}>
+        {items.map((it, i) => (
+          <div key={i} style={{ background: "#fff", border: "1px solid #eef2f7", borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ color: "#f59e0b", fontSize: 15, letterSpacing: 1 }}>{"★".repeat(Math.max(0, Math.min(5, Number(it.rating) || 5)))}</div>
+            <p style={{ fontSize: 15, color: "#374151", lineHeight: 1.6, margin: 0, fontStyle: "italic" }}>“{it.quote || "Great experience!"}”</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: "auto" }}>
+              {it.avatar ? <img src={it.avatar} alt={it.author || ""} style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }} /> : <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>👤</div>}
+              <div><div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{it.author || "Customer"}</div>{it.role && <div style={{ fontSize: 12, color: "#6b7280" }}>{it.role}</div>}</div>
+            </div>
+          </div>
+        ))}
+      </SecGrid>
+    </SectionCanvasWrap>
+  );
+}
+
+// FAQ: heading + native <details> accordion list (q / a).
+function SectionFAQContent({ p }: { p: any }) {
+  const items: any[] = Array.isArray(p.items) ? p.items : [];
+  const accent = p.accentColor || "#005bd3";
+  return (
+    <SectionCanvasWrap props={p}>
+      <SectionHeading title={p.sectionTitle} subtitle={p.sectionSubtitle} />
+      <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", flexDirection: "column", gap: 10 }}>
+        {items.map((it, i) => (
+          <details key={i} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "14px 18px", background: "#fff" }}>
+            <summary style={{ fontSize: 15, fontWeight: 600, color: "#111827", cursor: "pointer", listStyle: "none", display: "flex", justifyContent: "space-between", gap: 12 }}>{it.q || "Question"}<span style={{ color: accent }}>＋</span></summary>
+            <p style={{ fontSize: 14, color: "#6b7280", lineHeight: 1.6, margin: "12px 0 0" }}>{it.a || ""}</p>
+          </details>
+        ))}
+      </div>
+    </SectionCanvasWrap>
+  );
+}
+
+// Gallery: heading + responsive image grid.
+function SectionGalleryContent({ p }: { p: any }) {
+  const items: any[] = Array.isArray(p.items) ? p.items : [];
+  const cols = p.galleryColumns ?? 3;
+  return (
+    <SectionCanvasWrap props={p}>
+      {p.showHeading !== false && <SectionHeading title={p.sectionTitle} subtitle={p.sectionSubtitle} />}
+      <SecGrid cols={cols} gap={p.gap ?? 12}>
+        {items.map((it, i) => it.url
+          ? <img key={i} src={it.url} alt={it.alt || ""} style={{ width: "100%", aspectRatio: "1/1", objectFit: "cover", borderRadius: 8, display: "block" }} />
+          : <div key={i} style={{ width: "100%", aspectRatio: "1/1", background: "#f1f5f9", border: "2px dashed #cbd5e1", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: 22 }}>🖼</div>)}
+      </SecGrid>
+    </SectionCanvasWrap>
+  );
+}
+
+// Logo Row: optional label + grayscale logo grid.
+function SectionLogosContent({ p }: { p: any }) {
+  const items: any[] = Array.isArray(p.items) ? p.items : [];
+  const cols = p.logoColumns ?? 6;
+  const gray = p.grayscale !== false;
+  return (
+    <SectionCanvasWrap props={p}>
+      {p.sectionTitle && <div style={{ textAlign: "center", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#94a3b8", marginBottom: 24 }}>{p.sectionTitle}</div>}
+      <SecGrid cols={cols} gap={24}>
+        {items.map((it, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 50 }}>
+            {it.url
+              ? <img src={it.url} alt={it.alt || ""} style={{ maxWidth: "100%", maxHeight: 44, objectFit: "contain", filter: gray ? "grayscale(1)" : undefined, opacity: gray ? 0.7 : 1 }} />
+              : <div style={{ width: "100%", height: 44, background: "#eef2f7", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", color: "#cbd5e1", fontSize: 18 }}>🏷</div>}
+          </div>
+        ))}
+      </SecGrid>
+    </SectionCanvasWrap>
+  );
+}
+
+// Carousel: optional marquee bar + heading + a row of product-style cards.
+function SectionCarouselContent({ p }: { p: any }) {
+  const items: any[] = Array.isArray(p.items) ? p.items : [];
+  const cols = p.cardCount ?? 3;
+  return (
+    <div>
+      {p.showMarquee !== false && (
+        <div style={{ background: p.marqueeBg || "#1a1a1a", padding: "10px 0", overflow: "hidden" }}>
+          <div style={{ display: "flex", gap: 40, color: p.marqueeColor || "#fff", fontSize: 13, fontWeight: 500, whiteSpace: "nowrap", padding: "0 24px" }}>
+            {Array.from({ length: 3 }).map((_, i) => <span key={i}>{p.marqueeText || "Announcement · "}</span>)}
+          </div>
+        </div>
+      )}
+      <SectionCanvasWrap props={p}>
+        {p.sectionTitle && <SectionHeading title={p.sectionTitle} />}
+        <SecGrid cols={cols} gap={20}>
+          {items.map((it, i) => (
+            <div key={i} style={{ background: "#fff", border: "1px solid #eef2f7", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+              {it.imageUrl
+                ? <img src={it.imageUrl} alt={it.title || ""} style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }} />
+                : <div style={{ width: "100%", aspectRatio: "4/3", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: 24 }}>🖼</div>}
+              <div style={{ padding: 16 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#111827", marginBottom: 6 }}>{it.title || "Card title"}</div>
+                {it.text && <p style={{ fontSize: 14, color: "#6b7280", lineHeight: 1.5, margin: "0 0 12px" }}>{it.text}</p>}
+                {it.buttonLabel && <a href={it.buttonUrl || "#"} style={{ display: "inline-block", color: "#005bd3", fontWeight: 700, fontSize: 14, textDecoration: "none" }}>{it.buttonLabel} →</a>}
+              </div>
+            </div>
+          ))}
+        </SecGrid>
+      </SectionCanvasWrap>
+    </div>
+  );
+}
+
+// Media Carousel: heading + large main image + thumbnail strip.
+function SectionMediaCarouselContent({ p }: { p: any }) {
+  const items: any[] = Array.isArray(p.items) ? p.items : [];
+  const main = items.find((it) => it.url) || items[0] || {};
+  return (
+    <SectionCanvasWrap props={p}>
+      {p.showHeading !== false && <SectionHeading title={p.sectionTitle} subtitle={p.sectionSubtitle} />}
+      <div style={{ maxWidth: 900, margin: "0 auto" }}>
+        {main.url
+          ? <img src={main.url} alt={main.alt || ""} style={{ width: "100%", aspectRatio: "16/9", objectFit: "cover", borderRadius: 12, display: "block" }} />
+          : <div style={{ width: "100%", aspectRatio: "16/9", background: "#f1f5f9", border: "2px dashed #cbd5e1", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: 36 }}>🎞</div>}
+        {p.showDots !== false && items.length > 1 && (
+          <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "center", flexWrap: "wrap" }}>
+            {items.map((it, i) => (
+              <div key={i} style={{ width: 64, height: 44, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb", background: "#f1f5f9", flexShrink: 0 }}>
+                {it.url ? <img src={it.url} alt={it.alt || ""} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </SectionCanvasWrap>
+  );
+}
+
 function SectionAboutContent({ p }: { p: any }) {
   const imageRight = p.imagePosition === "right";
 
@@ -970,23 +1108,18 @@ export const sectionTemplateConfig: Record<string, any> = {
         <TabSection title="Heading" />
         <ToggleField label="Show Heading" value={p.showHeading !== false} onChange={(v) => set("showHeading", v)} />
         {p.showHeading !== false && <><StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Our Gallery" /><StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="A short description" /></>}
+        <TabSection title="Images" />
+        <SectionItemsField label="Images" items={p.items} onChange={(v) => set("items", v)} max={24}
+          newItem={() => ({ url: "", alt: "" })}
+          fields={[{ key: "url", label: "Image", type: "image" }, { key: "alt", label: "Alt Text", placeholder: "Describe the image" }]} />
         <TabSection title="Grid" />
         <InlineSelect label="Columns" value={String(p.galleryColumns ?? 3)} onChange={(v) => set("galleryColumns", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }, { value: "5", label: "5" }]} />
         <SliderNumberField label="Gap (px)" value={p.gap ?? 12} onChange={(v) => set("gap", v)} min={0} max={60} step={2} unit="px" />
       </>
     )),
-    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 2, advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "Our Gallery", sectionSubtitle: "", galleryColumns: 3, gap: 12, showHeading: true }),
-    render: (p: any) => (
-      <SectionCanvasWrap props={p}>
-        {p.showHeading !== false && <SectionDZ slot={0} label={p.sectionTitle || "Gallery heading"} icon="H" minH={60} hint="Drop Heading block" />}
-        <div style={{ marginTop: 20 }}>
-          <SecGrid cols={3} gap={p.gap ?? 12}><SectionDZ slot={1} label="Image 1" icon="🖼" minH={130} /><SectionDZ slot={2} label="Image 2" icon="🖼" minH={130} /><SectionDZ slot={3} label="Image 3" icon="🖼" minH={130} /></SecGrid>
-        </div>
-        <div style={{ marginTop: p.gap ?? 12 }}>
-          <SecGrid cols={4} gap={p.gap ?? 12}><SectionDZ slot={4} label="Image 4" icon="🖼" minH={90} /><SectionDZ slot={5} label="Image 5" icon="🖼" minH={90} /><SectionDZ slot={6} label="Image 6" icon="🖼" minH={90} /><SectionDZ slot={7} label="Image 7" icon="🖼" minH={90} /></SecGrid>
-        </div>
-      </SectionCanvasWrap>
-    ),
+    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 2, advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "Our Gallery", sectionSubtitle: "", galleryColumns: 3, gap: 12, showHeading: true,
+      items: [{ url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }] }),
+    render: (p: any) => <SectionGalleryContent p={p} />,
   },
 
   // ── Testimonial ───────────────────────────────────────────────────────────
@@ -997,22 +1130,21 @@ export const sectionTemplateConfig: Record<string, any> = {
         <TabSection title="Heading" />
         <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="What Our Customers Say" />
         <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="Real reviews from real customers" />
+        <TabSection title="Reviews" />
+        <SectionItemsField label="Reviews" items={p.items} onChange={(v) => set("items", v)}
+          newItem={() => ({ quote: "Great experience!", author: "Customer", role: "", rating: "5", avatar: "" })}
+          fields={[{ key: "quote", label: "Quote", type: "textarea", placeholder: "Their feedback…" }, { key: "author", label: "Author", placeholder: "Jane Doe" }, { key: "role", label: "Role / Company", placeholder: "CEO, Acme" }, { key: "rating", label: "Stars (1-5)", placeholder: "5" }, { key: "avatar", label: "Avatar", type: "image" }]} />
         <TabSection title="Layout" />
         <InlineSelect label="Columns" value={String(p.reviewCount ?? 3)} onChange={(v) => set("reviewCount", Number(v))} options={[{ value: "1", label: "1 (Single)" }, { value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
       </>
     )),
-    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 1, bgType: "color", bgColor: "#f8fafc", advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "What Our Customers Say", sectionSubtitle: "", reviewCount: 3 }),
-    render: (p: any) => {
-      const cols = Math.min(p.reviewCount ?? 3, 4);
-      return (
-        <SectionCanvasWrap props={p}>
-          <SectionDZ slot={0} label={p.sectionTitle || "Testimonials heading"} icon="H" minH={60} hint="Drop Heading block" />
-          <div style={{ marginTop: 24 }}>
-            <SecGrid cols={cols} gap={24}>{Array.from({ length: cols }).map((_, i) => <SectionDZ key={i} slot={i + 1} label={`Review ${i + 1} — quote, author, star rating`} icon="💬" minH={120} hint="Drop BlockQuote + StarRating" />)}</SecGrid>
-          </div>
-        </SectionCanvasWrap>
-      );
-    },
+    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 1, bgType: "color", bgColor: "#f8fafc", advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "What Our Customers Say", sectionSubtitle: "Real reviews from real customers", reviewCount: 3,
+      items: [
+        { quote: "Absolutely love it. Setup was effortless and the results speak for themselves.", author: "Jamie Carter", role: "Marketing Lead", rating: "5", avatar: "" },
+        { quote: "The best decision we made this year. Support is incredibly responsive.", author: "Priya Nair", role: "Founder, Bloom", rating: "5", avatar: "" },
+        { quote: "Simple, powerful, and reliable. Highly recommended to any team.", author: "Marcus Hill", role: "CTO", rating: "5", avatar: "" },
+      ] }),
+    render: (p: any) => <SectionTestimonialContent p={p} />,
   },
 
   // ── Carousel ──────────────────────────────────────────────────────────────
@@ -1025,22 +1157,19 @@ export const sectionTemplateConfig: Record<string, any> = {
         {p.showMarquee !== false && <><StackedTextField label="Text" value={p.marqueeText ?? ""} onChange={(v) => set("marqueeText", v)} placeholder="Announcement · " /><ColorPickerField label="Background" value={p.marqueeBg ?? "#1a1a1a"} onChange={(v) => set("marqueeBg", v)} /><ColorPickerField label="Text Color" value={p.marqueeColor ?? "#ffffff"} onChange={(v) => set("marqueeColor", v)} /></>}
         <TabSection title="Carousel" />
         <StackedTextField label="Section Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Featured" />
+        <SectionItemsField label="Cards" items={p.items} onChange={(v) => set("items", v)}
+          newItem={() => ({ imageUrl: "", title: "New Card", text: "", buttonLabel: "", buttonUrl: "#" })}
+          fields={[{ key: "imageUrl", label: "Image", type: "image" }, { key: "title", label: "Title", placeholder: "Card title" }, { key: "text", label: "Text", type: "textarea", placeholder: "Short text" }, { key: "buttonLabel", label: "Button Label", placeholder: "Shop (optional)" }, { key: "buttonUrl", label: "Button URL", type: "url" }]} />
         <InlineSelect label="Cards Per Row" value={String(p.cardCount ?? 3)} onChange={(v) => set("cardCount", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
       </>
     )),
-    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 2, advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "Featured", showMarquee: true, marqueeText: "Free shipping · New arrivals · Special offers · ", marqueeBg: "#1a1a1a", marqueeColor: "#ffffff", cardCount: 3 }),
-    render: (p: any) => {
-      const cols = p.cardCount ?? 3;
-      return (
-        <div>
-          {p.showMarquee !== false && <div style={{ background: p.marqueeBg || "#1a1a1a", padding: "10px 0", overflow: "hidden" }}><div style={{ display: "flex", gap: 40, color: p.marqueeColor || "#fff", fontSize: 13, fontWeight: 500, whiteSpace: "nowrap", padding: "0 24px" }}>{Array.from({ length: 3 }).map((_, i) => <span key={i}>{p.marqueeText || "Announcement · "}</span>)}</div></div>}
-          <SectionCanvasWrap props={p}>
-            <SectionDZ slot={0} label={p.sectionTitle || "Section heading"} icon="H" minH={60} hint="Drop Heading block" />
-            <div style={{ marginTop: 20 }}><SecGrid cols={cols} gap={20}>{Array.from({ length: cols }).map((_, i) => <SectionDZ key={i} slot={i + 1} label={`Card ${i + 1}`} icon="🃏" minH={160} hint="Drop Image, Text, Button blocks" />)}</SecGrid></div>
-          </SectionCanvasWrap>
-        </div>
-      );
-    },
+    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 2, advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "Featured", showMarquee: true, marqueeText: "Free shipping · New arrivals · Special offers · ", marqueeBg: "#1a1a1a", marqueeColor: "#ffffff", cardCount: 3,
+      items: [
+        { imageUrl: "", title: "Featured Product", text: "A short description of this item.", buttonLabel: "Shop Now", buttonUrl: "#" },
+        { imageUrl: "", title: "Best Seller", text: "A short description of this item.", buttonLabel: "Shop Now", buttonUrl: "#" },
+        { imageUrl: "", title: "New Arrival", text: "A short description of this item.", buttonLabel: "Shop Now", buttonUrl: "#" },
+      ] }),
+    render: (p: any) => <SectionCarouselContent p={p} />,
   },
 
   // ── Contact Form ─────────────────────────────────────────────────────────
@@ -1141,22 +1270,16 @@ export const sectionTemplateConfig: Record<string, any> = {
         <TabSection title="Heading" />
         <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Featured Media" />
         <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="Short description" />
-        <TabSection title="Carousel" />
-        <StackedNumberField label="Thumbnail Count" value={p.thumbnailCount ?? 4} onChange={(v) => set("thumbnailCount", v)} min={2} max={8} step={1} />
-        <ToggleField label="Autoplay" value={!!p.autoplay} onChange={(v) => set("autoplay", v)} />
-        {p.autoplay && <SliderNumberField label="Interval (ms)" value={p.interval ?? 4000} onChange={(v) => set("interval", v)} min={1000} max={10000} step={500} unit="ms" />}
-        <ToggleField label="Show Arrows" value={p.showArrows !== false} onChange={(v) => set("showArrows", v)} />
-        <ToggleField label="Show Dots" value={p.showDots !== false} onChange={(v) => set("showDots", v)} />
+        <TabSection title="Slides" />
+        <SectionItemsField label="Slides" items={p.items} onChange={(v) => set("items", v)} max={10}
+          newItem={() => ({ url: "", alt: "" })}
+          fields={[{ key: "url", label: "Image", type: "image" }, { key: "alt", label: "Alt Text", placeholder: "Describe the image" }]} />
+        <ToggleField label="Show Thumbnails" value={p.showDots !== false} onChange={(v) => set("showDots", v)} />
       </>
     )),
-    defaultProps: baseSectionProps({ columns: 1, advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "Featured Media", sectionSubtitle: "", thumbnailCount: 4, autoplay: false, interval: 4000, showArrows: true, showDots: true }),
-    render: (p: any) => (
-      <SectionCanvasWrap props={p}>
-        <SectionDZ slot={0} label={p.sectionTitle || "Media carousel heading"} icon="H" minH={60} hint="Drop Heading block" />
-        <div style={{ marginTop: 20 }}><SectionDZ slot={1} label="Main media — drop Image or Video block (YouTube/Vimeo/upload)" icon="🎞" minH={300} hint="Supports Image block and Video block" /></div>
-        <div style={{ marginTop: 12 }}><SecGrid cols={p.thumbnailCount ?? 4} gap={8}>{Array.from({ length: p.thumbnailCount ?? 4 }).map((_, i) => <SectionDZ key={i} slot={i + 2} label={`Thumbnail ${i + 1}`} icon="🖼" minH={60} />)}</SecGrid></div>
-      </SectionCanvasWrap>
-    ),
+    defaultProps: baseSectionProps({ columns: 1, advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "Featured Media", sectionSubtitle: "", showArrows: true, showDots: true,
+      items: [{ url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }] }),
+    render: (p: any) => <SectionMediaCarouselContent p={p} />,
   },
 
   // ── Services ──────────────────────────────────────────────────────────────
@@ -1260,18 +1383,22 @@ export const sectionTemplateConfig: Record<string, any> = {
         <TabSection title="Heading" />
         <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Frequently Asked Questions" />
         <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="Everything you need to know" />
-        <TabSection title="Items" />
-        <StackedNumberField label="FAQ Slots" value={p.faqCount ?? 4} onChange={(v) => set("faqCount", v)} min={1} max={12} step={1} />
+        <TabSection title="Questions" />
+        <SectionItemsField label="Questions" items={p.items} onChange={(v) => set("items", v)}
+          newItem={() => ({ q: "New question?", a: "The answer." })}
+          fields={[{ key: "q", label: "Question", placeholder: "How does it work?" }, { key: "a", label: "Answer", type: "textarea", placeholder: "Explain the answer…" }]} />
+        <TabSection title="Style" />
         <ColorPickerField label="Accent Color" value={p.accentColor ?? "#005bd3"} onChange={(v) => set("accentColor", v)} />
       </>
     )),
-    defaultProps: baseSectionProps({ columns: 1, advPadding: { top: 70, right: 0, bottom: 70, left: 0 }, sectionTitle: "Frequently Asked Questions", sectionSubtitle: "", faqCount: 4, accentColor: "#005bd3" }),
-    render: (p: any) => (
-      <SectionCanvasWrap props={p}>
-        <SectionDZ slot={0} label={p.sectionTitle || "FAQ heading"} icon="H" minH={60} hint="Drop Heading block" />
-        <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 8 }}>{Array.from({ length: p.faqCount ?? 4 }).map((_, i) => <SectionDZ key={i} slot={i + 1} label={`FAQ ${i + 1} — question & answer`} icon="❓" minH={52} hint="Drop Accordion block" />)}</div>
-      </SectionCanvasWrap>
-    ),
+    defaultProps: baseSectionProps({ columns: 1, advPadding: { top: 70, right: 0, bottom: 70, left: 0 }, sectionTitle: "Frequently Asked Questions", sectionSubtitle: "Everything you need to know", accentColor: "#005bd3",
+      items: [
+        { q: "How do I get started?", a: "Sign up and follow the quick onboarding — it takes less than five minutes." },
+        { q: "Can I cancel anytime?", a: "Yes, you can cancel your plan at any time with no penalties." },
+        { q: "Do you offer support?", a: "Absolutely. Our team is available 24/7 to help you out." },
+        { q: "Is there a free trial?", a: "Yes, every plan comes with a 14-day free trial — no card required." },
+      ] }),
+    render: (p: any) => <SectionFAQContent p={p} />,
   },
 
   // ── Team ──────────────────────────────────────────────────────────────────
@@ -1306,19 +1433,19 @@ export const sectionTemplateConfig: Record<string, any> = {
     fields: makeSectionFields("Section_Logos", (p, set) => (
       <>
         <TabSection title="Label" />
-        <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Trusted By" />
+        <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Trusted By (leave blank to hide)" />
         <TabSection title="Logos" />
-        <StackedNumberField label="Logo Count" value={p.logoCount ?? 6} onChange={(v) => set("logoCount", v)} min={2} max={12} step={1} />
+        <SectionItemsField label="Logos" items={p.items} onChange={(v) => set("items", v)} max={18}
+          newItem={() => ({ url: "", alt: "" })}
+          fields={[{ key: "url", label: "Logo", type: "image" }, { key: "alt", label: "Alt Text", placeholder: "Brand name" }]} />
+        <TabSection title="Style" />
+        <InlineSelect label="Per Row" value={String(p.logoColumns ?? 6)} onChange={(v) => set("logoColumns", Number(v))} options={[{ value: "3", label: "3" }, { value: "4", label: "4" }, { value: "5", label: "5" }, { value: "6", label: "6" }]} />
         <ToggleField label="Grayscale" value={p.grayscale !== false} onChange={(v) => set("grayscale", v)} />
       </>
     )),
-    defaultProps: baseSectionProps({ columns: 6, columnsTablet: 3, bgType: "color", bgColor: "#f8fafc", advPadding: { top: 40, right: 0, bottom: 40, left: 0 }, sectionTitle: "Trusted By", logoCount: 6, grayscale: true }),
-    render: (p: any) => (
-      <SectionCanvasWrap props={p}>
-        <SectionDZ slot={0} label={p.sectionTitle || "'Trusted by' label"} icon="🏷" minH={40} hint="Drop Heading block (small)" />
-        <div style={{ marginTop: 16 }}><SecGrid cols={Math.min(p.logoCount ?? 6, 6)} gap={16}>{Array.from({ length: p.logoCount ?? 6 }).map((_, i) => <SectionDZ key={i} slot={i + 1} label={`Logo ${i + 1}`} icon="🏷" minH={50} hint="Drop Image block" />)}</SecGrid></div>
-      </SectionCanvasWrap>
-    ),
+    defaultProps: baseSectionProps({ columns: 6, columnsTablet: 3, bgType: "color", bgColor: "#f8fafc", advPadding: { top: 40, right: 0, bottom: 40, left: 0 }, sectionTitle: "Trusted By", logoColumns: 6, grayscale: true,
+      items: [{ url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }] }),
+    render: (p: any) => <SectionLogosContent p={p} />,
   },
 
   // ── Features ──────────────────────────────────────────────────────────────
