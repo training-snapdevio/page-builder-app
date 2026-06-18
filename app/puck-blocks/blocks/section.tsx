@@ -23,6 +23,7 @@ import {
   SliderNumberField,
   StackedNumberField,
   StackedTextField,
+  StackedTextareaField,
   TabSection,
   ToggleField,
 } from "@/puck-blocks/shared";
@@ -557,6 +558,61 @@ function SecGrid({ cols, gap = 32, children }: { cols: number; gap?: number; chi
   return <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap, alignItems: "stretch" }}>{children}</div>;
 }
 
+// ─── About section — pre-filled, directly editable content ───────────────────
+// Renders the section's own fields (heading/text/button/image) as real content,
+// so users customise it from the settings panel instead of dragging blocks in.
+// The storefront equivalent lives in puck-renderer.ts (renderSectionAbout) and
+// must be kept visually in sync with this component.
+function SectionAboutContent({ p }: { p: any }) {
+  const imageRight = p.imagePosition === "right";
+
+  const textCol = (
+    <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+      {p.badge && (
+        <span style={{ display: "inline-block", alignSelf: "flex-start", background: "#005bd3", color: "#fff", fontSize: 12, fontWeight: 700, padding: "3px 12px", borderRadius: 4, marginBottom: 16, letterSpacing: "0.04em" }}>
+          {p.badge}
+        </span>
+      )}
+      {p.subtitle && (
+        <p style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: p.buttonBg || "#005bd3", margin: "0 0 8px" }}>
+          {p.subtitle}
+        </p>
+      )}
+      <h2 style={{ fontSize: "clamp(1.5rem,3vw,2.25rem)", fontWeight: 800, color: p.titleColor || "#111827", lineHeight: 1.2, margin: "0 0 16px" }}>
+        {p.title || "Who We Are"}
+      </h2>
+      {p.description && (
+        <p style={{ fontSize: "1rem", color: p.textColor || "#6b7280", lineHeight: 1.7, margin: "0 0 24px" }}>
+          {p.description}
+        </p>
+      )}
+      {p.buttonLabel && (
+        <a href={p.buttonUrl || "#"} style={{ display: "inline-block", alignSelf: "flex-start", background: p.buttonBg || "#005bd3", color: p.buttonTextColor || "#fff", padding: "12px 28px", borderRadius: 6, fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
+          {p.buttonLabel}
+        </a>
+      )}
+    </div>
+  );
+
+  const imageCol = p.imageUrl ? (
+    <img src={p.imageUrl} alt={p.imageAlt || ""} style={{ width: "100%", borderRadius: 8, objectFit: "cover", maxHeight: 420, display: "block" }} />
+  ) : (
+    <div style={{ width: "100%", minHeight: 280, background: "#f1f5f9", borderRadius: 8, border: "2px dashed #cbd5e1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, color: "#94a3b8" }}>
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      <span style={{ fontSize: 13, fontWeight: 600 }}>Upload image</span>
+      <span style={{ fontSize: 11 }}>Set in Content → Image</span>
+    </div>
+  );
+
+  return (
+    <SectionCanvasWrap props={p}>
+      <SecGrid cols={2} gap={48}>
+        {imageRight ? <>{textCol}{imageCol}</> : <>{imageCol}{textCol}</>}
+      </SecGrid>
+    </SectionCanvasWrap>
+  );
+}
+
 // ─── Base defaultProps shared by section templates ────────────────────────────
 
 function baseSectionProps(overrides: Record<string, unknown> = {}) {
@@ -732,27 +788,34 @@ export const sectionTemplateConfig: Record<string, any> = {
     fields: makeSectionFields("Section_About", (p, set) => (
       <>
         <TabSection title="Content" />
-        <StackedTextField label="Badge" value={p.badge ?? ""} onChange={(v) => set("badge", v)} placeholder="About Us" />
+        <StackedTextField label="Badge" value={p.badge ?? ""} onChange={(v) => set("badge", v)} placeholder="About Us (leave blank to hide)" />
         <StackedTextField label="Heading" value={p.title ?? ""} onChange={(v) => set("title", v)} placeholder="Who We Are" />
         <StackedTextField label="Subheading" value={p.subtitle ?? ""} onChange={(v) => set("subtitle", v)} placeholder="Our story and mission" />
-        <StackedTextField label="Description" value={p.description ?? ""} onChange={(v) => set("description", v)} placeholder="A few sentences about your company…" />
+        <StackedTextareaField label="Description" value={p.description ?? ""} onChange={(v) => set("description", v)} placeholder="A few sentences about your company…" />
+        <TabSection title="Button" />
+        <StackedTextField label="Button Label" value={p.buttonLabel ?? ""} onChange={(v) => set("buttonLabel", v)} placeholder="Learn More (leave blank to hide)" />
+        <LinkUrlField label="Button URL" value={p.buttonUrl ?? ""} onChange={(v) => set("buttonUrl", v)} />
         <TabSection title="Image" />
         <ImageField label="Image" value={p.imageUrl ?? ""} onChange={(v) => set("imageUrl", v)} />
         <StackedTextField label="Alt Text" value={p.imageAlt ?? ""} onChange={(v) => set("imageAlt", v)} placeholder="About image" />
         <InlineSelect label="Image Position" value={p.imagePosition ?? "left"} onChange={(v) => set("imagePosition", v)}
           options={[{ value: "left", label: "Image Left" }, { value: "right", label: "Image Right" }]} />
+        <TabSection title="Colors" />
+        <ColorPickerField label="Heading Color" value={p.titleColor ?? ""} onChange={(v) => set("titleColor", v)} />
+        <ColorPickerField label="Text Color" value={p.textColor ?? ""} onChange={(v) => set("textColor", v)} />
+        <ColorPickerField label="Button Background" value={p.buttonBg ?? ""} onChange={(v) => set("buttonBg", v)} />
+        <ColorPickerField label="Button Text" value={p.buttonTextColor ?? ""} onChange={(v) => set("buttonTextColor", v)} />
       </>
     )),
-    defaultProps: baseSectionProps({ columns: 2, columnsTablet: 1, advPadding: { top: 80, right: 0, bottom: 80, left: 0 }, badge: "About Us", title: "Who We Are", subtitle: "Our story and mission", description: "", imageUrl: "", imageAlt: "About image", imagePosition: "left" }),
-    render: (p: any) => (
-      <SectionCanvasWrap props={p}>
-        <SecGrid cols={2} gap={48}>
-          {p.imagePosition !== "right"
-            ? <>{p.imageUrl ? <img src={p.imageUrl} alt={p.imageAlt || ""} style={{ width: "100%", borderRadius: 8, objectFit: "cover", maxHeight: 400 }} /> : <SectionDZ slot={0} label="About image" icon="🖼" minH={240} hint="Drop Image block" />}<SectionDZ slot={1} label={`${p.badge || "About Us"} — heading, text, stats`} icon="👤" minH={240} hint="Drop Heading, Text, Icon blocks" /></>
-            : <><SectionDZ slot={1} label={`${p.badge || "About Us"} — heading, text, stats`} icon="👤" minH={240} hint="Drop Heading, Text, Icon blocks" />{p.imageUrl ? <img src={p.imageUrl} alt={p.imageAlt || ""} style={{ width: "100%", borderRadius: 8, objectFit: "cover", maxHeight: 400 }} /> : <SectionDZ slot={0} label="About image" icon="🖼" minH={240} hint="Drop Image block" />}</>}
-        </SecGrid>
-      </SectionCanvasWrap>
-    ),
+    defaultProps: baseSectionProps({
+      columns: 2, columnsTablet: 1, advPadding: { top: 80, right: 0, bottom: 80, left: 0 },
+      badge: "About Us", title: "Who We Are", subtitle: "Our story and mission",
+      description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut elit tellus, luctus nec ullamcorper mattis, pulvinar dapibus leo.",
+      buttonLabel: "Learn More", buttonUrl: "#",
+      imageUrl: "", imageAlt: "About image", imagePosition: "left",
+      titleColor: "#111827", textColor: "#6b7280", buttonBg: "#005bd3", buttonTextColor: "#ffffff",
+    }),
+    render: (p: any) => <SectionAboutContent p={p} />,
   },
 
   // ── Gallery ───────────────────────────────────────────────────────────────

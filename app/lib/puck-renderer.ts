@@ -1105,6 +1105,61 @@ function renderSectionBlock(p: Props, zones: Zones): string {
   return `<section style="position:relative;overflow:hidden;${bg}${borderCss}${radiusCss}${minH}padding:${pt}px ${pr}px ${pb_val}px ${pl}px;margin:${mt}px ${mr}px ${mb}px ${ml}px;box-sizing:border-box"><div style="${maxW}width:100%;box-sizing:border-box">${blocksHtml}</div></section>`;
 }
 
+// ─── Section template renderers (pre-filled, directly-editable sections) ──────
+// These mirror the editor components in app/puck-blocks/blocks/section.tsx.
+// Keep the markup visually in sync with the editor render of each template.
+
+// Outer <section> shell shared by all pre-filled section templates: background,
+// padding/margin, optional min-height and a boxed/full content wrapper.
+function sectionShell(p: Props, inner: string): string {
+  const pad = (p.advPadding as any) ?? {};
+  const mar = (p.advMargin as any) ?? {};
+  const pt = pad.top ?? 60, pb = pad.bottom ?? 60, pl = pad.left ?? 0, pr = pad.right ?? 0;
+  const mt = mar.top ?? 0, mb = mar.bottom ?? 0, ml = mar.left ?? 0, mr = mar.right ?? 0;
+  const minH = p.minHeightPx && Number(p.minHeightPx) > 0 ? `min-height:${p.minHeightPx}px;` : "";
+  let bg = "";
+  if (p.bgType === "color" && p.bgColor) bg = `background-color:${esc(p.bgColor as string)};`;
+  else if (p.bgType === "gradient" && p.bgGrad1 && p.bgGrad2)
+    bg = `background:linear-gradient(${p.bgGradAngle ?? 180}deg,${esc(p.bgGrad1 as string)},${esc(p.bgGrad2 as string)});`;
+  else if (p.bgType === "image" && p.bgImage)
+    bg = `background-image:url(${esc(p.bgImage as string)});background-size:cover;background-position:center center;`;
+  const maxW = p.contentWidth === "boxed" ? `max-width:${p.containerWidth ?? 1140}px;margin-left:auto;margin-right:auto;` : "";
+  return `<section style="position:relative;overflow:hidden;${bg}${minH}padding:${pt}px ${pr}px ${pb}px ${pl}px;margin:${mt}px ${mr}px ${mb}px ${ml}px;box-sizing:border-box"><div style="${maxW}width:100%;padding:0 24px;box-sizing:border-box">${inner}</div></section>`;
+}
+
+// About: image + heading/text/button, two-column, stacks on mobile.
+function renderSectionAbout(p: Props): string {
+  const imageRight = p.imagePosition === "right";
+  const badge = esc((p.badge as string) || "");
+  const subtitle = esc((p.subtitle as string) || "");
+  const title = esc((p.title as string) || "Who We Are");
+  const description = esc((p.description as string) || "");
+  const buttonLabel = esc((p.buttonLabel as string) || "");
+  const buttonUrl = esc((p.buttonUrl as string) || "#");
+  const imageUrl = esc((p.imageUrl as string) || "");
+  const imageAlt = esc((p.imageAlt as string) || "");
+  const titleColor = esc((p.titleColor as string) || "#111827");
+  const textColor = esc((p.textColor as string) || "#6b7280");
+  const buttonBg = esc((p.buttonBg as string) || "#005bd3");
+  const buttonTextColor = esc((p.buttonTextColor as string) || "#ffffff");
+
+  const textCol = `<div style="display:flex;flex-direction:column;justify-content:center">`
+    + (badge ? `<span style="display:inline-block;align-self:flex-start;background:#005bd3;color:#fff;font-size:12px;font-weight:700;padding:3px 12px;border-radius:4px;margin-bottom:16px;letter-spacing:0.04em">${badge}</span>` : "")
+    + (subtitle ? `<p style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:${buttonBg};margin:0 0 8px">${subtitle}</p>` : "")
+    + `<h2 style="font-size:clamp(1.5rem,3vw,2.25rem);font-weight:800;color:${titleColor};line-height:1.2;margin:0 0 16px">${title}</h2>`
+    + (description ? `<p style="font-size:1rem;color:${textColor};line-height:1.7;margin:0 0 24px">${description}</p>` : "")
+    + (buttonLabel ? `<a href="${buttonUrl}" style="display:inline-block;align-self:flex-start;background:${buttonBg};color:${buttonTextColor};padding:12px 28px;border-radius:6px;font-weight:700;font-size:15px;text-decoration:none">${buttonLabel}</a>` : "")
+    + `</div>`;
+
+  const imageCol = imageUrl
+    ? `<img src="${imageUrl}" alt="${imageAlt}" style="width:100%;border-radius:8px;object-fit:cover;max-height:420px;display:block" />`
+    : "";
+
+  const cols = imageRight ? `${textCol}${imageCol}` : `${imageCol}${textCol}`;
+  const grid = `<div class="pb-sec-about-grid" style="display:grid;grid-template-columns:${imageUrl ? "1fr 1fr" : "1fr"};gap:48px;align-items:center">${cols}</div>`;
+  return sectionShell(p, grid);
+}
+
 // ─── New block renderers ──────────────────────────────────────────────────────
 
 function advSpacing(p: Props): string {
@@ -1795,6 +1850,7 @@ function renderBlock(block: Block, zones: Zones): string {
       case "ShareButtons":     html = renderShareButtons(p); break;
       case "LayoutBlock":      html = renderLayoutBlock(p, zones); break;
       case "Section":          html = renderSectionBlock(p, zones); break;
+      case "Section_About":    html = renderSectionAbout(p); break;
       // GlobalHeader/Footer are theme concerns; GlobalBlock needs DB lookup (skip)
       default: return "";
     }
@@ -1820,6 +1876,7 @@ img{max-width:100%;height:auto}
 .pb-bar-fill{display:block!important;box-sizing:border-box!important}
 @media(max-width:767px){
 .pb-grid-2col{grid-template-columns:1fr!important;gap:32px!important}
+.pb-sec-about-grid{grid-template-columns:1fr!important;gap:32px!important}
 .pb-grid-ncol{grid-template-columns:1fr!important}
 .pb-grid-stats{grid-template-columns:repeat(2,1fr)!important;gap:12px!important}
 .pb-collage{grid-template-columns:repeat(2,1fr)!important;grid-template-rows:auto!important}
