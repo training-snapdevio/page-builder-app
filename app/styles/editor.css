@@ -227,6 +227,28 @@ select._Sidebar--right_o396p_25 ._Input-input_bsxfo_26,
   outline: none !important;
 }
 
+/* ── Responsive grid classes (mirror RESPONSIVE_CSS in puck-renderer.ts) ─── */
+/* These apply inside the editor canvas iframe so section/block layouts       */
+/* behave the same way as on the storefront at each breakpoint.               */
+.pb-sec-inner{padding-left:clamp(16px,4vw,24px);padding-right:clamp(16px,4vw,24px)}
+.pb-countdown-box{flex:1 1 60px}
+@media(max-width:767px){
+  .pb-grid-2col{grid-template-columns:1fr!important;gap:24px!important}
+  .pb-sec-about-grid{grid-template-columns:1fr!important;gap:24px!important}
+  .pb-sec-cards{grid-template-columns:1fr!important;gap:16px!important}
+  .pb-sec-gallery{grid-template-columns:repeat(2,1fr)!important}
+  .pb-sec-logos{grid-template-columns:repeat(3,1fr)!important;gap:16px!important}
+  .pb-grid-ncol{grid-template-columns:1fr!important}
+  .pb-grid-stats{grid-template-columns:repeat(2,1fr)!important;gap:12px!important}
+}
+@media(min-width:768px) and (max-width:1023px){
+  .pb-grid-ncol{grid-template-columns:repeat(2,1fr)!important}
+  .pb-sec-cards{grid-template-columns:repeat(2,1fr)!important}
+  .pb-sec-gallery{grid-template-columns:repeat(2,1fr)!important}
+  .pb-sec-logos{grid-template-columns:repeat(4,1fr)!important}
+  .pb-sec-about-grid{grid-template-columns:1fr!important;gap:32px!important}
+}
+
 /* ── Thin Scrollbars — App-wide ─────────────────────────────────────────── */
 * {
   scrollbar-width: thin;

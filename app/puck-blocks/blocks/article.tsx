@@ -13,9 +13,11 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
+  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
+  buildResponsiveSpacingCss,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -100,6 +102,8 @@ export const ArticleComponent = {
                     <TabSection title="Spacing" />
                     <FourSideField label="Margin"  value={props.advMargin  ?? { top: 0, right: 0, bottom: 0, left: 0 }}   onChange={(v) => set("advMargin", v)} />
                     <FourSideField label="Padding" value={props.advPadding ?? { top: 48, right: 24, bottom: 48, left: 24 }} onChange={(v) => set("advPadding", v)} />
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet"  value={!!props.hideTablet}  onChange={(v) => set("hideTablet", v)} />
@@ -148,7 +152,7 @@ export const ArticleComponent = {
     dateFontWeight: "400",
     advMargin:  { top: 0,  right: 0,  bottom: 0,  left: 0  },
     advPadding: { top: 48, right: 24, bottom: 48, left: 24 },
-    hideDesktop: false,
+    hideDesktop: false, responsiveSpacing: {},
     hideTablet:  false,
     hideMobile:  false,
   },
@@ -161,6 +165,7 @@ export const ArticleComponent = {
     authorColor, authorFontFamily, authorFontSize, authorFontWeight,
     dateColor, dateFontFamily, dateFontSize, dateFontWeight,
     advMargin, advPadding, hideDesktop, hideTablet, hideMobile,
+    id, responsiveSpacing,
   }: any) => {
     const m  = advMargin  ?? { top: 0,  right: 0,  bottom: 0,  left: 0  };
     const pd = advPadding ?? { top: 48, right: 24, bottom: 48, left: 24 };
@@ -263,6 +268,7 @@ export const ArticleComponent = {
     return (
       <div
         className={hideClasses || undefined}
+        data-pb-rs={id}
         style={{
           position: "relative",
           marginTop: m.top, marginRight: m.right, marginBottom: m.bottom, marginLeft: m.left,
@@ -270,6 +276,7 @@ export const ArticleComponent = {
         }}
       >
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${id}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
         <div style={{ maxWidth: 860, margin: "0 auto" }}>
           {isHorizontal ? (
             <div style={{ display: "flex", flexDirection: imagePosition === "left" ? "row" : "row-reverse", gap: 48, alignItems: "flex-start" }}>

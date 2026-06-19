@@ -10,6 +10,8 @@ import {
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
+  buildResponsiveSpacingCss,
+  ResponsiveSpacingField,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -248,6 +250,8 @@ export const PhotoCollageComponent = {
 
                 {tab === "advanced" && (
                   <>
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v: any) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet"  value={!!props.hideTablet}  onChange={(v: any) => set("hideTablet", v)}  />
@@ -276,12 +280,12 @@ export const PhotoCollageComponent = {
     hoverEffect: "none",
     boxShadow: false,
     shadowStrength: "subtle",
-    hideDesktop: false,
+    hideDesktop: false, responsiveSpacing: {},
     hideTablet: false,
     hideMobile: false,
   },
 
-  render: ({ layout, images, gap, borderRadius, objectFit, aspectRatio, hoverEffect, boxShadow, shadowStrength, hideDesktop, hideTablet, hideMobile }: any) => {
+  render: ({ layout, images, gap, borderRadius, objectFit, aspectRatio, hoverEffect, boxShadow, shadowStrength, hideDesktop, hideTablet, hideMobile, id, responsiveSpacing }: any) => {
     const imgs = ((images as any[]) ?? []).filter((img: any) => img.url);
     const gapPx = `${gap ?? 8}px`;
     const br = `${borderRadius ?? 8}px`;
@@ -400,8 +404,9 @@ export const PhotoCollageComponent = {
     }
 
     return (
-      <div className={hideClasses || undefined} style={{ position: "relative" }}>
+      <div className={hideClasses || undefined} data-pb-rs={id} style={{ position: "relative" }}>
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${id}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
         {content}
       </div>
     );

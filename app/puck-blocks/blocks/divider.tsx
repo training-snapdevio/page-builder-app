@@ -12,10 +12,12 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
+  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   SliderUnitField,
   EditorHideOverlay,
+  buildResponsiveSpacingCss,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -166,6 +168,8 @@ const DividerComponent = {
                     <TabSection title="Spacing" />
                     <FourSideField label="Margin (px)" value={props.advMargin} onChange={(v) => set("advMargin", v)} />
 
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -206,7 +210,7 @@ const DividerComponent = {
     elementFontSize: 14,
     elementSpacing: 12,
     advMargin: { top: 0, right: 0, bottom: 0, left: 0 },
-    hideDesktop: false,
+    hideDesktop: false, responsiveSpacing: {},
     hideTablet: false,
     hideMobile: false,
     cssId: "",
@@ -242,6 +246,8 @@ const DividerComponent = {
     hideDesktop,
     hideTablet,
     hideMobile,
+    responsiveSpacing,
+    id,
     cssId,
     cssClass,
     zIndex,
@@ -344,6 +350,7 @@ const DividerComponent = {
     return (
       <div
         id={cssId || undefined}
+        data-pb-rs={id}
         className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={{
           position: "relative",
@@ -357,6 +364,7 @@ const DividerComponent = {
         }}
       >
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${id}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
         {lineWrap}
       </div>
     );

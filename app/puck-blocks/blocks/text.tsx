@@ -11,9 +11,11 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
+  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
+  buildResponsiveSpacingCss,
 } from "@/puck-blocks/shared";
 
 export const TextComponent = {
@@ -193,6 +195,8 @@ export const TextComponent = {
                     <FourSideField label="Border Radius (px)" value={props.advBorderRadius} onChange={(v) => set("advBorderRadius", v)} />
 
 
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -236,7 +240,7 @@ export const TextComponent = {
     advBorderWidth: { top: 0, right: 0, bottom: 0, left: 0 },
     advBorderColor: "",
     advBorderRadius: { top: 0, right: 0, bottom: 0, left: 0 },
-    hideDesktop: false,
+    hideDesktop: false, responsiveSpacing: {},
     hideTablet: false,
     hideMobile: false,
     cssId: "",
@@ -276,6 +280,8 @@ export const TextComponent = {
     hideDesktop,
     hideTablet,
     hideMobile,
+    responsiveSpacing,
+    id,
     cssId,
     cssClass,
     customCss,
@@ -303,6 +309,7 @@ export const TextComponent = {
     return (
       <div
         id={cssId || undefined}
+        data-pb-rs={id}
         className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={{
           position: "relative",
@@ -321,6 +328,7 @@ export const TextComponent = {
         }}
       >
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${id}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
         {customCss && <style>{`#${cssId || "text-block"} { ${customCss} }`}</style>}
         {linkColor && <style>{`.text-block-links-${cssId || "default"} a { color: ${linkColor}; }`}</style>}
         <p

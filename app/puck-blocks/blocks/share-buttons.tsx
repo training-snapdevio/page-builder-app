@@ -11,9 +11,11 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
+  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
+  buildResponsiveSpacingCss,
 } from "@/puck-blocks/shared";
 
 const SHARE_PLATFORMS = [
@@ -134,6 +136,8 @@ const ShareButtonsComponent = {
                     <TabSection title="Background" />
                     <InlineSelect label="Type" value={bgType} onChange={(v) => set("advBgType", v)} options={[{ value: "none", label: "None" }, { value: "color", label: "Color" }]} />
                     {bgType === "color" && <ColorPickerField label="Color" value={props.advBgColor ?? ""} onChange={(v) => set("advBgColor", v)} />}
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -155,11 +159,11 @@ const ShareButtonsComponent = {
     fontSize: 14, fontWeight: "600",
     alignment: "left",
     advBgType: "none", advBgColor: "", advMargin: { top: 0, right: 0, bottom: 0, left: 0 }, advPadding: { top: 8, right: 0, bottom: 8, left: 0 },
-    hideDesktop: false, hideTablet: false, hideMobile: false, cssId: "", cssClass: "", zIndex: null,
+    hideDesktop: false, responsiveSpacing: {}, hideTablet: false, hideMobile: false, cssId: "", cssClass: "", zIndex: null,
   },
-  render: ({ enabled, labels, showLabel, btnStyle, btnSize, borderRadius, spacing, iconColor, textColor, bgColor, hoverBg, useBrandColors, fontSize, fontWeight, alignment, advBgType, advBgColor, advMargin, advPadding, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex }) => {
+  render: ({ enabled, labels, showLabel, btnStyle, btnSize, borderRadius, spacing, iconColor, textColor, bgColor, hoverBg, useBrandColors, fontSize, fontWeight, alignment, advBgType, advBgColor, advMargin, advPadding, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex, id: puckId, responsiveSpacing }: any) => {
     const [copied, setCopied] = useState(false);
-    const id = cssId || `share-${Math.random().toString(36).slice(2, 7)}`;
+    const id = cssId || `share-${puckId?.slice(-6) || "blk"}`;
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
     const resolvedFontSize = `${Number(fontSize) || 14}px`;
     const sizeMap = { small: { px: "8px 12px", fs: "12px" }, medium: { px: "10px 16px", fs: resolvedFontSize }, large: { px: "12px 20px", fs: "16px" } };
@@ -182,8 +186,9 @@ const ShareButtonsComponent = {
       }
     };
     return (
-      <div id={id} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ position: "relative", paddingTop: advPadding?.top ?? 8, paddingRight: advPadding?.right ?? 0, paddingBottom: advPadding?.bottom ?? 8, paddingLeft: advPadding?.left ?? 0, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
+      <div id={id} data-pb-rs={id} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ position: "relative", paddingTop: advPadding?.top ?? 8, paddingRight: advPadding?.right ?? 0, paddingBottom: advPadding?.bottom ?? 8, paddingLeft: advPadding?.left ?? 0, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${id}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
         {hoverCss && <style>{hoverCss}</style>}
         <div style={{ display: "flex", gap: `${Number(spacing) || 8}px`, flexWrap: "wrap", justifyContent: alignment === "center" ? "center" : alignment === "right" ? "flex-end" : "flex-start" }}>
           {platforms.map(p => {

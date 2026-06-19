@@ -12,6 +12,8 @@ import {
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
+  buildResponsiveSpacingCss,
+  ResponsiveSpacingField,
 } from "@/puck-blocks/shared";
 
 export const MarqueeBarComponent = {
@@ -92,6 +94,8 @@ export const MarqueeBarComponent = {
                 )}
                 {tab === "advanced" && (
                   <>
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet"  value={!!props.hideTablet}  onChange={(v) => set("hideTablet", v)} />
@@ -119,12 +123,12 @@ export const MarqueeBarComponent = {
     padding: 10,
     itemGap: 40,
     repeat: 10,
-    hideDesktop: false,
+    hideDesktop: false, responsiveSpacing: {},
     hideTablet: false,
     hideMobile: false,
   },
 
-  render: ({ text, speed, direction, pauseOnHover, backgroundColor, textColor, fontSize, fontWeight, textTransform, padding, itemGap, repeat, hideDesktop, hideTablet, hideMobile }: any) => {
+  render: ({ text, speed, direction, pauseOnHover, backgroundColor, textColor, fontSize, fontWeight, textTransform, padding, itemGap, repeat, hideDesktop, hideTablet, hideMobile, id, responsiveSpacing }: any) => {
     const [hovered, setHovered] = useState(false);
     const animationName = direction === "right" ? "mqRight" : "mqLeft";
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
@@ -134,11 +138,13 @@ export const MarqueeBarComponent = {
     return (
       <div
         className={hideClasses || undefined}
+        data-pb-rs={id}
         onMouseEnter={() => pauseOnHover && setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{ position: "relative", width: "100%", overflow: "hidden", whiteSpace: "nowrap", backgroundColor, color: textColor, fontSize, fontWeight, textTransform: textTransform as any, padding: `${padding ?? 10}px 0`, boxSizing: "border-box" }}
       >
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${id}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
         <div style={{ display: "inline-block", animation: `${animationName} ${speed}s linear infinite`, animationPlayState: pauseOnHover && hovered ? "paused" : "running" }}>
           {repeatedText}
         </div>

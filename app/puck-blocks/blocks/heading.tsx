@@ -12,9 +12,11 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
+  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
+  buildResponsiveSpacingCss,
 } from "@/puck-blocks/shared";
 import {
   LinkUrlField,
@@ -321,6 +323,8 @@ export const HeadingBlockComponent = {
                     />
 
 
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField
                       label="Hide on Desktop"
@@ -397,7 +401,7 @@ export const HeadingBlockComponent = {
     advBorderRadius: { top: 0, right: 0, bottom: 0, left: 0 },
     // Advanced – shadow
     // Advanced – responsive
-    hideDesktop: false,
+    hideDesktop: false, responsiveSpacing: {},
     hideTablet: false,
     hideMobile: false,
     // Advanced – custom
@@ -448,6 +452,8 @@ export const HeadingBlockComponent = {
     hideDesktop,
     hideTablet,
     hideMobile,
+    responsiveSpacing,
+    id,
     cssId,
     cssClass,
     customCss,
@@ -544,10 +550,12 @@ export const HeadingBlockComponent = {
     return (
       <div
         id={cssId || undefined}
+        data-pb-rs={id}
         className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={wrapperStyle}
       >
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${id}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
         {customCss && <style>{`#${cssId || "heading-block"} { ${customCss} }`}</style>}
         {linkUrl
           ? <a href={linkUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit" }}>{headingEl}</a>

@@ -1307,6 +1307,142 @@ function InlineSelect({
   );
 }
 
+// ─── Responsive Spacing helpers ──────────────────────────────────────────────
+
+/**
+ * Generates a CSS string for responsive spacing overrides, keyed by a unique
+ * block id. Used in both the editor canvas (as an inline <style> tag) and the
+ * storefront renderer (via responsiveSpacingStyle in puck-renderer.ts).
+ *
+ * Usage in a block render:
+ *   {responsiveSpacingCss && <style>{responsiveSpacingCss(`#${id || "blk"}`, responsiveSpacing)}</style>}
+ */
+export function buildResponsiveSpacingCss(
+  selector: string,
+  rs: ResponsiveSpacing | undefined | null,
+): string {
+  if (!rs) return "";
+  const side = (v: any) => Number(v ?? 0);
+  const mRule = (bp: any) =>
+    bp?.margin
+      ? `margin:${side(bp.margin.top)}px ${side(bp.margin.right)}px ${side(bp.margin.bottom)}px ${side(bp.margin.left)}px!important;`
+      : "";
+  const pRule = (bp: any) =>
+    bp?.padding
+      ? `padding:${side(bp.padding.top)}px ${side(bp.padding.right)}px ${side(bp.padding.bottom)}px ${side(bp.padding.left)}px!important;`
+      : "";
+
+  const rules: string[] = [];
+  const d = mRule(rs.desktop) + pRule(rs.desktop);
+  if (d) rules.push(`@media(min-width:1024px){${selector}{${d}}}`);
+  const t = mRule(rs.tablet) + pRule(rs.tablet);
+  if (t) rules.push(`@media(min-width:768px) and (max-width:1023px){${selector}{${t}}}`);
+  const m = mRule(rs.mobile) + pRule(rs.mobile);
+  if (m) rules.push(`@media(max-width:767px){${selector}{${m}}}`);
+  return rules.join("");
+}
+
+/**
+ * Drop this inside any block render to inject responsive spacing as a <style> tag.
+ * Uses the cssId if provided, otherwise falls back to a React useId-based uid.
+ *
+ * Usage:
+ *   <ResponsiveSpacingStyle id={cssId} responsiveSpacing={responsiveSpacing} />
+ *
+ * The generated CSS targets `[data-pb-rs="<uid>"]` on the outer wrapper div,
+ * which each block should add: data-pb-rs={rsUid}
+ *
+ * Simpler pattern — just call buildResponsiveSpacingStyle(id, rs) inline:
+ *   const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${uid}"]`, responsiveSpacing);
+ *   {rsCss && <style>{rsCss}</style>}
+ */
+
+// ─── Responsive Spacing Field ─────────────────────────────────────────────────
+// Shows Desktop / Tablet / Mobile tabs. Each tab has Margin + Padding FourSideFields.
+// Stored as: { desktop: {margin,padding}, tablet: {margin,padding}, mobile: {margin,padding} }
+
+type FourSide = { top: number; right: number; bottom: number; left: number };
+export type ResponsiveSpacing = {
+  desktop?: { margin?: Partial<FourSide>; padding?: Partial<FourSide> };
+  tablet?:  { margin?: Partial<FourSide>; padding?: Partial<FourSide> };
+  mobile?:  { margin?: Partial<FourSide>; padding?: Partial<FourSide> };
+};
+
+const BPIcon = {
+  desktop: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+    </svg>
+  ),
+  tablet: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="18" r="1"/>
+    </svg>
+  ),
+  mobile: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="18" r="1"/>
+    </svg>
+  ),
+};
+
+function ResponsiveSpacingField({
+  value,
+  onChange,
+  defaultMargin = { top: 0, right: 0, bottom: 0, left: 0 },
+  defaultPadding = { top: 0, right: 0, bottom: 0, left: 0 },
+}: {
+  value?: ResponsiveSpacing;
+  onChange: (v: ResponsiveSpacing) => void;
+  defaultMargin?: Partial<FourSide>;
+  defaultPadding?: Partial<FourSide>;
+}) {
+  const [bp, setBp] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const val = value ?? {};
+  const bpVal = val[bp] ?? {};
+
+  const merge = (side: "margin" | "padding", fs: FourSide) =>
+    onChange({ ...val, [bp]: { ...bpVal, [side]: fs } });
+
+  const tabs: Array<"desktop" | "tablet" | "mobile"> = ["desktop", "tablet", "mobile"];
+  const bpLabel: Record<string, string> = { desktop: "Desktop", tablet: "Tablet", mobile: "Mobile" };
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      {/* Breakpoint switcher */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 10, background: "var(--p-color-bg-surface-secondary,#f6f6f7)", borderRadius: 8, padding: 3 }}>
+        {tabs.map((t) => (
+          <button
+            key={t}
+            onClick={() => setBp(t)}
+            title={bpLabel[t]}
+            style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+              padding: "5px 8px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
+              background: bp === t ? "#fff" : "transparent",
+              color: bp === t ? "var(--p-color-text,#202223)" : "var(--p-color-text-secondary,#6d7175)",
+              boxShadow: bp === t ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+              transition: "all 0.15s",
+            }}
+          >
+            {BPIcon[t]}{bpLabel[t]}
+          </button>
+        ))}
+      </div>
+      <FourSideField
+        label="Margin (px)"
+        value={{ top: defaultMargin.top ?? 0, right: defaultMargin.right ?? 0, bottom: defaultMargin.bottom ?? 0, left: defaultMargin.left ?? 0, ...bpVal.margin }}
+        onChange={(fs) => merge("margin", fs)}
+      />
+      <FourSideField
+        label="Padding (px)"
+        value={{ top: defaultPadding.top ?? 0, right: defaultPadding.right ?? 0, bottom: defaultPadding.bottom ?? 0, left: defaultPadding.left ?? 0, ...bpVal.padding }}
+        onChange={(fs) => merge("padding", fs)}
+      />
+    </div>
+  );
+}
+
 export {
   AlignField,
   ToggleField,
@@ -1325,9 +1461,11 @@ export {
   TabSection,
   EditorHideOverlay,
   FourSideField,
+  ResponsiveSpacingField,
   InlineSelect,
 };
-export type { BlockTab };
+export type { BlockTab, ResponsiveSpacing };
+// buildResponsiveSpacingCss is already exported inline above
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Slider / icon-group field helpers (shared by layout, grid and content blocks)

@@ -20,6 +20,8 @@ import {
   ColorPickerField,
   EditorHideOverlay,
   FourSideField,
+  ResponsiveSpacingField,
+  buildResponsiveSpacingCss,
   InlineSelect,
   SliderNumberField,
   StackedNumberField,
@@ -164,6 +166,8 @@ const SectionBlockComponent = {
                     <TabSection title="Spacing" />
                     <FourSideField label="Margin (px)" value={props.advMargin} onChange={(v) => set("advMargin", v)} />
                     <FourSideField label="Padding (px)" value={props.advPadding ?? { top: 60, right: 0, bottom: 60, left: 0 }} onChange={(v) => set("advPadding", v)} />
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -207,7 +211,7 @@ const SectionBlockComponent = {
     dividerBottom: "none", dividerBottomColor: "#fff", dividerBottomHeight: 50, dividerBottomFlip: false,
     // Spacing / visibility
     advMargin: { top: 0, right: 0, bottom: 0, left: 0 }, advPadding: { top: 60, right: 0, bottom: 60, left: 0 },
-    hideDesktop: false, hideTablet: false, hideMobile: false,
+    hideDesktop: false, hideTablet: false, hideMobile: false, responsiveSpacing: {},
     // Animation
     animation: "none", animDuration: 600, animDelay: 0,
     // Custom
@@ -224,7 +228,7 @@ const SectionBlockComponent = {
     borderStyle, borderWidth4, borderColor, borderRadius4,
     dividerTop, dividerTopColor, dividerTopHeight, dividerTopFlip,
     dividerBottom, dividerBottomColor, dividerBottomHeight, dividerBottomFlip,
-    advMargin, advPadding, hideDesktop, hideTablet, hideMobile,
+    advMargin, advPadding, hideDesktop, hideTablet, hideMobile, responsiveSpacing,
     animation, animDuration, animDelay,
     cssId, cssClass, customCss, zIndex,
   }: any) => {
@@ -316,6 +320,7 @@ const SectionBlockComponent = {
     return (
       <div
         id={uid}
+        data-pb-rs={uid}
         className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={outerStyle}
       >
@@ -324,6 +329,7 @@ const SectionBlockComponent = {
         {(animCss || customCss) && (
           <style>{`${animCss}${customCss || ""}`}</style>
         )}
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${uid}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
 
         {/* Background video */}
         {bgType === "video" && bgVideo && (
@@ -449,6 +455,8 @@ function SectionAdvancedFields({ props, set }: { props: any; set: (k: string, v:
         options={[{ value: "1", label: "1" }, { value: "2", label: "2" }]} />
       <SliderNumberField label="Column Gap" value={props.columnGapPx ?? 32} onChange={(v) => set("columnGapPx", v)} min={0} max={120} step={4} unit="PX" />
       <SliderNumberField label="Row Gap" value={props.rowGapPx ?? 32} onChange={(v) => set("rowGapPx", v)} min={0} max={120} step={4} unit="PX" />
+      <TabSection title="Responsive Spacing" />
+      <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
       <TabSection title="Responsive" />
       <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
       <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -526,6 +534,7 @@ function SectionCanvasWrap({ props, children }: { props: any; children: React.Re
         marginTop: props.advMargin?.top ?? 0, marginBottom: props.advMargin?.bottom ?? 0,
         boxSizing: "border-box",
       }}>
+        <EditorHideOverlay hideDesktop={props.hideDesktop} hideTablet={props.hideTablet} hideMobile={props.hideMobile} />
         {props.bgType === "video" && props.bgVideo && (
           <video autoPlay loop={props.bgVideoLoop !== false} muted={props.bgVideoMute !== false} playsInline
             src={props.bgVideo} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0 }} />
@@ -557,7 +566,7 @@ function SectionDZ({ slot, label, icon, hint, minH = 80 }: { slot: number; label
 }
 
 function SecGrid({ cols, gap = 32, children }: { cols: number; gap?: number; children: React.ReactNode }) {
-  return <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap, alignItems: "stretch" }}>{children}</div>;
+  return <div className="pb-sec-cards" style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap, alignItems: "stretch" }}>{children}</div>;
 }
 
 // ─── Reusable section content helpers ────────────────────────────────────────
@@ -890,9 +899,9 @@ function SectionAboutContent({ p }: { p: any }) {
 
   return (
     <SectionCanvasWrap props={p}>
-      <SecGrid cols={2} gap={48}>
+      <div className="pb-sec-about-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "clamp(24px,4vw,48px)", alignItems: "center" }}>
         {imageRight ? <>{textCol}{imageCol}</> : <>{imageCol}{textCol}</>}
-      </SecGrid>
+      </div>
     </SectionCanvasWrap>
   );
 }
@@ -910,7 +919,7 @@ function baseSectionProps(overrides: Record<string, unknown> = {}) {
     borderStyle: "none", borderWidth: 1, borderColor: "", borderRadius: 0,
     advMargin: { top: 0, right: 0, bottom: 0, left: 0 },
     advPadding: { top: 60, right: 0, bottom: 60, left: 0 },
-    hideDesktop: false, hideTablet: false, hideMobile: false,
+    hideDesktop: false, hideTablet: false, hideMobile: false, responsiveSpacing: {},
     animation: "none", animDuration: 600, animDelay: 0,
     cssId: "", cssClass: "", zIndex: null,
     ...overrides,
@@ -1197,7 +1206,7 @@ export const sectionTemplateConfig: Record<string, any> = {
       return (
         <SectionCanvasWrap props={p}>
           <SectionHeading title={p.sectionTitle || "Get In Touch"} subtitle={p.sectionSubtitle} />
-          <SecGrid cols={2} gap={48}>
+          <div className="pb-sec-about-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "clamp(24px,4vw,48px)" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 16, justifyContent: "center" }}>
               {p.address && <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}><span style={{ fontSize: 18 }}>📍</span><span style={{ color: "#374151", fontSize: 15 }}>{p.address}</span></div>}
               {p.phone && <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}><span style={{ fontSize: 18 }}>📞</span><a href={`tel:${p.phone}`} style={{ color: "#374151", fontSize: 15, textDecoration: "none" }}>{p.phone}</a></div>}
@@ -1209,7 +1218,7 @@ export const sectionTemplateConfig: Record<string, any> = {
               <textarea placeholder="Your message" rows={4} style={{ ...inputStyle, resize: "vertical" }} />
               <button type="submit" style={{ background: "#005bd3", color: "#fff", padding: "12px 28px", borderRadius: 6, fontWeight: 700, fontSize: 15, border: "none", cursor: "pointer" }}>{p.submitLabel || "Send Message"}</button>
             </form>
-          </SecGrid>
+          </div>
         </SectionCanvasWrap>
       );
     },

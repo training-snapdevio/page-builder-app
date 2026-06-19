@@ -15,9 +15,11 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
+  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
+  buildResponsiveSpacingCss,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -290,6 +292,8 @@ const ButtonComponent = {
                       </>
                     )}
 
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -344,7 +348,7 @@ const ButtonComponent = {
     advBgType: "none",
     advBgColor: "",
     advMargin: { top: 0, right: 0, bottom: 0, left: 0 },
-    hideDesktop: false,
+    hideDesktop: false, responsiveSpacing: {},
     hideTablet: false,
     hideMobile: false,
     cssId: "",
@@ -395,6 +399,8 @@ const ButtonComponent = {
     hideDesktop,
     hideTablet,
     hideMobile,
+    responsiveSpacing,
+    id,
     cssId,
     cssClass,
     customCss,
@@ -518,10 +524,12 @@ const ButtonComponent = {
     return (
       <div
         id={cssId || undefined}
+        data-pb-rs={id}
         className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={{ position: "relative", textAlign: !fullWidth ? (alignment as any) : undefined, zIndex: zIndex ?? undefined, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, ...wrapBg }}
       >
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${id}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
         <style>{animCss}{hoverCss}{customCss ? `.${btnClass} { ${customCss} }` : ""}</style>
         {/* key on anim+duration+delay forces remount → replays animation in editor when settings change */}
         <div className={`${btnClass}-wrap`} key={`${anim}-${animDuration}-${animDelay}`} style={{ display: fullWidth ? "block" : "inline-block" }}>

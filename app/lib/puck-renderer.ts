@@ -465,7 +465,7 @@ function Image(p: Props): string {
   const styleTag = extraCss ? `<style>${extraCss}</style>` : "";
 
   const imgStyle = `width:100%;height:${height};${isCustomH ? `object-fit:${objectFit};` : ""}display:block;opacity:${opacity};${borderCss}`;
-  const imgTag   = `<img src="${esc(imageUrl)}" alt="${altText}" loading="lazy" style="${imgStyle}">`;
+  const imgTag   = `<img src="${esc(imageUrl)}" alt="${altText}" loading="lazy" class="no-global-style" style="${imgStyle}">`;
 
   const safeLink = linkUrl && (linkUrl.startsWith("http://") || linkUrl.startsWith("https://")) ? linkUrl : "";
   const wrapped = safeLink
@@ -592,7 +592,7 @@ function Article(p: Props): string {
     const is = `width:100%;height:${imgH}px;object-fit:${imgFit};display:block`;
     // Radius + overflow:hidden go on the wrapper so object-fit:cover is clipped
     // to the rounded corners (a radius on the <img> alone bleeds with cover).
-    imgHtml = `<div style="flex-shrink:0;min-width:0;border-radius:${imgBr};overflow:hidden;${isHoriz ? `width:44%;` : `width:100%;margin-bottom:${imgMb}px`}"><img src="${esc(imgSrc)}" alt="${esc(String(p.articleTitle || ""))}" loading="lazy" style="${is}"></div>`;
+    imgHtml = `<div style="flex-shrink:0;min-width:0;border-radius:${imgBr};overflow:hidden;${isHoriz ? `width:44%;` : `width:100%;margin-bottom:${imgMb}px`}"><img src="${esc(imgSrc)}" alt="${esc(String(p.articleTitle || ""))}" loading="lazy" class="no-global-style" style="${is}"></div>`;
   }
 
   const showAuthor = p.showAuthor !== false;
@@ -1114,7 +1114,7 @@ function sectionShell(p: Props, inner: string): string {
   else if (p.bgType === "image" && p.bgImage)
     bg = `background-image:url(${esc(p.bgImage as string)});background-size:cover;background-position:center center;`;
   const maxW = p.contentWidth === "boxed" ? `max-width:${p.containerWidth ?? 1140}px;margin-left:auto;margin-right:auto;` : "";
-  return `<section style="position:relative;overflow:hidden;${bg}${minH}padding:${pt}px ${pr}px ${pb}px ${pl}px;margin:${mt}px ${mr}px ${mb}px ${ml}px;box-sizing:border-box"><div style="${maxW}width:100%;padding:0 24px;box-sizing:border-box">${inner}</div></section>`;
+  return `<section style="position:relative;overflow:hidden;${bg}${minH}padding:${pt}px ${pr}px ${pb}px ${pl}px;margin:${mt}px ${mr}px ${mb}px ${ml}px;box-sizing:border-box"><div class="pb-sec-inner" style="${maxW}width:100%;padding:0 24px;box-sizing:border-box">${inner}</div></section>`;
 }
 
 // Centered section heading (title + subtitle) shared by section templates.
@@ -1153,11 +1153,11 @@ function renderSectionAbout(p: Props): string {
     + `</div>`;
 
   const imageCol = imageUrl
-    ? `<img src="${imageUrl}" alt="${imageAlt}" style="width:100%;border-radius:8px;object-fit:cover;max-height:420px;display:block" />`
+    ? `<img src="${imageUrl}" alt="${imageAlt}" class="no-global-style" style="width:100%;border-radius:8px;object-fit:cover;max-height:420px;display:block" />`
     : "";
 
   const cols = imageRight ? `${textCol}${imageCol}` : `${imageCol}${textCol}`;
-  const grid = `<div class="pb-sec-about-grid" style="display:grid;grid-template-columns:${imageUrl ? "1fr 1fr" : "1fr"};gap:48px;align-items:center">${cols}</div>`;
+  const grid = `<div class="pb-sec-about-grid" style="display:grid;grid-template-columns:${imageUrl ? "1fr 1fr" : "1fr"};gap:clamp(24px,4vw,48px);align-items:center">${cols}</div>`;
   return sectionShell(p, grid);
 }
 
@@ -1189,7 +1189,7 @@ function renderSectionCountdown(p: Props): string {
   const subC = onDark ? "rgba(255,255,255,0.8)" : "#6b7280";
   const boxes = [["12", "Days"], ["08", "Hours"], ["45", "Mins"], ["30", "Secs"]];
   const boxesHtml = boxes.map(([n, l]) =>
-    `<div style="min-width:78px;background:${onDark ? "rgba(255,255,255,0.1)" : "#f1f5f9"};border-radius:10px;padding:14px 18px"><div style="font-size:32px;font-weight:800;color:${titleC};line-height:1">${n}</div><div style="font-size:12px;color:${subC};margin-top:4px;text-transform:uppercase;letter-spacing:0.05em">${l}</div></div>`
+    `<div class="pb-countdown-box" style="min-width:64px;background:${onDark ? "rgba(255,255,255,0.1)" : "#f1f5f9"};border-radius:10px;padding:14px 18px"><div style="font-size:clamp(22px,6vw,32px);font-weight:800;color:${titleC};line-height:1">${n}</div><div style="font-size:12px;color:${subC};margin-top:4px;text-transform:uppercase;letter-spacing:0.05em">${l}</div></div>`
   ).join("");
   const cta = p.ctaLabel ? `<a href="${esc((p.ctaUrl as string) || "#")}" style="display:inline-block;background:${esc((p.progressColor as string) || "#ef4444")};color:#fff;padding:12px 32px;border-radius:6px;font-weight:700;font-size:15px;text-decoration:none">${esc(p.ctaLabel as string)}</a>` : "";
   const progress = p.showProgress !== false
@@ -1220,7 +1220,7 @@ function renderSectionForm(p: Props): string {
     + (p.email ? `<div style="display:flex;gap:10px;align-items:flex-start"><span style="font-size:18px">✉️</span><a href="mailto:${esc(p.email as string)}" style="color:#374151;font-size:15px;text-decoration:none">${esc(p.email as string)}</a></div>` : "")
     + `</div>`;
   const form = `<form onsubmit="return false"><input type="text" placeholder="Your name" style="${inputStyle}" /><input type="email" placeholder="Your email" style="${inputStyle}" /><textarea placeholder="Your message" rows="4" style="${inputStyle};resize:vertical"></textarea><button type="submit" style="background:#005bd3;color:#fff;padding:12px 28px;border-radius:6px;font-weight:700;font-size:15px;border:none;cursor:pointer">${esc((p.submitLabel as string) || "Send Message")}</button></form>`;
-  const grid = `<div class="pb-sec-about-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:48px">${info}${form}</div>`;
+  const grid = `<div class="pb-sec-about-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:clamp(24px,4vw,48px)">${info}${form}</div>`;
   return sectionShell(p, sectionHeadingHtml(p.sectionTitle as string || "Get In Touch", p.sectionSubtitle as string) + grid);
 }
 
@@ -1252,7 +1252,7 @@ function renderSectionCards(p: Props, variant: "services" | "features" | "team" 
   const card = (it: any): string => {
     if (variant === "team") {
       const img = it.imageUrl
-        ? `<img src="${esc(it.imageUrl)}" alt="${esc(it.name || "")}" style="width:120px;height:120px;border-radius:50%;object-fit:cover;margin:0 auto 14px;display:block" />`
+        ? `<img src="${esc(it.imageUrl)}" alt="${esc(it.name || "")}" class="no-global-style" style="width:120px;height:120px;border-radius:50%;object-fit:cover;margin:0 auto 14px;display:block" />`
         : `<div style="width:120px;height:120px;border-radius:50%;background:#e5e7eb;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:36px">👤</div>`;
       return `<div style="text-align:center">${img}<div style="font-size:17px;font-weight:700;color:#111827">${esc(it.name || "Name")}</div><div style="font-size:14px;color:${accent};font-weight:600;margin-top:2px">${esc(it.role || "Role")}</div>${it.bio ? `<p style="font-size:13px;color:#6b7280;line-height:1.6;margin:8px 0 0">${esc(it.bio)}</p>` : ""}</div>`;
     }
@@ -1287,7 +1287,7 @@ function renderSectionTestimonial(p: Props): string {
   const cards = items.map((it) => {
     const stars = "★".repeat(Math.max(0, Math.min(5, Number(it.rating) || 5)));
     const avatar = it.avatar
-      ? `<img src="${esc(it.avatar)}" alt="${esc(it.author || "")}" style="width:40px;height:40px;border-radius:50%;object-fit:cover" />`
+      ? `<img src="${esc(it.avatar)}" alt="${esc(it.author || "")}" class="no-global-style" style="width:40px;height:40px;border-radius:50%;object-fit:cover" />`
       : `<div style="width:40px;height:40px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:16px">👤</div>`;
     return `<div style="background:#fff;border:1px solid #eef2f7;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.04);display:flex;flex-direction:column;gap:12px">`
       + `<div style="color:#f59e0b;font-size:15px;letter-spacing:1px">${stars}</div>`
@@ -1314,10 +1314,10 @@ function renderSectionGallery(p: Props): string {
   const items: any[] = Array.isArray(p.items) ? (p.items as any[]) : [];
   const cols = Number(p.galleryColumns ?? 3);
   const cells = items.filter((it) => it.url).map((it) =>
-    `<img src="${esc(it.url)}" alt="${esc(it.alt || "")}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;display:block" />`
+    `<img src="${esc(it.url)}" alt="${esc(it.alt || "")}" class="no-global-style" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;display:block" />`
   ).join("");
   const heading = p.showHeading !== false ? sectionHeadingHtml(p.sectionTitle as string, p.sectionSubtitle as string) : "";
-  const grid = `<div class="pb-sec-cards" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${Number(p.gap ?? 12)}px">${cells}</div>`;
+  const grid = `<div class="pb-sec-gallery" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${Number(p.gap ?? 12)}px">${cells}</div>`;
   return sectionShell(p, heading + grid);
 }
 
@@ -1330,7 +1330,7 @@ function renderSectionLogos(p: Props): string {
     `<div style="display:flex;align-items:center;justify-content:center;min-height:50px"><img src="${esc(it.url)}" alt="${esc(it.alt || "")}" style="max-width:100%;max-height:44px;object-fit:contain;${gray ? "filter:grayscale(1);opacity:0.7" : ""}" /></div>`
   ).join("");
   const label = p.sectionTitle ? `<div style="text-align:center;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:24px">${esc(p.sectionTitle as string)}</div>` : "";
-  const grid = `<div class="pb-sec-cards" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:24px">${cells}</div>`;
+  const grid = `<div class="pb-sec-logos" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:24px">${cells}</div>`;
   return sectionShell(p, label + grid);
 }
 
@@ -1357,7 +1357,7 @@ function renderSectionMediaCarousel(p: Props): string {
   const main = items.find((it) => it.url) || items[0] || {};
   const heading = p.showHeading !== false ? sectionHeadingHtml(p.sectionTitle as string, p.sectionSubtitle as string) : "";
   const mainHtml = main.url
-    ? `<img src="${esc(main.url)}" alt="${esc(main.alt || "")}" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;display:block" />`
+    ? `<img src="${esc(main.url)}" alt="${esc(main.alt || "")}" class="no-global-style" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;display:block" />`
     : "";
   const thumbs = (p.showDots !== false && items.length > 1)
     ? `<div style="display:flex;gap:8px;margin-top:12px;justify-content:center;flex-wrap:wrap">${items.filter((it) => it.url).map((it) => `<div style="width:64px;height:44px;border-radius:6px;overflow:hidden;border:1px solid #e5e7eb;flex-shrink:0"><img src="${esc(it.url)}" alt="${esc(it.alt || "")}" style="width:100%;height:100%;object-fit:cover" /></div>`).join("")}</div>`
@@ -1373,6 +1373,30 @@ function advSpacing(p: Props): string {
   const mt = m.top ?? 0, mr = m.right ?? 0, mb = m.bottom ?? 0, ml = m.left ?? 0;
   const pt = pad.top ?? 0, pr = pad.right ?? 0, pb = pad.bottom ?? 0, pl = pad.left ?? 0;
   return `margin:${mt}px ${mr}px ${mb}px ${ml}px;padding:${pt}px ${pr}px ${pb}px ${pl}px;`;
+}
+
+// Emits a <style> block for responsive spacing overrides when responsiveSpacing prop is set.
+// Returns { style: string, className: string } — style is "" if no responsive overrides.
+function responsiveSpacingStyle(p: Props, blockId: string): { style: string; className: string } {
+  const rs = p.responsiveSpacing as any;
+  if (!rs) return { style: "", className: "" };
+  const uid = `pb-rs-${blockId.slice(-8)}`;
+  const side = (v: any) => Number(v ?? 0);
+  const mRule = (bp: any) => bp?.margin
+    ? `margin:${side(bp.margin.top)}px ${side(bp.margin.right)}px ${side(bp.margin.bottom)}px ${side(bp.margin.left)}px!important;`
+    : "";
+  const pRule = (bp: any) => bp?.padding
+    ? `padding:${side(bp.padding.top)}px ${side(bp.padding.right)}px ${side(bp.padding.bottom)}px ${side(bp.padding.left)}px!important;`
+    : "";
+  const rules: string[] = [];
+  const d = mRule(rs.desktop) + pRule(rs.desktop);
+  if (d) rules.push(`@media(min-width:1024px){.${uid}{${d}}}`);
+  const t = mRule(rs.tablet) + pRule(rs.tablet);
+  if (t) rules.push(`@media(min-width:768px) and (max-width:1023px){.${uid}{${t}}}`);
+  const m = mRule(rs.mobile) + pRule(rs.mobile);
+  if (m) rules.push(`@media(max-width:767px){.${uid}{${m}}}`);
+  if (!rules.length) return { style: "", className: "" };
+  return { style: `<style>${rules.join("")}</style>`, className: uid };
 }
 
 function advBgStyle(p: Props): string {
@@ -1453,7 +1477,7 @@ function renderDivider(p: Props): string {
         elContent = `<span style="font-size:${p.elementFontSize ?? 14}px;color:${esc((p.elementTextColor as string) || color)};white-space:nowrap;line-height:1;">${esc((p.elementText as string) || "OR")}</span>`;
       } else if (elType === "image") {
         const imgR = Number(p.elementImageRadius ?? 0);
-        elContent = `<img src="${imgUrl.replace(/"/g, "&quot;")}" alt="" style="width:${imgW}px;height:${imgH}px;object-fit:contain;display:inline-block;vertical-align:middle;${imgR > 0 ? `border-radius:${imgR}px;` : ""}" />`;
+        elContent = `<img src="${imgUrl.replace(/"/g, "&quot;")}" alt="" class="no-global-style" style="width:${imgW}px;height:${imgH}px;object-fit:contain;display:inline-block;vertical-align:middle;${imgR > 0 ? `border-radius:${imgR}px;` : ""}" />`;
       } else {
         elContent = `<span style="font-size:${p.iconSize ?? 20}px;color:${esc((p.iconColor as string) || color)};line-height:1;display:inline-block;">${esc(iconVal)}</span>`;
       }
@@ -1898,7 +1922,7 @@ function renderAlert(p: Props): string {
   let iconHtml = "";
   if (showIcon) {
     iconHtml = isImgIcon
-      ? `<img src="${rawIcon.replace(/"/g, "&quot;")}" alt="icon" style="width:1.5rem;height:1.5rem;object-fit:contain;flex-shrink:0;border-radius:0" />`
+      ? `<img src="${rawIcon.replace(/"/g, "&quot;")}" alt="icon" class="no-global-style" style="width:1.5rem;height:1.5rem;object-fit:contain;flex-shrink:0;border-radius:0" />`
       : `<span style="font-size:1.25rem;color:${iconColor};flex-shrink:0;line-height:1.3">${resolvedIcon}</span>`;
   }
   const titleHtml = alertTitle ? `<div style="font-size:${titleFontSize};font-weight:${titleFontWeight};margin-bottom:4px">${alertTitle}</div>` : "";
@@ -1956,22 +1980,22 @@ function renderBlockQuote(p: Props): string {
     none: "",
     left: `border-left:${borderWidth}px solid ${borderColor};padding-left:20px;`,
     top:  `border-top:${borderWidth}px solid ${borderColor};padding-top:20px;`,
-    box:  `border:${borderWidth}px solid ${borderColor};`,
+    box:  `border:${borderWidth}px solid ${borderColor};padding:16px;`,
   };
 
   const quoteIconSvg = `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="${iconColor}" style="opacity:0.15"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1zm12 0c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>`;
 
   let iconHtml = "";
   if (showQuoteIcon) {
-    if (iconPosition === "top-left") iconHtml = `<div style="margin-bottom:8px">${quoteIconSvg}</div>`;
-    else if (iconPosition === "top-right") iconHtml = `<div style="text-align:right;margin-bottom:8px">${quoteIconSvg}</div>`;
+    const iconJustify = iconPosition === "top-right" ? "flex-end" : "flex-start";
+    iconHtml = `<div style="display:flex;justify-content:${iconJustify};margin-bottom:8px">${quoteIconSvg}</div>`;
   }
 
   const quoteEl = `<p style="font-size:${quoteFontSize};${quoteFontFamily ? `font-family:${quoteFontFamily};` : ""}font-style:${quoteFontStyle};color:${quoteTextColor};line-height:${quoteLineHeight};margin:0 0 16px 0">&ldquo;${quoteText}&rdquo;</p>`;
 
   let authorEl = "";
   if (authorName || authorImage) {
-    const imgEl = authorImage ? `<img src="${authorImage}" alt="${authorName}" style="width:${imageSize};height:${imageSize};border-radius:${imageBorderRadius};object-fit:cover;flex-shrink:0">` : "";
+    const imgEl = authorImage ? `<img src="${authorImage}" alt="${authorName}" class="no-global-style" style="width:${imageSize};height:${imageSize};border-radius:${imageBorderRadius};object-fit:cover;flex-shrink:0">` : "";
     const nameEl = authorName ? `<div style="font-size:${nameFontSize};font-weight:${nameFontWeight};color:${nameColor}">${authorName}</div>` : "";
     const titleEl = authorTitle ? `<div style="font-size:${titleFontSize};color:${titleColor};opacity:0.7">${authorTitle}</div>` : "";
     const aJustify = flexJustify(alignment);
@@ -1980,7 +2004,7 @@ function renderBlockQuote(p: Props): string {
 
   const bqStyle = `margin:0;position:relative;background:${bgColor || "transparent"};${bgColor ? "padding:24px;border-radius:8px;" : ""}${borderMap[borderType] || ""}`;
 
-  return `<div style="${spacing}text-align:${alignment};${wrapExtraStyle}"><blockquote style="${bqStyle}">${iconHtml}${quoteEl}${authorEl}</blockquote></div>`;
+  return `<div style="${spacing}text-align:${alignment};${wrapExtraStyle}">${iconHtml}<blockquote style="${bqStyle}">${quoteEl}${authorEl}</blockquote></div>`;
 }
 
 // ─── Main render dispatcher ───────────────────────────────────────────────────
@@ -2096,7 +2120,11 @@ function renderBlock(block: Block, zones: Zones): string {
     }
     // Single, reusable hide-on-screen-size handling for EVERY block/section:
     // inject puck-hide-* into the outermost element (no per-block code needed).
-    return applyHideClasses(html, p);
+    html = applyHideClasses(html, p);
+    // Responsive spacing: inject per-breakpoint margin/padding class + style tag.
+    const { style: rsStyle, className: rsClass } = responsiveSpacingStyle(p, (block.props?.id as string) || block.type);
+    if (rsClass) html = rsStyle + injectClasses(html, rsClass);
+    return html;
   } catch {
     return "";
   }
@@ -2112,24 +2140,36 @@ function renderBlock(block: Block, zones: Zones): string {
 // Responsive CSS injected once per page — targets class names added to each section's grid
 // container. Uses !important so it overrides the inline styles written by each render function.
 const RESPONSIVE_CSS = `<style data-pb="responsive">
+*{box-sizing:border-box}
 img{max-width:100%;height:auto}
+.pb-sec-inner{padding-left:clamp(16px,4vw,24px)!important;padding-right:clamp(16px,4vw,24px)!important}
+.pb-collage-wrap{box-sizing:border-box}
+.pb-collage-wrap *{box-sizing:border-box}
+.pb-collage-item{position:relative!important;margin:0!important;padding:0!important}
+.pb-collage-item img{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important}
 .pb-bar-track{display:block!important;overflow:hidden!important;box-sizing:border-box!important}
 .pb-bar-fill{display:block!important;box-sizing:border-box!important}
+.pb-countdown-box{flex:1 1 60px!important}
 @media(max-width:767px){
-.pb-grid-2col{grid-template-columns:1fr!important;gap:32px!important}
-.pb-sec-about-grid{grid-template-columns:1fr!important;gap:32px!important}
-.pb-sec-cards{grid-template-columns:1fr!important}
+.pb-grid-2col{grid-template-columns:1fr!important;gap:24px!important}
+.pb-sec-about-grid{grid-template-columns:1fr!important;gap:24px!important}
+.pb-sec-cards{grid-template-columns:1fr!important;gap:16px!important}
+.pb-sec-gallery{grid-template-columns:repeat(2,1fr)!important}
+.pb-sec-logos{grid-template-columns:repeat(3,1fr)!important;gap:16px!important}
 .pb-grid-ncol{grid-template-columns:1fr!important}
 .pb-grid-stats{grid-template-columns:repeat(2,1fr)!important;gap:12px!important}
-.pb-collage{grid-template-columns:repeat(2,1fr)!important;grid-template-rows:auto!important}
-.pb-collage>*{grid-column:auto!important;grid-row:auto!important}
-.pb-hero{padding:40px 20px!important}
+.pb-collage-wrap{grid-template-columns:repeat(2,1fr)!important;grid-template-rows:auto!important}
+.pb-collage-wrap>*{grid-column:auto!important;grid-row:auto!important}
+.pb-hero{padding:40px 16px!important}
 .pb-header-nav{display:none!important}
 .puck-hide-mobile{display:none!important}
 }
 @media(min-width:768px) and (max-width:1023px){
 .pb-grid-ncol{grid-template-columns:repeat(2,1fr)!important}
 .pb-sec-cards{grid-template-columns:repeat(2,1fr)!important}
+.pb-sec-gallery{grid-template-columns:repeat(2,1fr)!important}
+.pb-sec-logos{grid-template-columns:repeat(4,1fr)!important}
+.pb-sec-about-grid{grid-template-columns:1fr!important;gap:32px!important}
 .puck-hide-tablet{display:none!important}
 }
 @media(min-width:1024px){

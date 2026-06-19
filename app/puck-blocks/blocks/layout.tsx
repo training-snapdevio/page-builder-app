@@ -9,6 +9,7 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
+  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   IconButtonGroup,
@@ -17,6 +18,7 @@ import {
   ALIGN_ICONS,
   WRAP_ICONS,
   EditorHideOverlay,
+  buildResponsiveSpacingCss,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -204,6 +206,8 @@ const LayoutBlockComponent = {
                     <TabSection title="Spacing" />
                     <FourSideField label="Margin (px)" value={props.advMargin} onChange={(v) => set("advMargin", v)} />
                     <FourSideField label="Padding (px)" value={props.advPadding ?? { top: 24, right: 24, bottom: 24, left: 24 }} onChange={(v) => set("advPadding", v)} />
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -237,7 +241,7 @@ const LayoutBlockComponent = {
     dividerTop: "none", dividerTopColor: "#fff", dividerTopHeight: 50, dividerTopFlip: false,
     dividerBottom: "none", dividerBottomColor: "#fff", dividerBottomHeight: 50, dividerBottomFlip: false,
     advMargin: { top: 0, right: 0, bottom: 0, left: 0 }, advPadding: { top: 24, right: 24, bottom: 24, left: 24 },
-    hideDesktop: false, hideTablet: false, hideMobile: false,
+    hideDesktop: false, responsiveSpacing: {}, hideTablet: false, hideMobile: false,
     animation: "none", animDuration: 600, animDelay: 0,
     cssId: "", cssClass: "", customCss: "", zIndex: null,
   },
@@ -255,6 +259,7 @@ const LayoutBlockComponent = {
     advMargin, advPadding, hideDesktop, hideTablet, hideMobile,
     animation, animDuration, animDelay,
     cssId, cssClass, customCss, zIndex,
+    responsiveSpacing,
   }: any) => {
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
     // Use Puck's stable auto-assigned id — never Math.random() which re-runs every render
@@ -345,8 +350,9 @@ const LayoutBlockComponent = {
     ` : "";
 
     return (
-      <div id={uid} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={outerStyle}>
+      <div id={uid} data-pb-rs={uid} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={outerStyle}>
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${uid}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
         {(animCss || customCss) && <style>{animCss}{customCss}</style>}
         {/* Background video */}
         {bgType === "video" && bgVideo && (

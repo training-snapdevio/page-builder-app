@@ -9,8 +9,10 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
+  ResponsiveSpacingField,
   InlineSelect,
   EditorHideOverlay,
+  buildResponsiveSpacingCss,
 } from "@/puck-blocks/shared";
 
 const GridBlockComponent = {
@@ -62,6 +64,8 @@ const GridBlockComponent = {
                     <TabSection title="Spacing" />
                     <FourSideField label="Margin (px)" value={props.advMargin} onChange={(v) => set("advMargin", v)} />
                     <FourSideField label="Padding (px)" value={props.advPadding ?? { top: 0, right: 0, bottom: 0, left: 0 }} onChange={(v) => set("advPadding", v)} />
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -80,9 +84,9 @@ const GridBlockComponent = {
     columnGap: "16px", rowGap: "16px",
     alignItems: "stretch", bgColor: "", borderRadius: "0px",
     advMargin: { top: 0, right: 0, bottom: 0, left: 0 }, advPadding: { top: 0, right: 0, bottom: 0, left: 0 },
-    hideDesktop: false, hideTablet: false, hideMobile: false, cssId: "", cssClass: "", zIndex: null,
+    hideDesktop: false, responsiveSpacing: {}, hideTablet: false, hideMobile: false, cssId: "", cssClass: "", zIndex: null,
   },
-  render: ({ id: puckId, columns, columnsTablet, columnsMobile, columnGap, rowGap, alignItems, bgColor, borderRadius, advMargin, advPadding, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex }: any) => {
+  render: ({ id: puckId, columns, columnsTablet, columnsMobile, columnGap, rowGap, alignItems, bgColor, borderRadius, advMargin, advPadding, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex, responsiveSpacing }: any) => {
     // Use Puck's stable block id so the CSS selector and DropZone names are
     // unique per instance and never change across re-renders.
     const uid = cssId || `pb-grid-${puckId || "g"}`;
@@ -91,6 +95,7 @@ const GridBlockComponent = {
     return (
       <div
         id={uid}
+        data-pb-rs={uid}
         className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={{
           paddingTop: advPadding?.top ?? 0, paddingRight: advPadding?.right ?? 0,
@@ -105,6 +110,7 @@ const GridBlockComponent = {
         }}
       >
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${uid}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
         <style>{`
           #${uid} > .puck-grid-inner {
             display: grid;

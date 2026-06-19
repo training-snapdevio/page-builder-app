@@ -13,9 +13,11 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
+  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
+  buildResponsiveSpacingCss,
 } from "@/puck-blocks/shared";
 
 const ProgressBarComponent = {
@@ -155,6 +157,8 @@ const ProgressBarComponent = {
                     <TabSection title="Background" />
                     <InlineSelect label="Type" value={bgType} onChange={(v) => set("advBgType", v)} options={[{ value: "none", label: "None" }, { value: "color", label: "Color" }]} />
                     {bgType === "color" && <ColorPickerField label="Color" value={props.advBgColor ?? ""} onChange={(v) => set("advBgColor", v)} />}
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -181,10 +185,10 @@ const ProgressBarComponent = {
     pctFontSize: 13, pctColor: "",
     alignment: "left", animation: "fill",
     advBgType: "none", advBgColor: "", advMargin: { top: 0, right: 0, bottom: 0, left: 0 }, advPadding: { top: 8, right: 0, bottom: 8, left: 0 },
-    hideDesktop: false, hideTablet: false, hideMobile: false, cssId: "", cssClass: "", zIndex: null,
+    hideDesktop: false, responsiveSpacing: {}, hideTablet: false, hideMobile: false, cssId: "", cssClass: "", zIndex: null,
   },
   render: (props: any) => {
-    const { label, value, showPercentage, pbType, fillStyle, fillColor, gradientEnd, trackColor, lineHeight, lineRadius, circleSize, ringThickness, showLabelInside, totalSteps, activeStep, showStepNumbers, multiRows, labelFontSize, labelColor, pctFontSize, pctColor, alignment, animation, advBgType, advBgColor, advMargin, advPadding, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex } = props;
+    const { label, value, showPercentage, pbType, fillStyle, fillColor, gradientEnd, trackColor, lineHeight, lineRadius, circleSize, ringThickness, showLabelInside, totalSteps, activeStep, showStepNumbers, multiRows, labelFontSize, labelColor, pctFontSize, pctColor, alignment, animation, advBgType, advBgColor, advMargin, advPadding, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex, id, responsiveSpacing } = props;
     const pct = Math.min(100, Math.max(0, value ?? 75));
     const animFill = animation === "fill";
     const [displayed, setDisplayed] = useState(animFill ? 0 : pct);
@@ -275,8 +279,10 @@ const ProgressBarComponent = {
     const type = pbType ?? "line";
 
     return (
-      <div ref={ref} id={cssId || undefined} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ ...wrapStyle, position: "relative" }}>
+      <div ref={ref} id={cssId || undefined}
+        data-pb-rs={id} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ ...wrapStyle, position: "relative" }}>
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${id}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
         {type === "line" && renderLine(label ?? "", pct, displayed)}
 
         {type === "circle" && (

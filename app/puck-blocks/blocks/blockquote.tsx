@@ -14,9 +14,11 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
+  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
+  buildResponsiveSpacingCss,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -71,7 +73,7 @@ const BlockQuoteComponent = {
                     <ColorPickerField label="Title Color" value={props.titleColor ?? ""} onChange={(v) => set("titleColor", v)} />
                     <SliderNumberField label="Title Font Size (px)" value={typeof props.titleFontSize === "number" ? props.titleFontSize : parseInt(props.titleFontSize ?? "14") || 14} onChange={(v) => set("titleFontSize", `${v}px`)} min={8} max={36} step={1} unit="px" />
                     <SliderNumberField label="Image Size (px)" value={typeof props.imageSize === "number" ? props.imageSize : parseInt(props.imageSize ?? "48") || 48} onChange={(v) => set("imageSize", `${v}px`)} min={24} max={160} step={1} unit="px" />
-                    <SliderNumberField label="Image Border Radius (px)" value={typeof props.imageBorderRadius === "number" ? props.imageBorderRadius : parseInt(props.imageBorderRadius ?? "50") || 50} onChange={(v) => set("imageBorderRadius", `${v}px`)} min={0} max={100} step={1} unit="px" />
+                    <SliderNumberField label="Image Border Radius (px)" value={typeof props.imageBorderRadius === "number" ? props.imageBorderRadius : (parseInt(props.imageBorderRadius ?? "50") ?? 50)} onChange={(v) => set("imageBorderRadius", `${v}px`)} min={0} max={100} step={1} unit="px" />
                     <TabSection title="Quote Icon" />
                     <ColorPickerField label="Icon Color" value={props.iconColor ?? ""} onChange={(v) => set("iconColor", v)} />
                     <SliderNumberField label="Icon Size (px)" value={typeof props.iconSize === "number" ? props.iconSize : parseInt(props.iconSize ?? "48") || 48} onChange={(v) => set("iconSize", `${v}px`)} min={16} max={96} step={1} unit="px" />
@@ -96,6 +98,8 @@ const BlockQuoteComponent = {
                     <InlineSelect label="Border Style" value={props.advBorderStyle ?? "none"} onChange={(v) => set("advBorderStyle", v)} options={[{ value: "none", label: "None" }, { value: "solid", label: "Solid" }, { value: "dashed", label: "Dashed" }]} />
                     {props.advBorderStyle !== "none" && (<><FourSideField label="Border Width (px)" value={props.advBorderWidth} onChange={(v) => set("advBorderWidth", v)} /><ColorPickerField label="Border Color" value={props.advBorderColor ?? ""} onChange={(v) => set("advBorderColor", v)} /></>)}
                     <FourSideField label="Border Radius (px)" value={props.advBorderRadius} onChange={(v) => set("advBorderRadius", v)} />
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -119,15 +123,15 @@ const BlockQuoteComponent = {
     alignment: "left",
     advBgType: "none", advBgColorWrap: "", advMargin: { top: 0, right: 0, bottom: 0, left: 0 }, advPadding: { top: 24, right: 24, bottom: 24, left: 24 },
     advBorderStyle: "none", advBorderWidth: { top: 0, right: 0, bottom: 0, left: 0 }, advBorderColor: "", advBorderRadius: { top: 0, right: 0, bottom: 0, left: 0 },
-    hideDesktop: false, hideTablet: false, hideMobile: false, cssId: "", cssClass: "", zIndex: null,
+    hideDesktop: false, responsiveSpacing: {}, hideTablet: false, hideMobile: false, cssId: "", cssClass: "", zIndex: null,
   },
-  render: ({ quoteText, authorName, authorTitle, authorImage, showQuoteIcon, quoteFontFamily, quoteFontSize, quoteFontStyle, quoteTextColor, quoteLineHeight, nameColor, nameFontSize, nameFontWeight, titleColor, titleFontSize, imageSize, imageBorderRadius, iconColor, iconSize, iconPosition, borderType, borderColor, borderWidth, bgColor, alignment, advBgType, advBgColorWrap, advMargin, advPadding, advBorderStyle, advBorderWidth, advBorderColor, advBorderRadius, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex }) => {
+  render: ({ quoteText, authorName, authorTitle, authorImage, showQuoteIcon, quoteFontFamily, quoteFontSize, quoteFontStyle, quoteTextColor, quoteLineHeight, nameColor, nameFontSize, nameFontWeight, titleColor, titleFontSize, imageSize, imageBorderRadius, iconColor, iconSize, iconPosition, borderType, borderColor, borderWidth, bgColor, alignment, advBgType, advBgColorWrap, advMargin, advPadding, advBorderStyle, advBorderWidth, advBorderColor, advBorderRadius, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex, id, responsiveSpacing }: any) => {
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
     const borderMap: Record<string, React.CSSProperties> = {
       none: {},
       left: { borderLeft: `${borderWidth || 4}px solid ${borderColor || "var(--primary-color)"}`, paddingLeft: 20 },
       top: { borderTop: `${borderWidth || 4}px solid ${borderColor || "var(--primary-color)"}`, paddingTop: 20 },
-      box: { border: `${borderWidth || 2}px solid ${borderColor || "var(--primary-color)"}` },
+      box: { border: `${borderWidth || 2}px solid ${borderColor || "var(--primary-color)"}`, padding: 16 },
     };
     const wrapBg = advBgType === "color" && advBgColorWrap ? { backgroundColor: advBgColorWrap } : {};
     const quoteIconSvg = (
@@ -136,11 +140,12 @@ const BlockQuoteComponent = {
       </svg>
     );
     return (
-      <div id={cssId || undefined} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ position: "relative", textAlign: alignment as any, paddingTop: advPadding?.top ?? 24, paddingRight: advPadding?.right ?? 24, paddingBottom: advPadding?.bottom ?? 24, paddingLeft: advPadding?.left ?? 24, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, borderTopLeftRadius: advBorderRadius?.top ?? 0, borderTopRightRadius: advBorderRadius?.right ?? 0, borderBottomRightRadius: advBorderRadius?.bottom ?? 0, borderBottomLeftRadius: advBorderRadius?.left ?? 0, ...(advBorderStyle && advBorderStyle !== "none" ? { borderStyle: advBorderStyle, borderTopWidth: advBorderWidth?.top ?? 0, borderRightWidth: advBorderWidth?.right ?? 0, borderBottomWidth: advBorderWidth?.bottom ?? 0, borderLeftWidth: advBorderWidth?.left ?? 0, borderColor: advBorderColor || "currentColor" } : {}), ...wrapBg }}>
+      <div id={cssId || undefined}
+        data-pb-rs={id} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ position: "relative", textAlign: alignment as any, paddingTop: advPadding?.top ?? 24, paddingRight: advPadding?.right ?? 24, paddingBottom: advPadding?.bottom ?? 24, paddingLeft: advPadding?.left ?? 24, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, borderTopLeftRadius: advBorderRadius?.top ?? 0, borderTopRightRadius: advBorderRadius?.right ?? 0, borderBottomRightRadius: advBorderRadius?.bottom ?? 0, borderBottomLeftRadius: advBorderRadius?.left ?? 0, ...(advBorderStyle && advBorderStyle !== "none" ? { borderStyle: advBorderStyle, borderTopWidth: advBorderWidth?.top ?? 0, borderRightWidth: advBorderWidth?.right ?? 0, borderBottomWidth: advBorderWidth?.bottom ?? 0, borderLeftWidth: advBorderWidth?.left ?? 0, borderColor: advBorderColor || "currentColor" } : {}), ...wrapBg }}>
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${id}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
+        {showQuoteIcon && <div style={{ display: "flex", justifyContent: iconPosition === "top-right" ? "flex-end" : "flex-start", marginBottom: 8 }}>{quoteIconSvg}</div>}
         <blockquote style={{ margin: 0, position: "relative", backgroundColor: bgColor || "transparent", padding: bgColor ? 24 : 0, borderRadius: bgColor ? 8 : 0, ...borderMap[borderType ?? "left"] }}>
-          {showQuoteIcon && iconPosition === "top-left" && <div style={{ marginBottom: 8 }}>{quoteIconSvg}</div>}
-          {showQuoteIcon && iconPosition === "top-right" && <div style={{ textAlign: "right", marginBottom: 8 }}>{quoteIconSvg}</div>}
           <p style={{ fontSize: quoteFontSize || "1.25rem", fontFamily: quoteFontFamily !== "inherit" ? quoteFontFamily : undefined, fontStyle: quoteFontStyle || "italic", color: quoteTextColor || "var(--text-color)", lineHeight: quoteLineHeight || "1.7", margin: "0 0 16px 0" }}>"{quoteText}"</p>
           {(authorName || authorImage) && (
             <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: alignment === "center" ? "center" : alignment === "right" ? "flex-end" : "flex-start" }}>

@@ -13,9 +13,11 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
+  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
+  buildResponsiveSpacingCss,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -239,6 +241,8 @@ const ImageComponent = {
                       <ColorPickerField label="Color" value={props.advBgColor ?? ""} onChange={(v) => set("advBgColor", v)} />
                     )}
 
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -282,7 +286,7 @@ const ImageComponent = {
     advBgColor: "",
     advMargin: { top: 0, right: 0, bottom: 0, left: 0 },
     advPadding: { top: 0, right: 0, bottom: 0, left: 0 },
-    hideDesktop: false,
+    hideDesktop: false, responsiveSpacing: {},
     hideTablet: false,
     hideMobile: false,
     cssId: "",
@@ -323,6 +327,8 @@ const ImageComponent = {
     hideDesktop,
     hideTablet,
     hideMobile,
+    responsiveSpacing,
+    id,
     cssId,
     cssClass,
     customCss,
@@ -449,6 +455,7 @@ const ImageComponent = {
         }}
       >
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${id}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
         <style>{`@keyframes pb-img-spin{to{transform:rotate(360deg)}}`}{animCss}{hoverCss}{customCss ? `#${imgId}{${customCss}}` : ""}</style>
         <div
           className="pb-img-inner"

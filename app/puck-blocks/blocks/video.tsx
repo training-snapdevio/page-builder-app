@@ -10,10 +10,12 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
+  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   SliderUnitField,
   EditorHideOverlay,
+  buildResponsiveSpacingCss,
 } from "@/puck-blocks/shared";
 import {
   VideoUploadField,
@@ -113,6 +115,8 @@ const VideoComponent = {
                     <FourSideField label="Margin (px)" value={props.advMargin} onChange={(v) => set("advMargin", v)} />
                     <FourSideField label="Padding (px)" value={props.advPadding ?? { top: 0, right: 0, bottom: 0, left: 0 }} onChange={(v) => set("advPadding", v)} />
 
+                    <TabSection title="Responsive Spacing" />
+                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -145,7 +149,7 @@ const VideoComponent = {
     borderRadius: 0,
     advMargin: { top: 0, right: 0, bottom: 0, left: 0 },
     advPadding: { top: 0, right: 0, bottom: 0, left: 0 },
-    hideDesktop: false,
+    hideDesktop: false, responsiveSpacing: {},
     hideTablet: false,
     hideMobile: false,
     cssId: "",
@@ -173,6 +177,8 @@ const VideoComponent = {
     hideDesktop,
     hideTablet,
     hideMobile,
+    responsiveSpacing,
+    id,
     cssId,
     cssClass,
     zIndex,
@@ -266,6 +272,7 @@ const VideoComponent = {
     return (
       <div
         id={cssId || undefined}
+        data-pb-rs={id}
         className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={{
           position: "relative",
@@ -277,6 +284,7 @@ const VideoComponent = {
         }}
       >
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
+        {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${id}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
         <div style={containerStyle}>
           {videoEl}
         </div>

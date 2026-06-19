@@ -196,7 +196,7 @@ async function fileCreate(
 }
 
 async function pollImageUrl(admin: AdminClient, id: string): Promise<string> {
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 60; i++) {
     const res = await admin.graphql(NODE_IMAGE, { variables: { id } });
     const json = (await res.json()) as {
       data?: {
@@ -210,6 +210,9 @@ async function pollImageUrl(admin: AdminClient, id: string): Promise<string> {
     const node = json.data?.node;
     if (node?.fileErrors?.length) {
       throw new Error(node.fileErrors.map((e) => e.message).join(", "));
+    }
+    if ((node?.fileStatus as string) === "FAILED") {
+      throw new Error("Shopify failed to process the uploaded image");
     }
     if (node?.image?.url) return node.image.url;
     await sleep(1000);
