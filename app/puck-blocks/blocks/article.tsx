@@ -12,10 +12,10 @@ import {
   ColorPickerField,
   BlockTabBar,
   TabSection,
-  EditorHideOverlay,
   FourSideField,
   InlineSelect,
   SliderNumberField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -262,6 +262,7 @@ export const ArticleComponent = {
 
     return (
       <div
+        className={hideClasses || undefined}
         style={{
           position: "relative",
           marginTop: m.top, marginRight: m.right, marginBottom: m.bottom, marginLeft: m.left,

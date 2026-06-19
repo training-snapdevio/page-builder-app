@@ -15,6 +15,7 @@ import {
   FourSideField,
   InlineSelect,
   SliderNumberField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -436,8 +437,9 @@ const ImageComponent = {
     return (
       <div
         id={imgId}
-        className={[`puck-img-wrap-outer`, entranceAnim && entranceAnim !== "none" ? "pb-img-animate" : "", cssClass].filter(Boolean).join(" ") || undefined}
+        className={[hideClasses, `puck-img-wrap-outer`, entranceAnim && entranceAnim !== "none" ? "pb-img-animate" : "", cssClass].filter(Boolean).join(" ") || undefined}
         style={{
+          position: "relative",
           paddingTop: advPadding?.top ?? 0, paddingRight: advPadding?.right ?? 0,
           paddingBottom: advPadding?.bottom ?? 0, paddingLeft: advPadding?.left ?? 0,
           marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0,
@@ -446,6 +448,7 @@ const ImageComponent = {
           ...wrapBgStyle,
         }}
       >
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         <style>{`@keyframes pb-img-spin{to{transform:rotate(360deg)}}`}{animCss}{hoverCss}{customCss ? `#${imgId}{${customCss}}` : ""}</style>
         <div
           className="pb-img-inner"

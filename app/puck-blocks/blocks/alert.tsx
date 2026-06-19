@@ -14,6 +14,7 @@ import {
   FourSideField,
   InlineSelect,
   SliderNumberField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -127,7 +128,8 @@ const AlertComponent = {
       ? { border: `${borderWidth || 1}px solid ${resolvedBorder}` }
       : {};
     return (
-      <div id={cssId || undefined} className={[cssClass].filter(Boolean).join(" ") || undefined} style={{ paddingTop: advPadding?.top ?? 16, paddingRight: advPadding?.right ?? 16, paddingBottom: advPadding?.bottom ?? 16, paddingLeft: advPadding?.left ?? 16, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, backgroundColor: resolvedBg, color: resolvedText, borderRadius: borderRadius ?? 8, zIndex: zIndex ?? undefined, position: "relative", lineHeight: lh, ...borderCss, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
+      <div id={cssId || undefined} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ paddingTop: advPadding?.top ?? 16, paddingRight: advPadding?.right ?? 16, paddingBottom: advPadding?.bottom ?? 16, paddingLeft: advPadding?.left ?? 16, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, backgroundColor: resolvedBg, color: resolvedText, borderRadius: borderRadius ?? 8, zIndex: zIndex ?? undefined, position: "relative", lineHeight: lh, ...borderCss, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
           {showIcon && (isImgIcon
             ? <img src={customIcon} alt="icon" style={{ width: "1.5rem", height: "1.5rem", objectFit: "contain", flexShrink: 0, borderRadius: 0 }} />

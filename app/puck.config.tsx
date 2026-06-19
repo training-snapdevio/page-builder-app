@@ -147,36 +147,6 @@ export const previewConfig: Config<Props, RootProps> = {
   components: commonComponents,
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 export const config: Config<Props, RootProps> = {
   root: {
     fields: {},

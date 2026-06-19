@@ -14,6 +14,7 @@ import {
   FourSideField,
   InlineSelect,
   SliderNumberField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 import {
   LinkUrlField,
@@ -504,6 +505,7 @@ export const HeadingBlockComponent = {
       : "var(--h6-size, 1rem)";
 
     const wrapperStyle: React.CSSProperties = {
+      position: "relative",
       paddingTop:    advPadding?.top    ?? 32,
       paddingRight:  advPadding?.right  ?? 0,
       paddingBottom: advPadding?.bottom ?? 32,
@@ -542,9 +544,10 @@ export const HeadingBlockComponent = {
     return (
       <div
         id={cssId || undefined}
-        className={[cssClass].filter(Boolean).join(" ") || undefined}
+        className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={wrapperStyle}
       >
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         {customCss && <style>{`#${cssId || "heading-block"} { ${customCss} }`}</style>}
         {linkUrl
           ? <a href={linkUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit" }}>{headingEl}</a>

@@ -17,6 +17,7 @@ import {
   FourSideField,
   InlineSelect,
   SliderNumberField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -517,9 +518,10 @@ const ButtonComponent = {
     return (
       <div
         id={cssId || undefined}
-        className={[cssClass].filter(Boolean).join(" ") || undefined}
-        style={{ textAlign: !fullWidth ? (alignment as any) : undefined, zIndex: zIndex ?? undefined, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, ...wrapBg }}
+        className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
+        style={{ position: "relative", textAlign: !fullWidth ? (alignment as any) : undefined, zIndex: zIndex ?? undefined, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, ...wrapBg }}
       >
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         <style>{animCss}{hoverCss}{customCss ? `.${btnClass} { ${customCss} }` : ""}</style>
         {/* key on anim+duration+delay forces remount → replays animation in editor when settings change */}
         <div className={`${btnClass}-wrap`} key={`${anim}-${animDuration}-${animDelay}`} style={{ display: fullWidth ? "block" : "inline-block" }}>

@@ -13,6 +13,7 @@ import {
   InlineSelect,
   SliderNumberField,
   SliderUnitField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 import {
   VideoUploadField,
@@ -73,7 +74,6 @@ const VideoComponent = {
                         { value: "hide", label: "Hide" },
                       ]}
                     />
-                    <ToggleField label="Play Inline" value={props.playInline !== false} onChange={(v) => set("playInline", v)} />
                   </>
                 )}
 
@@ -91,7 +91,7 @@ const VideoComponent = {
                         { value: "1:1", label: "1:1 (Square)" },
                       ]}
                     />
-                    <SliderUnitField
+                    <SliderNumberField
                       label="Width"
                       value={props.videoWidthVal ?? 100}
                       unit="%"
@@ -134,7 +134,6 @@ const VideoComponent = {
     autoplay: false,
     loop: false,
     controls: "show",
-    playInline: true,
     aspectRatio: "16:9",
     videoWidthVal: 100,
     videoWidthUnit: "%",
@@ -160,7 +159,6 @@ const VideoComponent = {
     autoplay,
     loop,
     controls,
-    playInline,
     aspectRatio,
     videoWidthVal,
     videoWidthUnit,
@@ -251,7 +249,6 @@ const VideoComponent = {
           loop={loop}
           muted
           controls={controls !== "hide"}
-          playsInline={playInline !== false}
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
       ) : (
@@ -269,8 +266,9 @@ const VideoComponent = {
     return (
       <div
         id={cssId || undefined}
-        className={[cssClass].filter(Boolean).join(" ") || undefined}
+        className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={{
+          position: "relative",
           paddingTop: advPadding?.top ?? 0, paddingRight: advPadding?.right ?? 0,
           paddingBottom: advPadding?.bottom ?? 0, paddingLeft: advPadding?.left ?? 0,
           marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0,
@@ -278,6 +276,7 @@ const VideoComponent = {
           zIndex: zIndex ?? undefined,
         }}
       >
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         <div style={containerStyle}>
           {videoEl}
         </div>

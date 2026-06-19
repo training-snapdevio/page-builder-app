@@ -6,12 +6,15 @@ import { usePuck } from "@my-app/puck-editor";
 import {
   AlignField,
   ToggleField,
+  StackedTextField,
   ColorPickerField,
   BlockTabBar,
   TabSection,
   FourSideField,
   InlineSelect,
   SliderNumberField,
+  StackedTextareaField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 
 const StarRatingComponent = {
@@ -44,7 +47,7 @@ const StarRatingComponent = {
                     <SliderNumberField label="Rating Value" value={props.ratingValue ?? 4} onChange={(v) => set("ratingValue", Math.round(v * 10) / 10)} min={0} max={5} step={0.5} unit="" />
                     <ToggleField label="Show Number" value={props.showNumber !== false} onChange={(v) => set("showNumber", v)} />
                     <InlineSelect label="Number Position" value={props.numberPosition ?? "after"} onChange={(v) => set("numberPosition", v)} options={[{ value: "before", label: "Before Stars" }, { value: "after", label: "After Stars" }]} />
-                    <SliderNumberField label="Review Count" value={props.reviewCount ?? 0} onChange={(v) => set("reviewCount", Math.max(0, Math.round(v)))} min={0} max={99999} step={1} unit="" />
+                    <StackedTextField label="Review Count" value={String(props.reviewCount ?? "")} onChange={(v) => set("reviewCount", v)} placeholder="e.g. 128" />
                   </>
                 )}
                 {tab === "style" && (
@@ -84,7 +87,7 @@ const StarRatingComponent = {
     },
   },
   defaultProps: {
-    ratingValue: 4, showNumber: true, numberPosition: "after", reviewCount: 0,
+    ratingValue: 4, showNumber: true, numberPosition: "after", reviewCount: "",
     starSize: "24px", filledColor: "#f59e0b", emptyColor: "#d1d5db", starGap: "4px",
     numFontSize: "16px", numFontWeight: "700", numColor: "",
     alignment: "left",
@@ -114,13 +117,15 @@ const StarRatingComponent = {
         </svg>
       );
     });
+    const reviewCountStr = String(reviewCount ?? "").trim();
     const numEl = showNumber && (
       <span style={{ fontSize: numFontSize || "16px", fontWeight: numFontWeight || "700", color: numColor || "var(--text-color)", whiteSpace: "nowrap" }}>
-        {val.toFixed(1)}{reviewCount ? ` (${reviewCount} reviews)` : ""}
+        {val.toFixed(1)}{reviewCountStr ? ` (${reviewCountStr} reviews)` : ""}
       </span>
     );
     return (
-      <div id={cssId || undefined} className={[cssClass].filter(Boolean).join(" ") || undefined} style={{ textAlign: alignment as any, paddingTop: advPadding?.top ?? 8, paddingRight: advPadding?.right ?? 0, paddingBottom: advPadding?.bottom ?? 8, paddingLeft: advPadding?.left ?? 0, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
+      <div id={cssId || undefined} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ position: "relative", textAlign: alignment as any, paddingTop: advPadding?.top ?? 8, paddingRight: advPadding?.right ?? 0, paddingBottom: advPadding?.bottom ?? 8, paddingLeft: advPadding?.left ?? 0, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         <div style={{ display: "inline-flex", alignItems: "center", gap: starGap || "4px", flexWrap: "wrap", justifyContent: alignment === "center" ? "center" : alignment === "right" ? "flex-end" : "flex-start" }}>
           {numberPosition === "before" && numEl}
           {stars}

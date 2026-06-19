@@ -2,6 +2,7 @@
 // ─── SocialIconsComponent ───
 
 import type * as React from "react";
+import { useEffect, useState as useLocalState } from "react";
 import { AlignCenter, AlignLeft, AlignRight } from "lucide-react";
 import { usePuck } from "@my-app/puck-editor";
 import {
@@ -13,6 +14,7 @@ import {
   FourSideField,
   InlineSelect,
   SliderNumberField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 
 const SOCIAL_PLATFORM_SVGS: Record<string, React.ReactNode> = {
@@ -68,6 +70,46 @@ const SOCIAL_PLATFORMS = [
   { key: "pinterest", label: "Pinterest", brandColor: "#E60023" },
   { key: "snapchat",  label: "Snapchat",  brandColor: "#FFFC00" },
 ];
+
+const SOCIAL_URL_PATTERN = /^(https?:\/\/|\/)/;
+
+function SocialUrlInput({ platform, value, onChange }: { platform: string; value: string; onChange: (v: string) => void }) {
+  const [draft, setDraft] = useLocalState(value);
+  const [touched, setTouched] = useLocalState(false);
+  useEffect(() => { setDraft(value); }, [value]);
+
+  const isValid = !draft || SOCIAL_URL_PATTERN.test(draft);
+  const showError = touched && draft && !isValid;
+
+  const commit = (raw: string) => {
+    setTouched(true);
+    const v = raw.trim();
+    if (!v || SOCIAL_URL_PATTERN.test(v)) onChange(v);
+  };
+
+  return (
+    <div style={{ paddingBottom: 6 }}>
+      <input
+        type="url"
+        value={draft}
+        placeholder={`${platform} URL…`}
+        onChange={(e) => { setDraft(e.target.value); setTouched(false); }}
+        onBlur={(e) => commit(e.target.value)}
+        style={{
+          width: "100%", padding: "4px 8px", fontSize: 12, boxSizing: "border-box",
+          border: `1px solid ${showError ? "#d72c0d" : "var(--p-color-border)"}`,
+          borderRadius: 4, outline: "none",
+          background: "var(--p-color-bg-surface)", color: "var(--p-color-text)",
+        }}
+      />
+      {showError && (
+        <div style={{ fontSize: 11, color: "#d72c0d", marginTop: 3 }}>
+          Must start with https:// or http://
+        </div>
+      )}
+    </div>
+  );
+}
 
 const SocialIconsComponent = {
   label: "Social Icons",
@@ -129,20 +171,12 @@ const SocialIconsComponent = {
                             </div>
                             {/* URL input only when enabled */}
                             {isOn && (
-                              <div style={{ paddingBottom: 6 }}>
-                                <input
-                                  type="url"
-                                  value={urls[pl.key] ?? ""}
-                                  placeholder={`${pl.label} URL…`}
-                                  onChange={(e) => set("urls", { ...urls, [pl.key]: e.target.value })}
-                                  style={{
-                                    width: "100%", padding: "4px 8px", fontSize: 12, boxSizing: "border-box",
-                                    border: "1px solid var(--p-color-border)", borderRadius: 4,
-                                    background: "var(--p-color-bg-surface)", color: "var(--p-color-text)",
-                                    outline: "none",
-                                  }}
-                                />
-                              </div>
+                              <SocialUrlInput
+                                key={pl.key}
+                                platform={pl.label}
+                                value={urls[pl.key] ?? ""}
+                                onChange={(v) => set("urls", { ...urls, [pl.key]: v })}
+                              />
                             )}
                           </div>
                         );
@@ -221,7 +255,8 @@ const SocialIconsComponent = {
     const hoverCss = (iconHoverColor || iconHoverBg) ? `#${id} a:hover .puck-si { ${iconHoverColor ? `color: ${iconHoverColor} !important;` : ""} ${iconHoverBg ? `background: ${iconHoverBg} !important;` : ""} transition: all 0.2s; } #${id} a .puck-si { transition: all 0.2s; }` : "";
     const platforms = SOCIAL_PLATFORMS.filter(p => (enabled ?? []).includes(p.key));
     return (
-      <div id={id} className={[cssClass].filter(Boolean).join(" ") || undefined} style={{ paddingTop: advPadding?.top ?? 8, paddingRight: advPadding?.right ?? 0, paddingBottom: advPadding?.bottom ?? 8, paddingLeft: advPadding?.left ?? 0, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
+      <div id={id} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ position: "relative", paddingTop: advPadding?.top ?? 8, paddingRight: advPadding?.right ?? 0, paddingBottom: advPadding?.bottom ?? 8, paddingLeft: advPadding?.left ?? 0, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, ...(advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {}) }}>
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         {hoverCss && <style>{hoverCss}</style>}
         <div style={{ display: "flex", gap: spacing, flexWrap: "wrap", justifyContent: alignment === "center" ? "center" : alignment === "right" ? "flex-end" : "flex-start" }}>
           {platforms.map(p => {

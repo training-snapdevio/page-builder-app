@@ -16,6 +16,7 @@ import {
   JUSTIFY_ICONS,
   ALIGN_ICONS,
   WRAP_ICONS,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -344,7 +345,8 @@ const LayoutBlockComponent = {
     ` : "";
 
     return (
-      <div id={uid} className={[cssClass].filter(Boolean).join(" ") || undefined} style={outerStyle}>
+      <div id={uid} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={outerStyle}>
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         {(animCss || customCss) && <style>{animCss}{customCss}</style>}
         {/* Background video */}
         {bgType === "video" && bgVideo && (

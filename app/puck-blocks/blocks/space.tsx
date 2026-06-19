@@ -8,6 +8,7 @@ import {
   BlockTabBar,
   TabSection,
   SliderNumberField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 
 const SpaceComponent = {
@@ -115,8 +116,9 @@ const SpaceComponent = {
       <div
         id={cssId || undefined}
         className={[uid, hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
-        style={{ backgroundColor: backgroundColor || undefined, zIndex: zIndex ?? undefined, display: "block", height: 0, paddingTop: hD, minHeight: 0, width: "100%", boxSizing: "border-box", fontSize: 0, lineHeight: 0 }}
+        style={{ position: "relative", backgroundColor: backgroundColor || undefined, zIndex: zIndex ?? undefined, display: "block", height: 0, paddingTop: hD, minHeight: 0, width: "100%", boxSizing: "border-box", fontSize: 0, lineHeight: 0 }}
       >
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         <style>{responsiveCss}</style>
       </div>
     );

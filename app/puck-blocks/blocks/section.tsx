@@ -18,6 +18,7 @@ import {
   AlignField,
   BlockTabBar,
   ColorPickerField,
+  EditorHideOverlay,
   FourSideField,
   InlineSelect,
   SliderNumberField,
@@ -315,9 +316,10 @@ const SectionBlockComponent = {
     return (
       <div
         id={uid}
-        className={[cssClass].filter(Boolean).join(" ") || undefined}
+        className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={outerStyle}
       >
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         {/* CSS */}
         {(animCss || customCss) && (
           <style>{`${animCss}${customCss || ""}`}</style>

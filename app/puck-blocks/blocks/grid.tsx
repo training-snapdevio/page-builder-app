@@ -10,6 +10,7 @@ import {
   TabSection,
   FourSideField,
   InlineSelect,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 
 const GridBlockComponent = {
@@ -90,7 +91,7 @@ const GridBlockComponent = {
     return (
       <div
         id={uid}
-        className={[cssClass].filter(Boolean).join(" ") || undefined}
+        className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={{
           paddingTop: advPadding?.top ?? 0, paddingRight: advPadding?.right ?? 0,
           paddingBottom: advPadding?.bottom ?? 0, paddingLeft: advPadding?.left ?? 0,
@@ -100,8 +101,10 @@ const GridBlockComponent = {
           backgroundColor: bgColor || undefined,
           borderRadius: borderRadius || undefined,
           boxSizing: "border-box",
+          position: "relative",
         }}
       >
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         <style>{`
           #${uid} > .puck-grid-inner {
             display: grid;

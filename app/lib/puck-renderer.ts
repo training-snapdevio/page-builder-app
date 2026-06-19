@@ -262,12 +262,9 @@ function Text(p: Props): string {
     ? `border-style:${esc(p.advBorderStyle as string)};border-width:${bdr.top}px ${bdr.right}px ${bdr.bottom}px ${bdr.left}px;border-color:${esc((p.advBorderColor as string) || "currentColor")};`
     : "";
 
-  const hideClass = [
-    p.hideDesktop ? "puck-hide-desktop" : "",
-    p.hideTablet  ? "puck-hide-tablet"  : "",
-    p.hideMobile  ? "puck-hide-mobile"  : "",
-    p.cssClass    ? esc(p.cssClass as string) : "",
-  ].filter(Boolean).join(" ");
+  // Structural class only — puck-hide-* classes are added centrally by the dispatcher.
+  // The `pb-text-blk` fallback must always be present so the linkColorStyle selector matches.
+  const blkClass = ["pb-text-blk", p.cssClass ? esc(p.cssClass as string) : ""].filter(Boolean).join(" ");
 
   const opacity    = p.opacity != null ? Number(p.opacity) / 100 : 1;
   const zIndex     = p.zIndex  != null ? `z-index:${p.zIndex};position:relative;` : "";
@@ -298,7 +295,7 @@ function Text(p: Props): string {
   const pEl = `<p style="${pStyle}">${esc((p.title as string) || "")}</p>`;
   const inner = linkUrl ? `<a href="${linkUrl}" style="text-decoration:none;color:inherit">${pEl}</a>` : pEl;
 
-  return `${linkColorStyle}<div${idAttr} class="${hideClass || "pb-text-blk"}" style="${outerStyle}">${inner}</div>`;
+  return `${linkColorStyle}<div${idAttr} class="${blkClass}" style="${outerStyle}">${inner}</div>`;
 }
 
 function HeadingBlock(p: Props): string {
@@ -323,7 +320,6 @@ function HeadingBlock(p: Props): string {
   const subtitleSize = p.subtitleSize ? `${p.subtitleSize}px` : "var(--base-font-size, 1rem)";
   const m = (p.advMargin as any) ?? { top: 0, right: 0, bottom: 0, left: 0 };
   const pd = (p.advPadding as any) ?? { top: 24, right: 24, bottom: 24, left: 24 };
-  const hideClass = [p.hideDesktop ? "puck-hide-desktop" : "", p.hideTablet ? "puck-hide-tablet" : "", p.hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
 
   // Background: only apply when advBgType is explicitly set (not "none")
   const advBgType = (p.advBgType as string) || "none";
@@ -385,7 +381,7 @@ function HeadingBlock(p: Props): string {
     dividerHtml = `<style>.${dvId}{display:flex!important;align-items:center!important;gap:12px!important;justify-content:${justify}!important;margin-top:16px!important;padding:0!important;background:none!important;}.${dvId} span.pb-dv-line{display:block!important;flex:1!important;height:0!important;max-width:${lineMaxW}px!important;border:none!important;border-top:${dividerThickness}px solid ${dividerColor}!important;padding:0!important;margin:0!important;box-sizing:content-box!important;background:none!important;}</style><div class="${dvId}"><span class="pb-dv-line"></span><span style="font-size:1.5rem;white-space:nowrap;flex-shrink:0">${dividerIcon}</span><span class="pb-dv-line"></span></div>`;
   }
 
-  return `<div class="${hideClass}" style="${wrapStyle}">
+  return `<div style="${wrapStyle}">
   ${headingHtml}
   ${p.subtitle ? `<p style="font-size:${subtitleSize};color:${subtitleColor};margin-top:8px;margin-bottom:0">${esc(p.subtitle as string)}</p>` : ""}
   ${dividerHtml}
@@ -408,7 +404,7 @@ function Space(p: Props): string {
   const hM = toCssLen(p.heightMobile,  p.heightMobileUnit,  hT);
   const blockId = esc((p.id as string) || String(Math.random()).slice(2));
   const uid = `sp-${blockId}`;
-  const classes = [uid, p.hideDesktop ? "puck-hide-desktop" : "", p.hideTablet ? "puck-hide-tablet" : "", p.hideMobile ? "puck-hide-mobile" : "", p.cssClass ? String(p.cssClass) : ""].filter(Boolean).join(" ");
+  const classes = [uid, p.cssClass ? String(p.cssClass) : ""].filter(Boolean).join(" ");
   const idAttr = p.cssId ? ` id="${esc(String(p.cssId))}"` : "";
   const bgStyle = p.backgroundColor ? `background-color:${esc(p.backgroundColor as string)};` : "";
   // Shopify themes reset height/min-height with !important — use padding-top
@@ -580,7 +576,7 @@ function Article(p: Props): string {
   const dateFS       = `${Number(p.dateFontSize) || 13}px`;
   const dateFW       = String(p.dateFontWeight ?? "400");
 
-  const cls          = ["pb-article", p.hideDesktop ? "puck-hide-desktop" : "", p.hideTablet ? "puck-hide-tablet" : "", p.hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
+  const cls          = "pb-article";
   const outerStyle   = `margin:${m.top}px ${m.right}px ${m.bottom}px ${m.left}px;padding:${pd.top}px ${pd.right}px ${pd.bottom}px ${pd.left}px`;
 
   // ── Featured image ──
@@ -805,7 +801,7 @@ function MarqueeBar(p: Props): string {
   const fontWeight = p.fontWeight ? String(p.fontWeight) : "500";
   const textTransform = p.textTransform ? String(p.textTransform) : "none";
   const pauseOnHover = p.pauseOnHover !== false;
-  const classAttr = ["pb-marquee", pauseOnHover ? "pb-marquee-pause" : "", p.hideDesktop ? "puck-hide-desktop" : "", p.hideTablet ? "puck-hide-tablet" : "", p.hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
+  const classAttr = ["pb-marquee", pauseOnHover ? "pb-marquee-pause" : ""].filter(Boolean).join(" ");
   const items = Array(repeat).fill(`<span style="margin-right:${itemGap}px">${esc(text)}</span>`).join("");
   return `<div class="${classAttr}" style="overflow:hidden;white-space:nowrap;background:${esc(bg)};color:${esc(textColor)};font-size:${fontSize};font-weight:${fontWeight};text-transform:${textTransform};padding:${padVal}px 0">
   <div class="pb-marquee-track" style="display:inline-block;animation:${dir} ${speed}s linear infinite">${items}</div>
@@ -834,12 +830,6 @@ function PhotoCollage(p: Props): string {
         ? "0 4px 12px rgba(0,0,0,0.2)"
         : "0 2px 6px rgba(0,0,0,0.12)";
 
-  const hideClasses = [
-    p.hideDesktop ? "puck-hide-desktop" : "",
-    p.hideTablet  ? "puck-hide-tablet"  : "",
-    p.hideMobile  ? "puck-hide-mobile"  : "",
-  ].filter(Boolean).join(" ");
-
   const arMap: Record<string, string> = { "1:1": "1/1", "4:3": "4/3", "16:9": "16/9", "3:2": "3/2" };
   const ar = arMap[aspectRatio] ?? "1/1";
 
@@ -856,7 +846,7 @@ function PhotoCollage(p: Props): string {
   const wrapCell = (content: string, extraStyle: string) =>
     `<div class="pb-collage-item" style="overflow:hidden;border-radius:${br}!important;box-shadow:${shadow};position:relative;${extraStyle}">${content}</div>`;
 
-  const wrapClass = ["pb-collage-wrap", hideClasses].filter(Boolean).join(" ");
+  const wrapClass = "pb-collage-wrap";
 
   if (!valid.length) {
     return `${hoverStyle}<div class="${wrapClass}" style="background:#f3f4f6;display:flex;align-items:center;justify-content:center;min-height:200px;border-radius:${br};color:#6b7280;font-size:14px">Add photos in the Content tab</div>`;
@@ -1438,8 +1428,8 @@ function renderDivider(p: Props): string {
     }
     if (lineStyle === "double") {
       const gap2 = Math.max(th, 2);
-      const lineDiv = `<div style="height:${th}px;min-height:${th}px;background:${color};${brCss}font-size:0;line-height:0;"></div>`;
-      return `<div style="${baseWrap}display:flex!important;flex-direction:column!important;gap:${gap2}px;">${lineDiv}${lineDiv}</div>`;
+      const lineDiv = `<div style="display:block!important;height:${th}px!important;min-height:${th}px!important;background:${color}!important;${brCss}font-size:0;line-height:0;border:none!important;padding:0!important;margin:0!important;box-sizing:content-box!important;"></div>`;
+      return `<div style="${baseWrap}display:flex!important;flex-direction:column!important;gap:${gap2}px!important;border:none!important;padding:0!important;">${lineDiv}${lineDiv}</div>`;
     }
     if (lineStyle === "dashed" || lineStyle === "dotted") {
       return `<div style="${baseWrap}height:${th}px;min-height:${th}px;border-top:${th}px ${lineStyle} ${color};background:transparent;box-sizing:content-box;font-size:0;line-height:0;overflow:hidden;"></div>`;
@@ -1482,14 +1472,7 @@ function renderDivider(p: Props): string {
     inner = buildLine(`width:${width};`);
   }
 
-  const hideClass = [
-    p.hideDesktop ? "puck-hide-desktop" : "",
-    p.hideTablet  ? "puck-hide-tablet"  : "",
-    p.hideMobile  ? "puck-hide-mobile"  : "",
-  ].filter(Boolean).join(" ");
-  const classAttr = hideClass ? ` class="${hideClass}"` : "";
-
-  return `<div${classAttr} style="${spacing}padding-top:${gap}px;padding-bottom:${gap}px;display:flex;justify-content:${justify};align-items:center;${advBgStyle(p)}">${inner}</div>`;
+  return `<div style="${spacing}padding-top:${gap}px;padding-bottom:${gap}px;display:flex;justify-content:${justify};align-items:center;${advBgStyle(p)}">${inner}</div>`;
 }
 
 function renderVideo(p: Props): string {
@@ -1574,12 +1557,7 @@ function renderSocialIcons(p: Props): string {
   const cssId = esc((p.cssId as string) || "") || "social-icons-blk";
   const cssClass = esc((p.cssClass as string) || "");
   const zIndex = p.zIndex != null ? `z-index:${p.zIndex};` : "";
-  const hideClass = [
-    p.hideDesktop ? "puck-hide-desktop" : "",
-    p.hideTablet  ? "puck-hide-tablet"  : "",
-    p.hideMobile  ? "puck-hide-mobile"  : "",
-  ].filter(Boolean).join(" ");
-  const classAttr = [cssClass, hideClass].filter(Boolean).join(" ");
+  const classAttr = cssClass;
 
   const enabled = (p.enabled as string[]) ?? ["facebook", "instagram", "twitter", "youtube"];
   const urls = (p.urls as Record<string, string>) ?? {};
@@ -1662,12 +1640,7 @@ function renderShareButtons(p: Props): string {
   const cssId = esc((p.cssId as string) || "") || `share-blk`;
   const cssClass = esc((p.cssClass as string) || "");
   const zIndex = p.zIndex != null ? `z-index:${p.zIndex};` : "";
-  const hideClass = [
-    p.hideDesktop ? "puck-hide-desktop" : "",
-    p.hideTablet  ? "puck-hide-tablet"  : "",
-    p.hideMobile  ? "puck-hide-mobile"  : "",
-  ].filter(Boolean).join(" ");
-  const classAttr = [cssClass, hideClass].filter(Boolean).join(" ");
+  const classAttr = cssClass;
   const bgColorStyle = (p.advBgType as string) === "color" && p.advBgColor ? `background-color:${esc(p.advBgColor as string)};` : "";
   const hoverBg = (p.hoverBg as string) || "";
   const hoverCss = hoverBg
@@ -1821,14 +1794,9 @@ function renderProgressBar(p: Props): string {
     return `<svg width="${sz}" height="${halfH}" viewBox="0 0 ${sz} ${halfH}" style="overflow:visible;display:block"><path d="M ${x1} ${cy} A ${r} ${r} 0 0 1 ${x2} ${cy}" fill="none" stroke="${tc}" stroke-width="${thick}" stroke-linecap="round"/><path d="M ${x1} ${cy} A ${r} ${r} 0 0 1 ${x2} ${cy}" fill="none" stroke="${fc}" stroke-width="${thick}" stroke-linecap="round" stroke-dasharray="${dash} ${halfCirc}"/></svg>`;
   };
 
-  // hide classes
-  const hideClass = [
-    p.hideDesktop ? "puck-hide-desktop" : "",
-    p.hideTablet  ? "puck-hide-tablet"  : "",
-    p.hideMobile  ? "puck-hide-mobile"  : "",
-    p.cssClass ? String(p.cssClass) : "",
-  ].filter(Boolean).join(" ");
-  const classAttr = hideClass ? ` class="${hideClass}"` : "";
+  // Structural class only — puck-hide-* are injected centrally by the dispatcher.
+  const cssClass = p.cssClass ? String(p.cssClass) : "";
+  const classAttr = cssClass ? ` class="${cssClass}"` : "";
 
   // Every type shares this outer wrapper.
   const wrap = (inner: string) =>
@@ -2017,25 +1985,67 @@ function renderBlockQuote(p: Props): string {
 
 // ─── Main render dispatcher ───────────────────────────────────────────────────
 
-function applyHideClasses(html: string, p: Props): string {
-  if (!html) return html;
-  const classes = [
+// ─── Responsive "hide on screen size" — single reusable implementation ─────────
+//
+// "Hide on Desktop/Tablet/Mobile" works by adding `puck-hide-desktop|tablet|mobile`
+// classes to a block's OUTERMOST element. The matching `display:none` media queries
+// live ONLY in RESPONSIVE_CSS (storefront + preview) and are DELIBERATELY ABSENT
+// from the editor canvas (see app/styles/editor.css) — so blocks stay visible while
+// editing but hide correctly on the storefront/preview at the chosen breakpoints.
+//
+// This logic is applied in ONE place — `applyHideClasses`, called by the dispatcher
+// for every block — so individual render functions never deal with hiding. The
+// helper injects the classes into the FIRST real element's `class` attribute
+// (skipping any leading <style> tag that some blocks emit), which means no extra
+// wrapper div is added and flex/grid/full-width layouts are never broken.
+
+function hideClassList(p: Props): string {
+  return [
     p.hideDesktop ? "puck-hide-desktop" : "",
     p.hideTablet  ? "puck-hide-tablet"  : "",
     p.hideMobile  ? "puck-hide-mobile"  : "",
   ].filter(Boolean).join(" ");
-  if (!classes) return html;
-  return `<div class="${classes}">${html}</div>`;
 }
 
-// Blocks that embed puck-hide-* classes on their own outermost element.
-// These must NOT be wrapped by applyHideClasses — it would add a redundant
-// wrapper div that breaks layout (e.g. flexbox children, full-width spacers).
-const SELF_HIDE_BLOCKS = new Set([
-  "TextBlock", "Text", "HeadingBlock", "Space", "MarqueeBar",
-  "Button", "StarRating", "ProgressBar", "SocialIcons", "ShareButtons",
-  "PhotoCollage", "LayoutBlock", "GridBlock", "Section",
-]);
+// Inject `extraClasses` into the first non-<style> element of `html`. If that element
+// already has a class="…" attribute the classes are appended; otherwise a class
+// attribute is added. Falls back to a wrapper div only if no element tag is found.
+function injectClasses(html: string, extraClasses: string): string {
+  if (!extraClasses) return html;
+
+  // Skip any leading <style>…</style> blocks (e.g. Button/SocialIcons emit one first).
+  let offset = 0;
+  const stylePrefix = /^\s*<style[\s\S]*?<\/style>\s*/i;
+  let m: RegExpMatchArray | null;
+  while ((m = html.slice(offset).match(stylePrefix))) {
+    offset += m[0].length;
+  }
+
+  // Find the first opening tag after the style prefix.
+  const tagMatch = html.slice(offset).match(/<([a-zA-Z][\w-]*)\b([^>]*)>/);
+  if (!tagMatch) return `<div class="${extraClasses}">${html}</div>`;
+
+  const tagStart = offset + (tagMatch.index ?? 0);
+  const [fullTag, , attrs] = tagMatch;
+  const classAttr = attrs.match(/\sclass\s*=\s*"([^"]*)"/i);
+
+  let newTag: string;
+  if (classAttr) {
+    // Append to the existing class attribute.
+    const merged = `${classAttr[1]} ${extraClasses}`.trim();
+    newTag = fullTag.replace(classAttr[0], ` class="${merged}"`);
+  } else {
+    // Add a class attribute right after the tag name.
+    newTag = fullTag.replace(/^<([a-zA-Z][\w-]*)/, `<$1 class="${extraClasses}"`);
+  }
+
+  return html.slice(0, tagStart) + newTag + html.slice(tagStart + fullTag.length);
+}
+
+function applyHideClasses(html: string, p: Props): string {
+  if (!html) return html;
+  return injectClasses(html, hideClassList(p));
+}
 
 function renderBlock(block: Block, zones: Zones): string {
   const p = block.props ?? {};
@@ -2084,8 +2094,9 @@ function renderBlock(block: Block, zones: Zones): string {
       // GlobalHeader/Footer are theme concerns; GlobalBlock needs DB lookup (skip)
       default: return "";
     }
-    // Only wrap with hide classes for blocks that don't handle them internally
-    return SELF_HIDE_BLOCKS.has(block.type) ? html : applyHideClasses(html, p);
+    // Single, reusable hide-on-screen-size handling for EVERY block/section:
+    // inject puck-hide-* into the outermost element (no per-block code needed).
+    return applyHideClasses(html, p);
   } catch {
     return "";
   }

@@ -13,6 +13,7 @@ import {
   FourSideField,
   InlineSelect,
   SliderNumberField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 
 export const TextComponent = {
@@ -302,8 +303,9 @@ export const TextComponent = {
     return (
       <div
         id={cssId || undefined}
-        className={[cssClass].filter(Boolean).join(" ") || undefined}
+        className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={{
+          position: "relative",
           paddingTop: advPadding?.top ?? 16, paddingRight: advPadding?.right ?? 0,
           paddingBottom: advPadding?.bottom ?? 16, paddingLeft: advPadding?.left ?? 0,
           marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0,
@@ -318,6 +320,7 @@ export const TextComponent = {
           ...borderStyle,
         }}
       >
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         {customCss && <style>{`#${cssId || "text-block"} { ${customCss} }`}</style>}
         {linkColor && <style>{`.text-block-links-${cssId || "default"} a { color: ${linkColor}; }`}</style>}
         <p

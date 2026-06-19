@@ -265,33 +265,22 @@ html::-webkit-scrollbar {
   display: none;
 }
 
-/* ── Responsive visibility classes (used by all blocks via hideDesktop/Tablet/Mobile props) ── */
-@media (min-width: 1024px) {
-  .puck-hide-desktop {
-    display: none !important;
-  }
-}
-
-@media (min-width: 768px) and (max-width: 1023px) {
-  .puck-hide-tablet {
-    display: none !important;
-  }
-}
-
-@media (max-width: 767px) {
-  .puck-hide-mobile {
-    display: none !important;
-  }
-}
-
-/* ── Editor canvas: never hide "hide on desktop/tablet/mobile" blocks ─────── */
-/* The puck-hide-* classes are only meant to take effect on the storefront and  */
-/* preview page, NOT inside the editor canvas — editors need to see all blocks. */
-._PuckCanvas-root_t6s9b_42 .puck-hide-desktop,
-._PuckCanvas-root_t6s9b_42 .puck-hide-tablet,
-._PuckCanvas-root_t6s9b_42 .puck-hide-mobile {
-  display: unset !important;
-}
+/* ── Responsive visibility (hide on desktop/tablet/mobile) — DELIBERATELY ABSENT ── */
+/*                                                                                    */
+/* The `.puck-hide-desktop|tablet|mobile` classes must take effect ONLY on the        */
+/* preview page and the Shopify storefront — NEVER inside the editor canvas, where    */
+/* the author needs to see and edit every block regardless of its hide settings.      */
+/*                                                                                     */
+/* Puck renders the canvas inside an <iframe id="preview-frame"> and copies the        */
+/* parent document's stylesheets into it. So any `.puck-hide-* { display:none }` rule  */
+/* defined here would leak into the canvas iframe and hide blocks while editing —      */
+/* the exact behavior we must avoid. A `:not(._PuckCanvas-root ...)` guard does NOT    */
+/* help, because inside the iframe there is no `_PuckCanvas-root` ancestor (it lives   */
+/* in the parent document, outside the frame).                                         */
+/*                                                                                     */
+/* Therefore the responsive-hide rules live exclusively in the storefront/preview      */
+/* string renderer (`app/lib/puck-renderer.ts` → RESPONSIVE_CSS), which is NOT loaded  */
+/* inside the editor. Do not re-add `.puck-hide-*` rules to this file.                 */
 
 /* ── Canvas scrollbar: align with right edge of the white page ────────────── */
 /* The canvas has padding all around (gray gutter). Removing the right padding  */

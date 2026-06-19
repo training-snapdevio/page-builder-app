@@ -11,6 +11,7 @@ import {
   TabSection,
   InlineSelect,
   SliderNumberField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 
 export const MarqueeBarComponent = {
@@ -79,8 +80,8 @@ export const MarqueeBarComponent = {
                       value={props.textTransform ?? "uppercase"}
                       onChange={(v) => set("textTransform", v)}
                       options={[
-                        { value: "uppercase",  label: "Uppercase"  },
                         { value: "capitalize", label: "Capitalize" },
+                        { value: "uppercase",  label: "Uppercase"  },
                         { value: "lowercase",  label: "Lowercase"  },
                       ]}
                     />
@@ -132,10 +133,12 @@ export const MarqueeBarComponent = {
     ));
     return (
       <div
+        className={hideClasses || undefined}
         onMouseEnter={() => pauseOnHover && setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        style={{ width: "100%", overflow: "hidden", whiteSpace: "nowrap", backgroundColor, color: textColor, fontSize, fontWeight, textTransform: textTransform as any, padding: `${padding ?? 10}px 0`, boxSizing: "border-box" }}
+        style={{ position: "relative", width: "100%", overflow: "hidden", whiteSpace: "nowrap", backgroundColor, color: textColor, fontSize, fontWeight, textTransform: textTransform as any, padding: `${padding ?? 10}px 0`, boxSizing: "border-box" }}
       >
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         <div style={{ display: "inline-block", animation: `${animationName} ${speed}s linear infinite`, animationPlayState: pauseOnHover && hovered ? "paused" : "running" }}>
           {repeatedText}
         </div>

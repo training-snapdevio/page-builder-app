@@ -12,10 +12,10 @@ import {
   ColorPickerField,
   BlockTabBar,
   TabSection,
-  EditorHideOverlay,
   FourSideField,
   InlineSelect,
   SliderNumberField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 
 const ProgressBarComponent = {
@@ -49,6 +49,7 @@ const ProgressBarComponent = {
               <>
                 {tab === "content" && (
                   <>
+                    <InlineSelect label="Type" value={pbType} onChange={(v) => set("pbType", v)} options={[{ value: "line", label: "Line" }, { value: "circle", label: "Circle" }, { value: "semicircle", label: "Semi-Circle" }, { value: "step", label: "Step" }, { value: "multirow", label: "Multi Row" }]} />
                     {pbType !== "multirow" && (
                       <>
                         <StackedTextField label="Label" value={props.label ?? ""} onChange={(v) => set("label", v)} placeholder="Skill or metric..." />
@@ -75,8 +76,6 @@ const ProgressBarComponent = {
                 )}
                 {tab === "style" && (
                   <>
-                    <TabSection title="Type" />
-                    <InlineSelect label="Type" value={pbType} onChange={(v) => set("pbType", v)} options={[{ value: "line", label: "Line" }, { value: "circle", label: "Circle" }, { value: "semicircle", label: "Semi-Circle" }, { value: "step", label: "Step" }, { value: "multirow", label: "Multi Row" }]} />
 
                     {pbType === "line" && (
                       <>
@@ -276,9 +275,8 @@ const ProgressBarComponent = {
     const type = pbType ?? "line";
 
     return (
-      <div ref={ref} id={cssId || undefined} className={cssClass || undefined} style={{ ...wrapStyle, position: "relative" }}>
+      <div ref={ref} id={cssId || undefined} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ ...wrapStyle, position: "relative" }}>
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
-
         {type === "line" && renderLine(label ?? "", pct, displayed)}
 
         {type === "circle" && (
@@ -338,7 +336,10 @@ const ProgressBarComponent = {
           const rowData: Array<{ label: string; value: number }> = multiRows ?? [{ label: "Row 1", value: 60 }];
           return (
             <div>
-              {rowData.map((row, i) => renderLine(row.label, Math.min(100, Math.max(0, row.value)), animFill ? 0 : Math.min(100, Math.max(0, row.value)), i))}
+              {rowData.map((row, i) => {
+                const rowPct = Math.min(100, Math.max(0, row.value));
+                return renderLine(row.label, rowPct, rowPct, i);
+              })}
             </div>
           );
         })()}

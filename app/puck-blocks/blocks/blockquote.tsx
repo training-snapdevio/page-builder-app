@@ -16,6 +16,7 @@ import {
   FourSideField,
   InlineSelect,
   SliderNumberField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -80,7 +81,8 @@ const BlockQuoteComponent = {
                     <ColorPickerField label="Border Color" value={props.borderColor ?? ""} onChange={(v) => set("borderColor", v)} />
                     <SliderNumberField label="Border Width (px)" value={props.borderWidth ?? 4} onChange={(v) => set("borderWidth", v)} min={1} max={20} step={1} unit="px" />
                     <TabSection title="Background" />
-                    <ColorPickerField label="Background Color" value={props.bgColor ?? ""} onChange={(v) => set("bgColor", v)} />
+                    <InlineSelect label="Type" value={bgType} onChange={(v) => set("advBgType", v)} options={[{ value: "none", label: "None" }, { value: "color", label: "Color" }]} />
+                    {bgType === "color" && <ColorPickerField label="Color" value={props.advBgColorWrap ?? ""} onChange={(v) => set("advBgColorWrap", v)} />}
                     <TabSection title="Alignment" />
                     <AlignField label="Alignment" value={props.alignment ?? "left"} onChange={(v) => set("alignment", v)} options={[{ value: "left", icon: <AlignLeft size={15} />, title: "Left" }, { value: "center", icon: <AlignCenter size={15} />, title: "Center" }, { value: "right", icon: <AlignRight size={15} />, title: "Right" }]} />
                   </>
@@ -90,9 +92,6 @@ const BlockQuoteComponent = {
                     <TabSection title="Spacing" />
                     <FourSideField label="Margin (px)" value={props.advMargin} onChange={(v) => set("advMargin", v)} />
                     <FourSideField label="Padding (px)" value={props.advPadding ?? { top: 24, right: 24, bottom: 24, left: 24 }} onChange={(v) => set("advPadding", v)} />
-                    <TabSection title="Background" />
-                    <InlineSelect label="Type" value={bgType} onChange={(v) => set("advBgType", v)} options={[{ value: "none", label: "None" }, { value: "color", label: "Color" }]} />
-                    {bgType === "color" && <ColorPickerField label="Color" value={props.advBgColorWrap ?? ""} onChange={(v) => set("advBgColorWrap", v)} />}
                     <TabSection title="Border" />
                     <InlineSelect label="Border Style" value={props.advBorderStyle ?? "none"} onChange={(v) => set("advBorderStyle", v)} options={[{ value: "none", label: "None" }, { value: "solid", label: "Solid" }, { value: "dashed", label: "Dashed" }]} />
                     {props.advBorderStyle !== "none" && (<><FourSideField label="Border Width (px)" value={props.advBorderWidth} onChange={(v) => set("advBorderWidth", v)} /><ColorPickerField label="Border Color" value={props.advBorderColor ?? ""} onChange={(v) => set("advBorderColor", v)} /></>)}
@@ -137,7 +136,8 @@ const BlockQuoteComponent = {
       </svg>
     );
     return (
-      <div id={cssId || undefined} className={[cssClass].filter(Boolean).join(" ") || undefined} style={{ textAlign: alignment as any, paddingTop: advPadding?.top ?? 24, paddingRight: advPadding?.right ?? 24, paddingBottom: advPadding?.bottom ?? 24, paddingLeft: advPadding?.left ?? 24, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, borderTopLeftRadius: advBorderRadius?.top ?? 0, borderTopRightRadius: advBorderRadius?.right ?? 0, borderBottomRightRadius: advBorderRadius?.bottom ?? 0, borderBottomLeftRadius: advBorderRadius?.left ?? 0, ...(advBorderStyle && advBorderStyle !== "none" ? { borderStyle: advBorderStyle, borderTopWidth: advBorderWidth?.top ?? 0, borderRightWidth: advBorderWidth?.right ?? 0, borderBottomWidth: advBorderWidth?.bottom ?? 0, borderLeftWidth: advBorderWidth?.left ?? 0, borderColor: advBorderColor || "currentColor" } : {}), ...wrapBg }}>
+      <div id={cssId || undefined} className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined} style={{ position: "relative", textAlign: alignment as any, paddingTop: advPadding?.top ?? 24, paddingRight: advPadding?.right ?? 24, paddingBottom: advPadding?.bottom ?? 24, paddingLeft: advPadding?.left ?? 24, marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0, marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0, zIndex: zIndex ?? undefined, borderTopLeftRadius: advBorderRadius?.top ?? 0, borderTopRightRadius: advBorderRadius?.right ?? 0, borderBottomRightRadius: advBorderRadius?.bottom ?? 0, borderBottomLeftRadius: advBorderRadius?.left ?? 0, ...(advBorderStyle && advBorderStyle !== "none" ? { borderStyle: advBorderStyle, borderTopWidth: advBorderWidth?.top ?? 0, borderRightWidth: advBorderWidth?.right ?? 0, borderBottomWidth: advBorderWidth?.bottom ?? 0, borderLeftWidth: advBorderWidth?.left ?? 0, borderColor: advBorderColor || "currentColor" } : {}), ...wrapBg }}>
+        <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         <blockquote style={{ margin: 0, position: "relative", backgroundColor: bgColor || "transparent", padding: bgColor ? 24 : 0, borderRadius: bgColor ? 8 : 0, ...borderMap[borderType ?? "left"] }}>
           {showQuoteIcon && iconPosition === "top-left" && <div style={{ marginBottom: 8 }}>{quoteIconSvg}</div>}
           {showQuoteIcon && iconPosition === "top-right" && <div style={{ textAlign: "right", marginBottom: 8 }}>{quoteIconSvg}</div>}

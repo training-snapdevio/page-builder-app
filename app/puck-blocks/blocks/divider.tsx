@@ -11,11 +11,11 @@ import {
   ColorPickerField,
   BlockTabBar,
   TabSection,
-  EditorHideOverlay,
   FourSideField,
   InlineSelect,
   SliderNumberField,
   SliderUnitField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -83,8 +83,8 @@ const DividerComponent = {
                         {props.elementType === "text"
                           ? <StackedTextField label="Text" value={props.elementText ?? ""} onChange={(v) => set("elementText", v)} placeholder="OR" />
                           : props.elementType === "image"
-                          ? <ImageField label="Image" value={props.elementImage ?? ""} onChange={(v) => set("elementImage", v)} />
-                          : <StackedTextField label="Icon (emoji or char)" value={props.elementIcon ?? "✦"} onChange={(v) => set("elementIcon", v)} placeholder="e.g. ✦ ★ •" />
+                            ? <ImageField label="Image" value={props.elementImage ?? ""} onChange={(v) => set("elementImage", v)} />
+                            : <StackedTextField label="Icon (emoji or char)" value={props.elementIcon ?? "✦"} onChange={(v) => set("elementIcon", v)} placeholder="e.g. ✦ ★ •" />
                         }
                         <InlineSelect
                           label="Element Position"
@@ -96,23 +96,23 @@ const DividerComponent = {
                             { value: "right", label: "Right" },
                           ]}
                         />
-                        <SliderUnitField
+                        <SliderNumberField
                           label="Width"
                           value={props.lineWidthVal ?? 100}
-                          unit={props.lineWidthUnit ?? "%"}
-                          onValueChange={(v) => set("lineWidthVal", v)}
-                          onUnitChange={(u) => set("lineWidthUnit", u)}
-                          units={["%", "px", "vw"]}
+                          onChange={(v) => set("lineWidthVal", v)}
+                          min={0}
+                          max={2000}
                           step={1}
+                          unit="px"
                         />
                         <AlignField
                           label="Alignment"
                           value={props.alignment ?? "center"}
                           onChange={(v) => set("alignment", v)}
                           options={[
-                            { value: "left",   icon: <AlignLeft   size={15} />, title: "Left"   },
+                            { value: "left", icon: <AlignLeft size={15} />, title: "Left" },
                             { value: "center", icon: <AlignCenter size={15} />, title: "Center" },
-                            { value: "right",  icon: <AlignRight  size={15} />, title: "Right"  },
+                            { value: "right", icon: <AlignRight size={15} />, title: "Right" },
                           ]}
                         />
                       </>
@@ -132,7 +132,7 @@ const DividerComponent = {
                     {(props.lineStyle ?? "solid") === "gradient" && (
                       <>
                         <ColorPickerField label="Start Color" value={props.gradientStart ?? "#e5e7eb"} onChange={(v) => set("gradientStart", v)} />
-                        <ColorPickerField label="End Color"   value={props.gradientEnd   ?? "#e5e7eb"} onChange={(v) => set("gradientEnd", v)} />
+                        <ColorPickerField label="End Color" value={props.gradientEnd ?? "#e5e7eb"} onChange={(v) => set("gradientEnd", v)} />
                       </>
                     )}
                     <SliderNumberField label="Gap (px)" value={props.gap ?? 16} onChange={(v) => set("gap", v)} min={0} max={120} step={1} unit="px" />
@@ -152,7 +152,6 @@ const DividerComponent = {
                           <>
                             <SliderNumberField label="Image Width (px)" value={props.elementImageWidth ?? 40} onChange={(v) => set("elementImageWidth", v)} min={8} max={300} step={1} unit="px" />
                             <SliderNumberField label="Image Height (px)" value={props.elementImageHeight ?? 40} onChange={(v) => set("elementImageHeight", v)} min={8} max={300} step={1} unit="px" />
-                            <SliderNumberField label="Image Border Radius (px)" value={props.elementImageRadius ?? 0} onChange={(v) => set("elementImageRadius", v)} min={0} max={150} step={1} unit="px" />
                           </>
                         )}
                         <SliderNumberField label="Spacing from Line (px)" value={props.elementSpacing ?? 12} onChange={(v) => set("elementSpacing", v)} min={0} max={60} step={1} unit="px" />
@@ -185,7 +184,7 @@ const DividerComponent = {
   defaultProps: {
     lineStyle: "solid",
     lineWidthVal: 100,
-    lineWidthUnit: "%",
+    lineWidthUnit: "px",
     alignment: "center",
     showElement: false,
     elementType: "icon",
@@ -194,7 +193,6 @@ const DividerComponent = {
     elementImage: "",
     elementImageWidth: 40,
     elementImageHeight: 40,
-    elementImageRadius: 0,
     elementPosition: "center",
     thickness: 1,
     borderRadius: 0,
@@ -228,7 +226,6 @@ const DividerComponent = {
     elementImage,
     elementImageWidth,
     elementImageHeight,
-    elementImageRadius,
     elementPosition,
     thickness,
     borderRadius: dividerBorderRadius,
@@ -263,7 +260,7 @@ const DividerComponent = {
 
       if (lineStyle === "gradient") {
         const c1 = gradientStart || "#e5e7eb";
-        const c2 = gradientEnd   || "#e5e7eb";
+        const c2 = gradientEnd || "#e5e7eb";
         return <div style={{ ...baseStyle, height: th, minHeight: th, background: `linear-gradient(90deg, ${c1}, ${c2})`, borderRadius: brPx }} />;
       }
       if (lineStyle === "shadow") {
@@ -277,7 +274,7 @@ const DividerComponent = {
         return (
           <div style={{ ...baseStyle, height: h, minHeight: h, overflow: "visible" }}>
             <svg width="100%" height={h} viewBox={`0 0 600 ${h}`} preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style={{ display: "block", overflow: "visible" }}>
-              <path d={`M0,${mid} C15,${mid-amp} 15,${mid+amp} 30,${mid} S45,${mid-amp} 60,${mid} S75,${mid+amp} 90,${mid} S105,${mid-amp} 120,${mid} S135,${mid+amp} 150,${mid} S165,${mid-amp} 180,${mid} S195,${mid+amp} 210,${mid} S225,${mid-amp} 240,${mid} S255,${mid+amp} 270,${mid} S285,${mid-amp} 300,${mid} S315,${mid+amp} 330,${mid} S345,${mid-amp} 360,${mid} S375,${mid+amp} 390,${mid} S405,${mid-amp} 420,${mid} S435,${mid+amp} 450,${mid} S465,${mid-amp} 480,${mid} S495,${mid+amp} 510,${mid} S525,${mid-amp} 540,${mid} S555,${mid+amp} 570,${mid} S585,${mid-amp} 600,${mid}`} fill="none" stroke={color} strokeWidth={th} vectorEffect="non-scaling-stroke" />
+              <path d={`M0,${mid} C15,${mid - amp} 15,${mid + amp} 30,${mid} S45,${mid - amp} 60,${mid} S75,${mid + amp} 90,${mid} S105,${mid - amp} 120,${mid} S135,${mid + amp} 150,${mid} S165,${mid - amp} 180,${mid} S195,${mid + amp} 210,${mid} S225,${mid - amp} 240,${mid} S255,${mid + amp} 270,${mid} S285,${mid - amp} 300,${mid} S315,${mid + amp} 330,${mid} S345,${mid - amp} 360,${mid} S375,${mid + amp} 390,${mid} S405,${mid - amp} 420,${mid} S435,${mid + amp} 450,${mid} S465,${mid - amp} 480,${mid} S495,${mid + amp} 510,${mid} S525,${mid - amp} 540,${mid} S555,${mid + amp} 570,${mid} S585,${mid - amp} 600,${mid}`} fill="none" stroke={color} strokeWidth={th} vectorEffect="non-scaling-stroke" />
             </svg>
           </div>
         );
@@ -305,7 +302,8 @@ const DividerComponent = {
       // solid / dashed / dotted — render as a real height div so it's always visible
       const bStyle = lineStyle === "dashed" ? "dashed" : lineStyle === "dotted" ? "dotted" : "solid";
       return (
-        <div style={{ ...baseStyle, height: th, minHeight: th, borderRadius: brPx, overflow: "hidden",
+        <div style={{
+          ...baseStyle, height: th, minHeight: th, borderRadius: brPx, overflow: "hidden",
           background: bStyle === "solid" ? color : "transparent",
           borderTop: bStyle !== "solid" ? `${th}px ${bStyle} ${color}` : undefined,
           boxSizing: "content-box" as const,
@@ -321,14 +319,14 @@ const DividerComponent = {
           {elementType === "text"
             ? <span style={{ fontSize: elementFontSize || 14, color: elementTextColor || color, whiteSpace: "nowrap" }}>{elementText || "OR"}</span>
             : elementType === "image"
-            ? <img src={elementImage as string} alt="" style={{ width: elementImageWidth || 40, height: elementImageHeight || 40, objectFit: "contain", display: "block", borderRadius: `${elementImageRadius ?? 0}px` }} />
-            : <span style={{ fontSize: iconSize || 20, color: iconColor || color, lineHeight: 1 }}>{iconVal}</span>
+              ? <img src={elementImage as string} alt="" style={{ width: elementImageWidth || 40, height: elementImageHeight || 40, objectFit: "contain", display: "block" }} />
+              : <span style={{ fontSize: iconSize || 20, color: iconColor || color, lineHeight: 1 }}>{iconVal}</span>
           }
         </div>
       )
       : null;
 
-    const lineWidthCss = `${lineWidthVal ?? 100}${lineWidthUnit ?? "%"}`;
+    const lineWidthCss = `${lineWidthVal ?? 100}px`;
     const outerJustify = showElement
       ? (alignment === "right" ? "flex-end" : alignment === "left" ? "flex-start" : "center")
       : "center";
@@ -346,7 +344,7 @@ const DividerComponent = {
     return (
       <div
         id={cssId || undefined}
-        className={cssClass || undefined}
+        className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={{
           position: "relative",
           paddingTop: gap ?? 16,

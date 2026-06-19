@@ -7,9 +7,9 @@ import {
   StackedTextField,
   BlockTabBar,
   TabSection,
-  EditorHideOverlay,
   InlineSelect,
   SliderNumberField,
+  EditorHideOverlay,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -57,13 +57,12 @@ export const PhotoCollageComponent = {
                     <TabSection title="Layout" />
                     <InlineSelect
                       label="Layout Type"
-                      value={props.layout ?? "mixed"}
+                      value={props.layout === "mixed" ? "grid" : (props.layout ?? "grid")}
                       onChange={(v: any) => set("layout", v)}
                       options={[
-                        { value: "mixed",    label: "Mixed Sizes" },
-                        { value: "grid",     label: "Grid"        },
-                        { value: "brick",    label: "Brick"       },
-                        { value: "carousel", label: "Carousel"    },
+                        { value: "grid",     label: "Grid"     },
+                        { value: "brick",    label: "Brick"    },
+                        { value: "carousel", label: "Carousel" },
                       ]}
                     />
                     <TabSection title="Photos" />
@@ -264,7 +263,7 @@ export const PhotoCollageComponent = {
   },
 
   defaultProps: {
-    layout: "mixed",
+    layout: "grid",
     images: [
       { url: "", alt: "Photo 1" },
       { url: "", alt: "Photo 2" },
@@ -401,7 +400,7 @@ export const PhotoCollageComponent = {
     }
 
     return (
-      <div style={{ position: "relative" }}>
+      <div className={hideClasses || undefined} style={{ position: "relative" }}>
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         {content}
       </div>
