@@ -18,12 +18,10 @@ import {
 } from "../lib/pages.server";
 import { savePageToShopify } from "../lib/shopify-pages.server";
 import { getGlobalSettings } from "../lib/settings.server";
-import { DEFAULT_GLOBAL_SETTINGS, type GlobalSettings } from "../lib/settings.defaults";
-import { getAllGlobalBlocks, type GlobalBlock } from "../lib/global-blocks.server";
-import { getSavedBlocks, type SavedBlock } from "../lib/saved-blocks.server";
-import { isValidPuckData } from "../lib/page-schema";
-import { renderPreviewBody, settingsToCSSString, buildGoogleFontsImport, collectBlockFonts } from "../lib/puck-renderer";
-import { resolvePageBlocks } from "../lib/resolve-blocks";
+import { DEFAULT_GLOBAL_SETTINGS } from "../lib/settings.defaults";
+import { getAllGlobalBlocks } from "../lib/global-blocks.server";
+import { getSavedBlocks } from "../lib/saved-blocks.server";
+import { createPreviewToken } from "../lib/preview-token.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -37,6 +35,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return {
     pages,
     shop: session.shop,
+    // Signed token that lets the standalone preview tab (/api/preview/:slug)
+    // render this shop's pages without an embedded-app admin session, so
+    // refresh / screenshots / extensions all work on a real URL.
+    previewToken: createPreviewToken(session.shop),
     settings: effective,
     // Shipped to the client so the View button can build the preview in the
     // browser (see buildPreviewDocument) instead of round-tripping through
@@ -47,66 +49,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     footerEnabled: !!effective.useCustomFooter,
   };
 };
-
-function escHtml(str: string): string {
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-/**
- * Build the standalone preview HTML document entirely in the browser, from data
- * the loader already provides. Mirrors what /api/preview/:slug returned, but
- * with no server round-trip — so it can't fail with a tunnel/Cloudflare error.
- * Returns null if the stored page data is corrupt or structurally invalid.
- */
-function buildPreviewDocument(
-  page: PageRecord,
-  settings: GlobalSettings,
-  globalBlocks: GlobalBlock[],
-  savedBlocks: SavedBlock[],
-): string | null {
-  let data: unknown;
-  try {
-    data = JSON.parse(page.data);
-  } catch {
-    return null;
-  }
-  if (!isValidPuckData(data)) return null;
-
-  const globalBlocksMap = Object.fromEntries(globalBlocks.map((b) => [b.id, b]));
-  const savedBlocksMap = Object.fromEntries(savedBlocks.map((b) => [b.name, b]));
-  const resolved = resolvePageBlocks(data, globalBlocksMap, savedBlocksMap);
-  const body = renderPreviewBody(resolved, settings);
-
-  // Inject the same design tokens the storefront uses so this preview matches
-  // the Puck editor canvas. The block markup references var(--primary-color),
-  // var(--heading-font), etc.; without this :root block they fall back to
-  // hardcoded defaults and the preview ignores the merchant's settings.
-  const fontsImport = buildGoogleFontsImport([
-    settings.fontFamily ?? "",
-    settings.headingFont ?? "",
-    ...collectBlockFonts(resolved),
-  ]);
-  const tokenCss = settingsToCSSString(settings);
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Preview: ${escHtml(page.title)}</title>
-  <style>
-    ${fontsImport}
-    ${tokenCss}
-    *, *::before, *::after { box-sizing: border-box; }
-    body { margin: 0; font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif); }
-    img { max-width: 100%; height: auto; }
-  </style>
-</head>
-<body>
-${body}
-</body>
-</html>`;
-}
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
@@ -268,9 +210,7 @@ function PageRow({
   page,
   brandFallback,
   isExporting,
-  settings,
-  globalBlocks,
-  savedBlocks,
+  previewToken,
   onExport,
   onEdit,
   onDelete,
@@ -279,9 +219,7 @@ function PageRow({
   page: PageRecord;
   brandFallback: string;
   isExporting: boolean;
-  settings: GlobalSettings;
-  globalBlocks: GlobalBlock[];
-  savedBlocks: SavedBlock[];
+  previewToken: string;
   onExport: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -290,43 +228,20 @@ function PageRow({
   const menuId = `row-menu-${page.slug}`;
   const isExported = page.status === "exported";
 
-  // Build the preview HTML in the browser from data the loader already shipped,
-  // then open it via a Blob URL. This avoids two problems: (1) the cross-origin
-  // document.write() failure when window.open("","_blank") opens at a different
-  // origin inside Shopify Admin's iframe, and (2) the Cloudflare 530 errors we
-  // hit fetching /api/preview over the dev tunnel.
-  const [previewing, setPreviewing] = useState(false);
-  const handleView = async () => {
-    if (previewing) return;
-    setPreviewing(true);
-    try {
-      const html = buildPreviewDocument(page, settings, globalBlocks, savedBlocks);
-      if (!html) {
-        throw new Error("This page's saved content is invalid or corrupt.");
-      }
-      // Open a blank window first, then write HTML into it.
-      // Blob URLs created inside Shopify Admin's iframe are scoped to that
-      // iframe context — a new top-level tab can't access them (ERR_FILE_NOT_FOUND).
-      // Writing directly to an about:blank window avoids the blob URL entirely.
-      const win = window.open("", "_blank");
-      if (win) {
-        win.document.open();
-        win.document.write(html);
-        win.document.close();
-      } else {
-        // Popup blocked — download as an HTML file the user can open locally.
-        const blob = new Blob([html], { type: "text/html" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `preview-${page.slug}.html`;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      }
-    } catch (err) {
-      alert(`Preview failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setPreviewing(false);
+  // Open the preview at a REAL URL (/api/preview/:slug) in a top-level tab, so
+  // refresh, screenshots, and browser extensions all work on it — unlike the
+  // old document.write() approach, which produced an about:blank page with no
+  // URL to reload. The signed token authorizes rendering without the embedded
+  // admin session that a standalone tab can't carry. The route sends no-cache
+  // headers, so every refresh re-fetches the latest saved data.
+  const previewUrl = `/api/preview/${encodeURIComponent(page.slug)}?token=${encodeURIComponent(previewToken)}`;
+  const handleView = () => {
+    const win = window.open(previewUrl, "_blank", "noopener");
+    if (!win) {
+      // Popup blocked — fall back to navigating the top-level window.
+      window.top
+        ? (window.top.location.href = previewUrl)
+        : (window.location.href = previewUrl);
     }
   };
 
@@ -357,13 +272,12 @@ function PageRow({
 
       <s-table-cell>
         <s-stack direction="inline" gap="small-300" alignItems="center">
-          <Tooltip label={previewing ? "Loading…" : "View"}>
+          <Tooltip label="View">
             <s-button
               variant="secondary"
               icon="view"
               accessibilityLabel="View"
               onClick={handleView}
-              {...(previewing ? { disabled: true } : {})}
             />
           </Tooltip>
 
@@ -397,7 +311,7 @@ function PageRow({
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function PagesIndex() {
-  const { pages, shop, settings, globalBlocks, savedBlocks } = useLoaderData<typeof loader>();
+  const { pages, shop, previewToken } = useLoaderData<typeof loader>();
   const deleteFetcher = useFetcher();
   const exportFetcher = useFetcher<{ ok: boolean; error?: string }>();
   const unpublishFetcher = useFetcher();
@@ -582,9 +496,7 @@ export default function PagesIndex() {
                   page={page}
                   brandFallback={brandFallback}
                   isExporting={exportingSlug === page.slug}
-                  settings={settings}
-                  globalBlocks={globalBlocks}
-                  savedBlocks={savedBlocks}
+                  previewToken={previewToken}
                   onExport={() => exportPage(page.slug)}
                   onEdit={() => {
                     setEditingSlug(page.slug);

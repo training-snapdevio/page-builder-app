@@ -260,7 +260,15 @@ export const ArticleComponent = {
           fontWeight: Number(bodyFontWeight ?? 400),
           fontFamily: bodyFontFamily && bodyFontFamily !== "inherit" ? bodyFontFamily : undefined,
         }}>
-          {body}
+          {body
+            ? String(body).split(/\n\n+/).map((para: string, i: number) => (
+                <p key={i} style={{ margin: "0 0 1em" }}>
+                  {para.split(/\n/).map((line: string, j: number, arr: string[]) => (
+                    <span key={j}>{line}{j < arr.length - 1 && <br />}</span>
+                  ))}
+                </p>
+              ))
+            : null}
         </div>
       </div>
     );

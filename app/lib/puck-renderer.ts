@@ -545,6 +545,16 @@ function Accordian(p: Props, zones: Zones): string {
 </div>`;
 }
 
+function bodyToHtml(text: string): string {
+  return text
+    .split(/\n\n+/)
+    .map(para => {
+      const lines = para.split(/\n/).map(esc).join("<br>");
+      return `<p style="margin:0 0 1em">${lines}</p>`;
+    })
+    .join("");
+}
+
 function Article(p: Props): string {
   const m  = (p.advMargin  as any) ?? { top: 0,  right: 0,  bottom: 0, left: 0  };
   const pd = (p.advPadding as any) ?? { top: 48, right: 24, bottom: 48, left: 24 };
@@ -615,7 +625,7 @@ function Article(p: Props): string {
       ${showAuthor && p.author ? `<span style="font-size:${authorFS};font-weight:${authorFW};font-family:${authorFont};color:${authorColor}">By <strong>${esc(String(p.author))}</strong></span>` : ""}
       ${showDate && dateStr ? `<span style="font-size:${dateFS};font-weight:${dateFW};font-family:${dateFont};color:${dateColor}">${esc(dateStr)}</span>` : ""}
     </div>` : ""}
-    <div style="font-size:${bodyFS};line-height:${bodyLH};color:${bodyColor};font-weight:${bodyFW};font-family:${bodyFont}">${p.body ? String(p.body) : ""}</div>`;
+    <div style="font-size:${bodyFS};line-height:${bodyLH};color:${bodyColor};font-weight:${bodyFW};font-family:${bodyFont}">${p.body ? bodyToHtml(String(p.body)) : ""}</div>`;
 
   const innerHtml = isHoriz
     ? `<div style="display:flex;flex-direction:${imgPos === "left" ? "row" : "row-reverse"};gap:48px;align-items:flex-start">${imgHtml}<div style="flex:1;min-width:0">${articleInner}</div></div>`
@@ -817,7 +827,7 @@ function PhotoCollage(p: Props): string {
   const brVal = Number(p.borderRadius ?? 8);
   const br = `${brVal}px`;
   const fit = (p.objectFit as string) || "cover";
-  const layout = (p.layout as string) || "mixed";
+  const layout = (p.layout as string) || "grid";
   const aspectRatio = (p.aspectRatio as string) || "1:1";
   const hoverEffect = (p.hoverEffect as string) || "none";
   const boxShadow = !!p.boxShadow;

@@ -53,12 +53,14 @@ import type { GlobalSettings } from "@/lib/settings.server";
 import type { SavedBlock } from "@/puck-splat/types";
 import { SaveAsGlobalBlockModal } from "@/puck-splat/components/SaveAsGlobalBlockModal";
 import {
+  CANVAS_SCROLL_STYLES,
   COMPONENT_ICONS,
   COMPONENT_LABELS,
   DRAWER_GRID_STYLES,
   DRAWER_ITEM_CARD_STYLE,
   FALLBACK_ICON,
   GLOBAL_BLOCKS_REFRESH_EVENT,
+  IFRAME_SCROLLBAR_CSS,
   PARALLAX_DRAG_STYLES,
   SAVED_BLOCKS_REFRESH_EVENT,
 } from "@/puck-splat/constants";
@@ -1341,6 +1343,7 @@ export default function PuckSplatEditor({
         <style>{DRAWER_GRID_STYLES}</style>
         <style>{PARALLAX_DRAG_STYLES}</style>
         <style>{FORCE_BLACK_EDITOR_LABELS_STYLES}</style>
+        <style>{CANVAS_SCROLL_STYLES}</style>
 
         <Puck
           plugins={[globalSettingsPlugin]}
@@ -1516,6 +1519,9 @@ export default function PuckSplatEditor({
             iframe: ({ children }) => (
               <>
                 <IframeThemeInjector />
+                {/* Page scrolls inside the iframe — scrollbar appears inside the
+                    white page area, not in the outer gray canvas gutter. */}
+                <style>{IFRAME_SCROLLBAR_CSS}</style>
                 {/* When inspector is OFF, disable the header/footer click-intercept
                     overlays so links and nav items are fully interactive. */}
                 {!inspectorEnabled && (

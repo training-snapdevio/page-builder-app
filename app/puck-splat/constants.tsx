@@ -1155,4 +1155,28 @@ export const PARALLAX_DRAG_STYLES = `
 
 export const SAVED_BLOCKS_REFRESH_EVENT = "saved-blocks:refresh";
 
+// ─── Canvas scroll suppression ────────────────────────────────────────────────
+// The page scrolls INSIDE the iframe (like the real storefront). The outer
+// canvas must not scroll so no scrollbar appears in the gray gutter.
+export const CANVAS_SCROLL_STYLES = `
+  ._PuckCanvas_t6s9b_1 { overflow: hidden !important; }
+`;
+
+// ─── Iframe page scrollbar ────────────────────────────────────────────────────
+// Injected into the iframe document so the scrollbar appears inside the white
+// page area, matching the app's thin-scrollbar style.
+export const IFRAME_SCROLLBAR_CSS = `
+  html {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-width: thin;
+    scrollbar-color: #c7c7d6 transparent;
+  }
+  html::-webkit-scrollbar { width: 8px; }
+  html::-webkit-scrollbar-track { background: transparent; }
+  html::-webkit-scrollbar-thumb { background: #c7c7d6; border-radius: 999px; }
+  html::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+  html::-webkit-scrollbar-corner { background: transparent; }
+`;
+
 export const GLOBAL_BLOCKS_REFRESH_EVENT = "global-blocks:refresh";

@@ -11,10 +11,16 @@
 (function () {
   "use strict";
 
-  var MOUNT_ATTR   = "data-block-id";
-  var PROXY_ATTR   = "data-proxy-url";
-  var THEME_ATTR   = "data-theme-styles";
-  var MOUNTED_ATTR = "data-pb-mounted";
+  var MOUNT_ATTR    = "data-block-id";
+  var PROXY_ATTR    = "data-proxy-url";
+  var THEME_ATTR    = "data-theme-styles";
+  var MOUNTED_ATTR  = "data-pb-mounted";
+  var FETCHING_ATTR = "data-pb-fetching";
+
+  // Tracks AbortControllers keyed by container element so we can cancel
+  // in-flight requests when a new mount is triggered before the previous
+  // fetch completes (race condition on first Block ID entry in theme editor).
+  var pendingAborts = new WeakMap();
 
   function log(msg, data) {
     if (typeof console !== "undefined" && console.warn) {
@@ -34,10 +40,16 @@
   }
 
   function unmountBlock(container) {
+    // Cancel any in-flight fetch for this container
+    var prev = pendingAborts.get(container);
+    if (prev) { try { prev.abort(); } catch (e) {} }
+    pendingAborts.delete(container);
+
     container.removeAttribute(MOUNTED_ATTR);
+    container.removeAttribute(FETCHING_ATTR);
     // Remove previously injected style tag
-    var prev = container.querySelector("style[data-pb-style]");
-    if (prev) prev.remove();
+    var prevStyle = container.querySelector("style[data-pb-style]");
+    if (prevStyle) prevStyle.remove();
     // Remove previously injected content wrapper
     var wrapper = container.querySelector(".pb-page-content");
     if (wrapper) wrapper.remove();
@@ -59,8 +71,13 @@
     if (!blockId || !proxyUrl) return;
     if (!force && container.getAttribute(MOUNTED_ATTR)) return;
 
+    // Cancel any prior in-flight request and reset state
     unmountBlock(container);
     container.setAttribute(MOUNTED_ATTR, "1");
+
+    // Stamp a unique fetch token so we can detect stale responses
+    var fetchToken = String(Date.now()) + Math.random();
+    container.setAttribute(FETCHING_ATTR, fetchToken);
 
     // theme_styles=1 → send NO app CSS, let theme cascade apply
     var useTheme = themeStyles === "true" || themeStyles === "1";
@@ -70,16 +87,23 @@
       "?block_id=" + encodeURIComponent(blockId) +
       "&theme_styles=" + (useTheme ? "1" : "0");
 
+    var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    if (controller) pendingAborts.set(container, controller);
+
     fetch(url, {
       method: "GET",
       headers: { Accept: "application/json" },
       credentials: "same-origin",
+      signal: controller ? controller.signal : undefined,
     })
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
       })
       .then(function (data) {
+        // Discard if a newer mount has already started for this container
+        if (container.getAttribute(FETCHING_ATTR) !== fetchToken) return;
+
         if (!data || !data.widgetConfig) {
           throw new Error("Invalid response");
         }
@@ -107,14 +131,23 @@
           wrapper.className = "pb-page-content";
           wrapper.innerHTML = cfg.html;
           container.appendChild(wrapper);
+          container.removeAttribute(FETCHING_ATTR);
+          pendingAborts.delete(container);
           return;
         }
 
         throw new Error("Unsupported widget type: " + (cfg.type || "unknown"));
       })
       .catch(function (err) {
+        // Ignore aborted requests — a newer mount took over
+        if (err && err.name === "AbortError") return;
+        // Ignore stale responses
+        if (container.getAttribute(FETCHING_ATTR) !== fetchToken) return;
+
         log("Block '" + blockId + "' failed", err && err.message);
         container.removeAttribute(MOUNTED_ATTR);
+        container.removeAttribute(FETCHING_ATTR);
+        pendingAborts.delete(container);
         showError(container, err && err.message);
       });
   }

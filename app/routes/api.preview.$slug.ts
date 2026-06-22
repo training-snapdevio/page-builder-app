@@ -10,6 +10,7 @@
 
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
+import { verifyPreviewToken } from "../lib/preview-token.server";
 import { getPageBySlug } from "../lib/pages.server";
 import { isValidPuckData } from "../lib/page-schema";
 import { renderPreviewBody } from "../lib/puck-renderer";
@@ -21,10 +22,23 @@ import { collectBlockFonts } from "../lib/puck-renderer";
 import { DEFAULT_GLOBAL_SETTINGS } from "../lib/settings.defaults";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
   const slug = params.slug!;
 
-  const page = await getPageBySlug(session.shop, slug);
+  // The preview opens in a top-level tab (so refresh/screenshots/extensions all
+  // work on a real URL), which doesn't carry the embedded-app admin session.
+  // Authorize via a signed token in the URL; if absent, fall back to the admin
+  // session so the route still works when opened directly inside the app.
+  const url = new URL(request.url);
+  const tokenShop = verifyPreviewToken(url.searchParams.get("token"));
+  let shop: string;
+  if (tokenShop) {
+    shop = tokenShop;
+  } else {
+    const { session } = await authenticate.admin(request);
+    shop = session.shop;
+  }
+
+  const page = await getPageBySlug(shop, slug);
   if (!page) {
     return new Response("<h1>Page not found</h1>", {
       status: 404,
@@ -51,7 +65,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   let settings = DEFAULT_GLOBAL_SETTINGS;
   try {
-    settings = await getGlobalSettings(session.shop);
+    settings = await getGlobalSettings(shop);
   } catch {
     // fall through to defaults
   }
@@ -62,8 +76,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   let resolved = data;
   try {
     const [globalBlocks, savedBlocks] = await Promise.all([
-      getAllGlobalBlocks(session.shop),
-      getSavedBlocks(session.shop),
+      getAllGlobalBlocks(shop),
+      getSavedBlocks(shop),
     ]);
     const globalBlocksMap = Object.fromEntries(globalBlocks.map((b) => [b.id, b]));
     const savedBlocksMap = Object.fromEntries(savedBlocks.map((b) => [b.name, b]));
