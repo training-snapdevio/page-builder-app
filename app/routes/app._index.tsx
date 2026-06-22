@@ -234,15 +234,27 @@ function PageRow({
   // URL to reload. The signed token authorizes rendering without the embedded
   // admin session that a standalone tab can't carry. The route sends no-cache
   // headers, so every refresh re-fetches the latest saved data.
-  const previewUrl = `/api/preview/${encodeURIComponent(page.slug)}?token=${encodeURIComponent(previewToken)}`;
+  const previewPath = `/api/preview/${encodeURIComponent(page.slug)}?token=${encodeURIComponent(previewToken)}`;
   const handleView = () => {
-    const win = window.open(previewUrl, "_blank", "noopener");
-    if (!win) {
-      // Popup blocked — fall back to navigating the top-level window.
-      window.top
-        ? (window.top.location.href = previewUrl)
-        : (window.location.href = previewUrl);
-    }
+    // Build an ABSOLUTE URL against this app's own origin. A relative path would
+    // resolve against the top-level admin origin (admin.shopify.com), and an
+    // embedded App-Bridge app routes bare navigations through window.top — which
+    // is exactly what was rewriting the admin tab's URL. An absolute, off-admin
+    // URL is treated as an external link, so App Bridge / the browser opens it in
+    // a fresh tab and the admin tab is left untouched.
+    const absoluteUrl = new URL(previewPath, window.location.origin).toString();
+    // Open via a synthetic <a target="_blank"> click rather than window.open.
+    // A real anchor click is treated by the browser as a user-initiated external
+    // navigation that opens a new tab WITHOUT routing through the embedded app's
+    // top frame, so the admin tab's URL is never touched. window.open inside the
+    // App-Bridge iframe was being proxied to window.top, which caused the bug.
+    const a = document.createElement("a");
+    a.href = absoluteUrl;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   return (

@@ -133,6 +133,9 @@
           container.appendChild(wrapper);
           container.removeAttribute(FETCHING_ATTR);
           pendingAborts.delete(container);
+
+          // Hydrate any Featured Product blocks with live storefront data.
+          hydrateFeaturedProducts(wrapper);
           return;
         }
 
@@ -152,11 +155,208 @@
       });
   }
 
+  // ── Featured Product live hydration ───────────────────────────────────────
+  //
+  // The server renders a snapshot of the picked product. Here we fetch the live
+  // product JSON from the storefront (/products/{handle}.js — available on every
+  // Shopify storefront, no auth) and update the title, price, image, button URL
+  // and availability so the block always reflects the current product.
+
+  // Format a price in cents using the active Shopify currency, falling back to
+  // a simple decimal if Intl/currency isn't available.
+  function formatMoney(cents, currency) {
+    var amount = (Number(cents) || 0) / 100;
+    try {
+      if (currency && typeof Intl !== "undefined" && Intl.NumberFormat) {
+        return new Intl.NumberFormat(undefined, { style: "currency", currency: currency }).format(amount);
+      }
+    } catch (e) {}
+    return amount.toFixed(2);
+  }
+
+  function hydrateOne(el) {
+    var handle = el.getAttribute("data-pb-product-handle");
+    if (!handle) return;
+    // Mark as hydrating so we never double-fetch the same element.
+    if (el.getAttribute("data-pb-fp-hydrated")) return;
+    el.setAttribute("data-pb-fp-hydrated", "1");
+
+    fetch("/products/" + encodeURIComponent(handle) + ".js", {
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (prod) {
+        if (!prod) return;
+        var cur = prod.currency || (window.Shopify && window.Shopify.currency && window.Shopify.currency.active);
+
+        // ── Resolve first available variant ────────────────────────────────
+        var firstAvail = null;
+        var allVariants = Array.isArray(prod.variants) ? prod.variants : [];
+        for (var i = 0; i < allVariants.length; i++) {
+          if (allVariants[i] && allVariants[i].available) { firstAvail = allVariants[i]; break; }
+        }
+        var activeVariant = firstAvail || allVariants[0] || null;
+
+        // ── Title ──────────────────────────────────────────────────────────
+        var titleEl = el.querySelector("[data-pb-fp-title]");
+        if (titleEl && prod.title) titleEl.textContent = prod.title;
+
+        // ── Vendor ─────────────────────────────────────────────────────────
+        var vendorEl = el.querySelector("[data-pb-fp-vendor]");
+        if (vendorEl && prod.vendor) vendorEl.textContent = prod.vendor;
+
+        // ── Price (first available variant, fallback to product price) ─────
+        var priceEl = el.querySelector("[data-pb-fp-price]");
+        if (priceEl) {
+          var priceCents = activeVariant && activeVariant.price != null ? activeVariant.price : prod.price;
+          priceEl.textContent = formatMoney(priceCents, cur);
+        }
+
+        // ── Compare-at price ───────────────────────────────────────────────
+        var compareEl = el.querySelector("[data-pb-fp-compare]");
+        if (compareEl) {
+          var compareCents = activeVariant && activeVariant.compare_at_price != null
+            ? activeVariant.compare_at_price
+            : (prod.compare_at_price || null);
+          if (compareCents) {
+            compareEl.textContent = formatMoney(compareCents, cur);
+            compareEl.style.display = "";
+          } else {
+            compareEl.style.display = "none";
+          }
+        }
+
+        // ── Description ────────────────────────────────────────────────────
+        var descEl = el.querySelector("[data-pb-fp-desc]");
+        if (descEl && prod.description != null) {
+          // prod.description from .js endpoint is plain-text; .body_html from JSON-LD
+          // would be HTML but isn't available here — keep as text for safety.
+          descEl.textContent = prod.description;
+        }
+
+        // ── SKU ────────────────────────────────────────────────────────────
+        var skuValEl = el.querySelector("[data-pb-fp-sku-val]");
+        if (skuValEl) {
+          skuValEl.textContent = (activeVariant && activeVariant.sku) ? activeVariant.sku : (prod.variants && prod.variants[0] && prod.variants[0].sku ? prod.variants[0].sku : "—");
+        }
+
+        // ── Image — swap to live featured image ────────────────────────────
+        var imgEl = el.querySelector("[data-pb-fp-image]");
+        if (imgEl && (prod.featured_image || (prod.images && prod.images[0]))) {
+          imgEl.src = prod.featured_image || prod.images[0];
+          imgEl.alt = prod.title || imgEl.alt || "";
+        }
+
+        // ── Variant selector — populate options from live data ─────────────
+        var variantWrap = el.querySelector("[data-pb-fp-variants]");
+        if (variantWrap && allVariants.length > 1) {
+          var select = variantWrap.querySelector("select");
+          if (select) {
+            select.innerHTML = "";
+            for (var vi = 0; vi < allVariants.length; vi++) {
+              var vr = allVariants[vi];
+              if (!vr) continue;
+              var opt = document.createElement("option");
+              opt.value = String(vr.id);
+              opt.textContent = vr.title || ("Variant " + (vi + 1));
+              if (!vr.available) opt.disabled = true;
+              if (vr === firstAvail) opt.selected = true;
+              select.appendChild(opt);
+            }
+          }
+          // Button-style swatches — replace placeholder buttons
+          var swatchWrap = variantWrap.querySelector("[data-pb-fp-swatches]");
+          if (swatchWrap) {
+            swatchWrap.innerHTML = "";
+            for (var si = 0; si < allVariants.length; si++) {
+              var sv = allVariants[si];
+              if (!sv) continue;
+              var btn2 = document.createElement("button");
+              btn2.style.cssText = "padding:5px 12px;border:1px solid " + (sv.available ? "#d1d5db" : "#f0f0f0") + ";border-radius:6px;font-size:13px;background:" + (sv === firstAvail ? "#1a1a1a" : "#fff") + ";color:" + (sv === firstAvail ? "#fff" : "#374151") + ";cursor:" + (sv.available ? "pointer" : "not-allowed") + ";opacity:" + (sv.available ? "1" : "0.45");
+              btn2.textContent = sv.title || ("V" + (si + 1));
+              btn2.disabled = !sv.available;
+              swatchWrap.appendChild(btn2);
+            }
+          }
+        }
+
+        // ── Quantity stepper wiring ────────────────────────────────────────
+        var qtyInput = el.querySelector("[data-pb-fp-qty]");
+        var qtyDec   = el.querySelector("[data-pb-fp-qty-dec]");
+        var qtyInc   = el.querySelector("[data-pb-fp-qty-inc]");
+        if (qtyInput && qtyDec && qtyInc) {
+          qtyDec.addEventListener("click", function () {
+            var v = parseInt(qtyInput.value, 10) || 1;
+            if (v > 1) qtyInput.value = v - 1;
+          });
+          qtyInc.addEventListener("click", function () {
+            var v = parseInt(qtyInput.value, 10) || 1;
+            qtyInput.value = v + 1;
+          });
+        }
+
+        // ── Button — PDP link or add-to-cart ──────────────────────────────
+        var btn = el.querySelector("[data-pb-fp-button]");
+        if (btn) {
+          btn.setAttribute("href", "/products/" + handle);
+          var soldOut = prod.available === false;
+          if (soldOut) {
+            btn.textContent = "Sold Out";
+            btn.style.opacity = "0.55";
+            btn.style.pointerEvents = "none";
+          }
+          if (btn.hasAttribute("data-pb-fp-atc") && !soldOut) {
+            var variantId = activeVariant ? activeVariant.id : null;
+            if (variantId != null) {
+              // Wire up ATC to respect quantity if selector is present.
+              btn.addEventListener("click", function (e) {
+                e.preventDefault();
+                var qty = qtyInput ? (parseInt(qtyInput.value, 10) || 1) : 1;
+                // Prefer Shopify Ajax API so the page doesn't reload.
+                fetch("/cart/add.js", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ id: variantId, quantity: qty }),
+                })
+                  .then(function () {
+                    // Trigger cart update event themes listen to.
+                    document.dispatchEvent(new CustomEvent("cart:refresh", { bubbles: true }));
+                    // Also fire the native Shopify section event some themes need.
+                    document.dispatchEvent(new CustomEvent("cart:updated", { bubbles: true }));
+                  })
+                  .catch(function () {
+                    // Fallback: navigate to cart/add URL.
+                    window.location.href = "/cart/add?id=" + variantId + "&quantity=" + qty;
+                  });
+              });
+            }
+          }
+        }
+      })
+      .catch(function (err) {
+        log("Featured product '" + handle + "' hydration failed", err && err.message);
+        // Snapshot stays as-is — graceful degradation.
+      });
+  }
+
+  function hydrateFeaturedProducts(root) {
+    var scope = root || document;
+    var els = scope.querySelectorAll(".pb-featured-product[data-pb-product-handle]");
+    for (var i = 0; i < els.length; i++) hydrateOne(els[i]);
+  }
+
   function scanAndMount(force) {
     var containers = document.querySelectorAll("[" + MOUNT_ATTR + "]");
     for (var i = 0; i < containers.length; i++) {
       mountBlock(containers[i], force);
     }
+    // Hydrate Featured Product blocks rendered directly in the page body (i.e.
+    // exported pages where the HTML isn't injected by this loader).
+    hydrateFeaturedProducts(document);
   }
 
   if (

@@ -641,6 +641,122 @@ function ImageLinkUrlField({ value, onChange }: { value: string; onChange: (v: s
   return <LinkUrlField value={value} onChange={onChange} />;
 }
 
+// ─── Product picker (App Bridge v4 ResourcePicker) ───────────────────────────
+//
+// Opens Shopify's native product picker so the merchant selects a REAL product
+// from their store. We persist the handle + id (the live keys) plus a snapshot
+// of the title/image/price for editor preview, pre-hydration paint, and static
+// exports. The storefront hydrates the snapshot from /products/{handle}.js so
+// the displayed data always reflects the live product.
+//
+// `value` shape: { id, handle, title, image, price, currencyCode, available } | null
+
+type PickedProduct = {
+  id?: string;
+  handle?: string;
+  title?: string;
+  image?: string;
+  price?: string;        // major-unit string, e.g. "29.99"
+  currencyCode?: string;
+  available?: boolean;
+};
+
+function ProductPickerField({
+  value,
+  onChange,
+  label = "Product",
+}: {
+  value: PickedProduct | null | undefined;
+  onChange: (v: PickedProduct | null) => void;
+  label?: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const product = value ?? null;
+
+  const openPicker = async () => {
+    setError(null);
+    // App Bridge v4 injects a global `shopify` object inside the embedded app.
+    const bridge = (typeof window !== "undefined" ? (window as any).shopify : undefined);
+    if (!bridge || typeof bridge.resourcePicker !== "function") {
+      setError("Product picker is unavailable outside the Shopify admin.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const selection = await bridge.resourcePicker({
+        type: "product",
+        action: "select",
+        multiple: false,
+        // Preselect the current product so re-opening keeps context.
+        selectionIds: product?.id ? [{ id: product.id }] : undefined,
+      });
+      // Cancelled — resourcePicker resolves to undefined.
+      if (!selection || !selection.length) return;
+
+      const p = selection[0];
+      const firstVariant = Array.isArray(p.variants) && p.variants.length ? p.variants[0] : undefined;
+      const firstImage =
+        (Array.isArray(p.images) && p.images.length ? p.images[0] : undefined) ?? undefined;
+
+      onChange({
+        id: p.id,
+        handle: p.handle,
+        title: p.title,
+        image: firstImage?.originalSrc ?? firstImage?.src ?? "",
+        // ResourcePicker prices are major-unit strings already (e.g. "29.99").
+        price: firstVariant?.price != null ? String(firstVariant.price) : undefined,
+        // ResourcePicker doesn't return shop currency; left to hydration.
+        currencyCode: undefined,
+        available: typeof p.totalInventory === "number" ? p.totalInventory > 0 : undefined,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not open the product picker.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const btnBase: React.CSSProperties = {
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+    width: "100%", padding: "8px 12px", fontSize: 12, fontWeight: 600,
+    border: "1px solid var(--p-color-border, #e1e3e5)",
+    borderRadius: "var(--p-border-radius-200, 8px)",
+    background: "var(--p-color-bg-surface, #fff)",
+    color: "var(--p-color-text, #202223)", cursor: "pointer",
+  };
+
+  return (
+    <StackedField label={label}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {product && (product.title || product.handle) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, border: "1px solid var(--p-color-border, #e1e3e5)", borderRadius: 8, background: "var(--p-color-bg-surface-secondary, #f6f6f7)" }}>
+            <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", flexShrink: 0, background: "var(--p-color-bg-surface, #fff)", border: "1px solid var(--p-color-border, #e1e3e5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {product.image
+                ? <img src={product.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--p-color-icon-subdued, #8c9196)" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--p-color-text, #202223)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{product.title || product.handle}</div>
+              {product.price != null && (
+                <div style={{ fontSize: 11, color: "var(--p-color-text-subdued, #6d7175)", marginTop: 1 }}>{product.price}</div>
+              )}
+            </div>
+            <button onClick={() => onChange(null)} title="Remove product" style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 5, border: "1px solid var(--p-color-border, #e1e3e5)", background: "var(--p-color-bg-surface, #fff)", color: "var(--p-color-text-critical, #d72c0d)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        )}
+        <button onClick={openPicker} disabled={busy} style={{ ...btnBase, opacity: busy ? 0.6 : 1, cursor: busy ? "default" : "pointer" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          {busy ? "Opening…" : product ? "Change Product" : "Select Product"}
+        </button>
+        {error && <div style={{ fontSize: 11, color: "var(--p-color-text-critical, #d72c0d)" }}>{error}</div>}
+      </div>
+    </StackedField>
+  );
+}
+
 
 // ─── Video upload component wrapper ──────────────────────────────────────────
 
@@ -764,4 +880,5 @@ export {
   LinkUrlField,
   ImageLinkUrlField,
   VideoUploadField,
+  ProductPickerField,
 };

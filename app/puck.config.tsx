@@ -37,6 +37,7 @@ import { AlertComponent } from "@/puck-blocks/blocks/alert";
 import { BlockQuoteComponent } from "@/puck-blocks/blocks/blockquote";
 import { LayoutBlockComponent } from "@/puck-blocks/blocks/layout";
 import { GridBlockComponent } from "@/puck-blocks/blocks/grid";
+import { FeaturedProductComponent } from "@/puck-blocks/blocks/featured-product";
 
 // ─── Common content components (extracted to ./puck-blocks/blocks/common) ────
 import { commonComponents } from "@/puck-blocks/blocks/common";
@@ -302,6 +303,8 @@ export const config: Config<Props, RootProps> = {
 
     GridBlock: GridBlockComponent,
 
+    FeaturedProduct: FeaturedProductComponent,
+
     Section: SectionBlockComponent,
 
     // Section template components — appear under "Sections" category in the drawer
@@ -312,6 +315,7 @@ export const config: Config<Props, RootProps> = {
 // Patch layout/section blocks into previewConfig for preview/SSR rendering
 (previewConfig.components as any).LayoutBlock = LayoutBlockComponent;
 (previewConfig.components as any).GridBlock = GridBlockComponent;
+(previewConfig.components as any).FeaturedProduct = FeaturedProductComponent;
 (previewConfig.components as any).Section = SectionBlockComponent;
 Object.entries(sectionTemplateConfig).forEach(([k, v]) => {
   (previewConfig.components as any)[k] = v;

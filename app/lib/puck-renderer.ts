@@ -917,6 +917,179 @@ function PhotoCollage(p: Props): string {
   return `${hoverStyle}<div class="${wrapClass}" style="display:grid;grid-template-columns:repeat(3,1fr);gap:${gapPx}">${cells}</div>`;
 }
 
+// ─── Featured Product ────────────────────────────────────────────────────────
+//
+// Renders a snapshot of the picked product as static HTML, tagged with
+// data-pb-product-handle. On the live storefront, pb-widget-loader.js fetches
+// /products/{handle}.js and refreshes the title/price/image/availability inside
+// this container, so the displayed data is always current. The snapshot is the
+// fallback for the pre-hydration paint and any non-storefront context.
+function FeaturedProduct(p: Props): string {
+  const product = (p.product as Record<string, unknown> | null | undefined) ?? null;
+  const handle  = product ? String(product.handle ?? "") : "";
+  if (!product || (!handle && !product.title)) return "";
+
+  const title        = esc((product.title       as string) || "");
+  const image        = esc((product.image       as string) || "");
+  const price        = esc((product.price       as string) || "");
+  const compareAt    = esc((product.compareAtPrice as string) || "");
+  const description  = esc((product.description as string) || "");
+  const vendor       = esc((product.vendor      as string) || "");
+  const sku          = esc((product.sku         as string) || "");
+  const productUrl   = handle ? `/products/${encodeURIComponent(handle)}` : "#";
+
+  // Display toggles
+  const showImage       = p.showImage       !== false;
+  const showTitle       = p.showTitle       !== false;
+  const showVendor      = !!p.showVendor;
+  const showPrice       = p.showPrice       !== false;
+  const showCompareAt   = !!p.showCompareAt;
+  const showDescription = !!p.showDescription;
+  const showSku         = !!p.showSku;
+  const showVariants    = !!p.showVariants;
+  const variantStyle    = (p.variantStyle as string) || "dropdown";
+  const showQuantity    = !!p.showQuantity;
+  const showRating      = !!p.showRating;
+  const ratingValue     = Number(p.ratingValue ?? 5);
+  const showButton      = p.showButton !== false;
+  const addToCart       = !!p.addToCart;
+  const buttonLabel     = esc((p.buttonLabel as string) || (addToCart ? "Add to Cart" : "Shop Now"));
+
+  // Badge
+  const showBadge  = !!p.showBadge;
+  const badgeText  = esc((p.badgeText  as string) || "Sale");
+  const badgeBg    = esc((p.badgeBg   as string) || "#ef4444");
+  const badgeColor = esc((p.badgeColor as string) || "#ffffff");
+
+  // Layout
+  const layout   = (p.layout as string) || "vertical";
+  const isHoriz  = layout === "horizontal" || layout === "horizontal-reverse";
+  const isRev    = layout === "horizontal-reverse";
+  const align    = (p.align as string) || "left";
+  const justify  = align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
+  const aspect   = (Number(p.imageAspect) || 100) / 100;
+  const imageFit = esc((p.imageFit as string) || "cover");
+  const radius   = Number(p.borderRadius ?? 12);
+  const shadow   = !!p.showShadow;
+  const divider  = !!p.showDividers;
+  const dividerCss = divider ? "border-top:1px solid #e5e7eb;margin-top:4px;padding-top:8px;" : "";
+
+  // Colors
+  const cardBg        = esc((p.cardBg           as string) || "");
+  const titleColor    = esc((p.titleColor        as string) || "var(--heading-color,#1a1a1a)");
+  const vendorColor   = esc((p.vendorColor       as string) || "#6b7280");
+  const priceColor    = esc((p.priceColor        as string) || "var(--primary-color,#0158ad)");
+  const compareColor  = esc((p.compareAtColor    as string) || "#9ca3af");
+  const descColor     = esc((p.descColor         as string) || "#374151");
+  const skuColor      = esc((p.skuColor          as string) || "#9ca3af");
+  const btnText       = esc((p.buttonTextColor   as string) || "#ffffff");
+  const btnBg         = esc((p.buttonBgColor     as string) || "var(--primary-color,#0158ad)");
+
+  // Typography
+  const titleFS  = Number(p.titleFontSize)   || 20;
+  const vendorFS = Number(p.vendorFontSize)  || 13;
+  const priceFS  = Number(p.priceFontSize)   || 18;
+  const descFS   = Number(p.descFontSize)    || 14;
+
+  // Button style
+  const btnWidth  = (p.buttonWidth as string) || "auto";
+  const btnRadius = Number(p.buttonRadius ?? 8);
+
+  const m  = (p.advMargin  as any) ?? { top: 0, right: 0, bottom: 0, left: 0 };
+  const pd = (p.advPadding as any) ?? { top: 16, right: 16, bottom: 16, left: 16 };
+
+  // ── Image ──
+  const badgeHtml = showBadge && badgeText
+    ? `<div style="position:absolute;top:10px;left:10px;background:${badgeBg};color:${badgeColor};font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:0.03em;text-transform:uppercase">${badgeText}</div>`
+    : "";
+  const imgHtml = showImage && image
+    ? `<div class="pb-fp-media" style="position:relative;flex-shrink:0;${isHoriz ? "width:42%;" : "width:100%;"}border-radius:${radius}px;overflow:hidden;background:#f3f4f6;aspect-ratio:${aspect}"><img data-pb-fp-image src="${image}" alt="${title}" loading="lazy" style="width:100%;height:100%;object-fit:${imageFit};display:block">${badgeHtml}</div>`
+    : "";
+
+  // ── Vendor ──
+  const vendorHtml = showVendor && vendor
+    ? `<div data-pb-fp-vendor style="font-size:${vendorFS}px;color:${vendorColor};font-weight:500;text-transform:uppercase;letter-spacing:0.06em">${vendor}</div>`
+    : "";
+
+  // ── Title ──
+  const titleHtml = showTitle
+    ? `<div data-pb-fp-title style="font-size:${titleFS}px;font-weight:700;color:${titleColor};font-family:var(--heading-font);line-height:1.25">${title}</div>`
+    : "";
+
+  // ── Star rating ──
+  const buildStars = (n: number): string => {
+    let s = "";
+    for (let i = 0; i < 5; i++) {
+      const isHalf = !!(i === Math.floor(n) && (n - Math.floor(n)) >= 0.5);
+      const full   = i < Math.floor(n);
+      const fill   = full ? "#f59e0b" : (isHalf ? "url(#pbh)" : "#d1d5db");
+      const grad   = isHalf ? `<defs><linearGradient id="pbh" x1="0" x2="1"><stop offset="50%" stop-color="#f59e0b"/><stop offset="50%" stop-color="#d1d5db"/></linearGradient></defs>` : "";
+      s += `<svg width="14" height="14" viewBox="0 0 24 24" style="display:inline-block">${grad}<polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill="${fill}" stroke="none"/></svg>`;
+    }
+    return s;
+  };
+  const ratingHtml = showRating
+    ? `<div style="display:flex;align-items:center;gap:4px;justify-content:${justify}">${buildStars(ratingValue)}<span style="font-size:12px;color:#6b7280">(${ratingValue})</span></div>`
+    : "";
+
+  // ── Prices ──
+  const compareHtml = showCompareAt && compareAt
+    ? `<span data-pb-fp-compare style="font-size:${priceFS}px;font-weight:400;color:${compareColor};text-decoration:line-through">${compareAt}</span>`
+    : "";
+  const priceHtml = showPrice
+    ? `<span data-pb-fp-price style="font-size:${priceFS}px;font-weight:700;color:${priceColor}">${price}</span>`
+    : "";
+  const priceRowHtml = showPrice || showCompareAt
+    ? `<div style="${dividerCss}display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;justify-content:${justify}">${compareHtml}${priceHtml}</div>`
+    : "";
+
+  // ── Description ──
+  const descHtml = showDescription && description
+    ? `<div data-pb-fp-desc style="${dividerCss}font-size:${descFS}px;color:${descColor};line-height:1.6">${description}</div>`
+    : "";
+
+  // ── SKU ──
+  const skuHtml = showSku
+    ? `<div data-pb-fp-sku style="${dividerCss}font-size:12px;color:${skuColor}">SKU: <span data-pb-fp-sku-val style="font-weight:500">${sku || "—"}</span></div>`
+    : "";
+
+  // ── Variant selector — rendered as functional HTML ──
+  const variantHtml = showVariants
+    ? `<div data-pb-fp-variants style="${dividerCss}">
+         ${variantStyle === "buttons"
+           ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"><button style="padding:5px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff;color:#374151;cursor:pointer">Default Title</button></div>`
+           : `<select style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;color:#374151;background:#fff"><option>Default Title</option></select>`
+         }
+       </div>`
+    : "";
+
+  // ── Quantity ──
+  const quantityHtml = showQuantity
+    ? `<div style="${dividerCss}display:flex;align-items:center;gap:8px">
+         <span style="font-size:11px;color:#6b7280;font-weight:500">Qty</span>
+         <div style="display:flex;align-items:center;border:1px solid #d1d5db;border-radius:6px;overflow:hidden">
+           <button data-pb-fp-qty-dec style="width:32px;height:36px;border:none;background:#f9fafb;cursor:pointer;font-size:16px;color:#374151">−</button>
+           <input data-pb-fp-qty type="number" value="1" min="1" style="width:44px;height:36px;border:none;border-left:1px solid #d1d5db;border-right:1px solid #d1d5db;text-align:center;font-size:13px;color:#374151">
+           <button data-pb-fp-qty-inc style="width:32px;height:36px;border:none;background:#f9fafb;cursor:pointer;font-size:16px;color:#374151">+</button>
+         </div>
+       </div>`
+    : "";
+
+  // ── Button ──
+  const btnWidthCss = btnWidth === "full" ? "width:100%;" : "";
+  const buttonHtml  = showButton
+    ? `<div style="${dividerCss}${btnWidthCss}margin-top:4px"><a data-pb-fp-button${addToCart ? " data-pb-fp-atc" : ""} href="${productUrl}" style="display:inline-flex;align-items:center;justify-content:center;${btnWidthCss}padding:10px 24px;border-radius:${btnRadius}px;font-size:14px;font-weight:600;text-decoration:none;color:${btnText};background:${btnBg};cursor:pointer">${buttonLabel}</a></div>`
+    : "";
+
+  const infoHtml = `<div class="pb-fp-info" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;align-items:${justify};text-align:${align}">${vendorHtml}${titleHtml}${ratingHtml}${priceRowHtml}${descHtml}${skuHtml}${variantHtml}${quantityHtml}${buttonHtml}</div>`;
+
+  const cardChildren = isRev ? `${infoHtml}${imgHtml}` : `${imgHtml}${infoHtml}`;
+  const cardCss = `display:flex;flex-direction:${isHoriz ? "row" : "column"};gap:${isHoriz ? "32px" : "16px"};align-items:${isHoriz ? "flex-start" : "stretch"};${cardBg ? `background:${cardBg};` : ""}border-radius:${radius}px;${shadow ? "box-shadow:0 4px 20px rgba(0,0,0,0.10);" : ""}padding:${pd.top}px ${pd.right}px ${pd.bottom}px ${pd.left}px`;
+  const card = `<div class="pb-fp-card" style="${cardCss}">${cardChildren}</div>`;
+
+  return `<div class="pb-featured-product" data-pb-product-handle="${esc(handle)}" style="position:relative;margin:${m.top}px ${m.right}px ${m.bottom}px ${m.left}px">${card}</div>`;
+}
+
 // ─── GlobalHeader / GlobalFooter renderers (used by chrome wrapper) ──────────
 
 function renderNavLinks(links: NavLink[] | undefined, textColor: string): string {
@@ -2099,6 +2272,7 @@ function renderBlock(block: Block, zones: Zones): string {
       case "Button":           html = Button(p); break;
       case "MarqueeBar":       html = MarqueeBar(p); break;
       case "PhotoCollage":     html = PhotoCollage(p); break;
+      case "FeaturedProduct":  html = FeaturedProduct(p); break;
       case "Divider":          html = renderDivider(p); break;
       case "Video":            html = renderVideo(p); break;
       case "BlockQuote":       html = renderBlockQuote(p); break;

@@ -1201,6 +1201,7 @@ export default function PuckSplatEditor({
 
     const BLOCK_KEYS = [
       "MarqueeBar", "HeadingBlock", "Text", "Article", "PhotoCollage",
+      "FeaturedProduct",
       "Image", "Space", "Button", "Divider", "Video", "BlockQuote",
       "StarRating", "ProgressBar", "Alert", "SocialIcons", "ShareButtons",
       "Section_Logos",

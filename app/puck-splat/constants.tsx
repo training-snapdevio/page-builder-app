@@ -135,6 +135,9 @@ export const COMPONENT_ICONS: Record<string, React.ReactNode> = {
   ProgressBar:  <BarChart2 size={24} strokeWidth={1.5} />,
   Alert:        <Bell size={24} strokeWidth={1.5} />,
 
+  // Commerce
+  FeaturedProduct: <ShoppingBag size={24} strokeWidth={1.5} />,
+
   // Legacy
   GridLayout:   <LayoutGrid size={24} strokeWidth={1.5} />,
   CardBlock:    <WalletCards size={24} strokeWidth={1.5} />,
@@ -175,6 +178,7 @@ export const COMPONENT_LABELS: Record<string, string> = {
   StarRating:          "Star Rating",
   ProgressBar:         "Progress Bar",
   Alert:               "Alert",
+  FeaturedProduct:     "Featured Product",
   Section:               "Section",
   LayoutBlock:           "Container",
   GridBlock:             "Grid",
