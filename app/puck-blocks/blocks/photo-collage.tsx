@@ -11,7 +11,6 @@ import {
   SliderNumberField,
   EditorHideOverlay,
   buildResponsiveSpacingCss,
-  ResponsiveSpacingField,
 } from "@/puck-blocks/shared";
 import {
   ImageField,
@@ -201,9 +200,8 @@ export const PhotoCollageComponent = {
                       value={props.objectFit ?? "cover"}
                       onChange={(v: any) => set("objectFit", v)}
                       options={[
-                        { value: "cover",   label: "Cover"   },
-                        { value: "contain", label: "Contain" },
-                        { value: "fill",    label: "Fill"    },
+                        { value: "cover", label: "Cover" },
+                        { value: "fill",  label: "Fill"  },
                       ]}
                     />
                     <InlineSelect
@@ -250,8 +248,6 @@ export const PhotoCollageComponent = {
 
                 {tab === "advanced" && (
                   <>
-                    <TabSection title="Responsive Spacing" />
-                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v: any) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet"  value={!!props.hideTablet}  onChange={(v: any) => set("hideTablet", v)}  />
@@ -319,7 +315,7 @@ export const PhotoCollageComponent = {
         <div
           key={i}
           className="pb-collage-item"
-          style={{ overflow: "hidden", borderRadius: br, boxShadow: shadow, position: "relative", ...cellStyle }}
+          style={{ overflow: "hidden", borderRadius: br, boxShadow: shadow, position: "relative", boxSizing: "border-box", ...cellStyle }}
         >
           <img
             src={img.url}
@@ -360,7 +356,9 @@ export const PhotoCollageComponent = {
     } else if (layout === "brick") {
       const FULL = 3;
       const brickW = `calc((100% - ${(FULL - 1)} * ${gapPx}) / ${FULL})`;
-      const halfW = `calc((${brickW} - ${gapPx}) / 2)`;
+      // Flattened (non-nested) calc so the flex-basis parses reliably everywhere —
+      // a nested calc here can collapse to 0 and left-align the offset row.
+      const halfW = `calc((100% - ${2 * FULL - 1} * ${gapPx}) / ${2 * FULL})`;
       const rows: { items: any[]; offset: boolean }[] = [];
       let bi = 0; let rowNo = 0;
       while (bi < imgs.length) {
@@ -371,14 +369,14 @@ export const PhotoCollageComponent = {
       }
       let imgIdx = 0;
       content = (
-        <div style={{ display: "flex", flexDirection: "column", gap: gapPx, overflow: "hidden" }}>
+        <div className="pb-collage-wrap" style={{ display: "flex", flexDirection: "column", gap: gapPx, overflow: "hidden", boxSizing: "border-box" }}>
           {rows.map(({ items, offset }: { items: any[]; offset: boolean }, rIdx: number) => (
-            <div key={rIdx} style={{ display: "flex", gap: gapPx }}>
-              {offset && <div style={{ flex: `0 0 ${halfW}` }} />}
+            <div key={rIdx} style={{ display: "flex", gap: gapPx, boxSizing: "border-box" }}>
+              {offset && <div style={{ flex: `0 0 ${halfW}`, boxSizing: "border-box" }} />}
               {items.map((img: any, cIdx: number) => (
                 <ImgCell key={cIdx} img={img} i={imgIdx++} cellStyle={{ flex: `0 0 ${brickW}`, aspectRatio: ar }} fitOverride="cover" />
               ))}
-              {offset && <div style={{ flex: `0 0 ${halfW}` }} />}
+              {offset && <div style={{ flex: `0 0 ${halfW}`, boxSizing: "border-box" }} />}
             </div>
           ))}
         </div>

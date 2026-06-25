@@ -266,7 +266,6 @@ function Text(p: Props): string {
   // The `pb-text-blk` fallback must always be present so the linkColorStyle selector matches.
   const blkClass = ["pb-text-blk", p.cssClass ? esc(p.cssClass as string) : ""].filter(Boolean).join(" ");
 
-  const opacity    = p.opacity != null ? Number(p.opacity) / 100 : 1;
   const zIndex     = p.zIndex  != null ? `z-index:${p.zIndex};position:relative;` : "";
   const fontFamily = (p.fontFamily && p.fontFamily !== "inherit") ? esc(p.fontFamily as string) : "var(--font-family)";
   const fontSize   = p.fontSize ? `${p.fontSize}px` : "var(--base-font-size,1rem)";
@@ -288,8 +287,13 @@ function Text(p: Props): string {
     : "";
 
   const idAttr = p.cssId ? ` id="${esc(p.cssId as string)}"` : "";
-  const outerStyle = `margin:${m.top}px ${m.right}px ${m.bottom}px ${m.left}px;padding:${pd.top}px ${pd.right}px ${pd.bottom}px ${pd.left}px;border-radius:${br.top}px ${br.right}px ${br.bottom}px ${br.left}px;opacity:${opacity};${zIndex}${bgStyle}${borderStyle}`;
-  const pStyle = `text-align:${alignment};font-size:${fontSize};font-weight:${fontWeight};font-family:${fontFamily};font-style:${fontStyle};line-height:${lineHeight};letter-spacing:${letterSpacing};text-decoration:${textDecoration};text-transform:${textTransform};color:${textColor};margin:0;${colCss}`;
+  // Keep horizontal padding at least as large as the adjacent corner radii so a
+  // rounded box + overflow:hidden can't clip text against the corner curve.
+  // Corner map: top→top-left, right→top-right, bottom→bottom-right, left→bottom-left.
+  const padLeft  = Math.max(pd.left  ?? 0, br.top    ?? 0, br.left   ?? 0);
+  const padRight = Math.max(pd.right ?? 0, br.right  ?? 0, br.bottom ?? 0);
+  const outerStyle = `margin:${m.top}px ${m.right}px ${m.bottom}px ${m.left}px;padding:${pd.top}px ${padRight}px ${pd.bottom}px ${padLeft}px;border-radius:${br.top}px ${br.right}px ${br.bottom}px ${br.left}px;overflow:hidden;${zIndex}${bgStyle}${borderStyle}`;
+  const pStyle = `text-align:${alignment};font-size:${fontSize};font-weight:${fontWeight};font-family:${fontFamily};font-style:${fontStyle};line-height:${lineHeight};letter-spacing:${letterSpacing};text-decoration:${textDecoration};text-transform:${textTransform};color:${textColor};margin:0;white-space:pre-wrap;${colCss}`;
 
   const linkColorStyle = linkColor ? `<style>${idAttr ? `#${esc(p.cssId as string)}` : ".pb-text-blk"} a{color:${linkColor}!important}</style>` : "";
   const pEl = `<p style="${pStyle}">${esc((p.title as string) || "")}</p>`;
@@ -341,20 +345,23 @@ function HeadingBlock(p: Props): string {
   const radiusCss = (br.top || br.right || br.bottom || br.left)
     ? `border-radius:${br.top}px ${br.right}px ${br.bottom}px ${br.left}px;`
     : "";
-  // Opacity
-  const opacityCss = (p.opacity != null && (p.opacity as number) !== 100)
-    ? `opacity:${(p.opacity as number) / 100};`
-    : "";
   // z-index
   const zCss = p.zIndex != null ? `z-index:${p.zIndex};position:relative;` : "";
 
-  const headingStyle = `font-size:${fs};font-weight:${fontWeight};font-family:${fontFamily};font-style:${fontStyle};text-transform:${textTransform};text-decoration:${textDecoration};line-height:${lineHeight};letter-spacing:${letterSpacing};color:${color};margin:0;`;
-  const wrapStyle = `text-align:${align};${bgCss}${borderCss}${radiusCss}${opacityCss}${zCss}margin:${m.top}px ${m.right}px ${m.bottom}px ${m.left}px;padding:${pd.top}px ${pd.right}px ${pd.bottom}px ${pd.left}px`;
+  // Hover color — scoped to a unique class so it only affects this heading
+  const hoverColor = (p.hoverColor as string) || "";
+  const hvId = `pb-h-${Math.random().toString(36).slice(2, 8)}`;
+  const hoverCss = hoverColor ? `<style>.${hvId}:hover{color:${esc(hoverColor)}!important}</style>` : "";
+  const hoverClassAttr = hoverColor ? ` class="${hvId}"` : "";
+  const transitionCss = hoverColor ? "transition:color 0.2s ease;" : "";
+
+  const headingStyle = `font-size:${fs};font-weight:${fontWeight};font-family:${fontFamily};font-style:${fontStyle};text-transform:${textTransform};text-decoration:${textDecoration};line-height:${lineHeight};letter-spacing:${letterSpacing};color:${color};margin:0;${transitionCss}`;
+  const wrapStyle = `text-align:${align};${bgCss}${borderCss}${radiusCss}${zCss}margin:${m.top}px ${m.right}px ${m.bottom}px ${m.left}px;padding:${pd.top}px ${pd.right}px ${pd.bottom}px ${pd.left}px`;
   const linkUrl = esc((p.linkUrl as string) || "");
   const headingLinkTarget = esc((p.linkTarget as string) || "_blank");
   const headingHtml = linkUrl
-    ? `<a href="${linkUrl}" target="${headingLinkTarget}" rel="noopener noreferrer" style="text-decoration:none;color:inherit"><${tag} style="${headingStyle}">${esc(p.title)}</${tag}></a>`
-    : `<${tag} style="${headingStyle}">${esc(p.title)}</${tag}>`;
+    ? `${hoverCss}<a href="${linkUrl}" target="${headingLinkTarget}" rel="noopener noreferrer" style="text-decoration:none;color:inherit"><${tag}${hoverClassAttr} style="${headingStyle}">${esc(p.title)}</${tag}></a>`
+    : `${hoverCss}<${tag}${hoverClassAttr} style="${headingStyle}">${esc(p.title)}</${tag}>`;
 
   // Divider rendering — uses border-top instead of height+background so Shopify
   // theme resets (height:auto!important, background resets) cannot collapse them.
@@ -545,12 +552,29 @@ function Accordian(p: Props, zones: Zones): string {
 </div>`;
 }
 
-function bodyToHtml(text: string): string {
-  return text
+function bodyToHtml(text: string, fontWeight?: string, color?: string): string {
+  // The old default body was "<p></p>"; users often typed plain text right
+  // after it without deleting it (e.g. "<p></p>Lorem..."), which made the
+  // HTML check below match and pass the whole thing through raw — collapsing
+  // line breaks and, when the body is just "<p></p>", showing nothing at all.
+  // Strip leading/trailing empty paragraph tags so the real text is detected.
+  const cleaned = text
+    .replace(/^(?:\s*<p>\s*<\/p>\s*)+/i, "")
+    .replace(/(?:\s*<p>\s*<\/p>\s*)+$/i, "")
+    .trim();
+  // If real HTML tags remain, pass it through directly
+  if (/<[a-z][\s\S]*>/i.test(cleaned)) return cleaned;
+  // Weight + color repeated on the <p> so a theme/global `p` rule (e.g. the
+  // Shopify theme's own `p { color }`) can't override them — otherwise the body
+  // inherits from the wrapper div and the theme's p-color wins, hiding the text.
+  const fw = fontWeight ? `font-weight:${fontWeight};` : "";
+  const co = color ? `color:${color};` : "";
+  // Otherwise treat as plain text
+  return cleaned
     .split(/\n\n+/)
     .map(para => {
       const lines = para.split(/\n/).map(esc).join("<br>");
-      return `<p style="margin:0 0 1em">${lines}</p>`;
+      return `<p style="margin:0 0 1em;${fw}${co}">${lines}</p>`;
     })
     .join("");
 }
@@ -599,7 +623,7 @@ function Article(p: Props): string {
   const isHoriz     = imgPos === "left" || imgPos === "right";
   let imgHtml = "";
   if (imgSrc) {
-    const is = `width:100%;height:${imgH}px;object-fit:${imgFit};display:block`;
+    const is = `width:100%;height:${imgH}px;object-fit:${imgFit};display:block;border-radius:${imgBr}`;
     // Radius + overflow:hidden go on the wrapper so object-fit:cover is clipped
     // to the rounded corners (a radius on the <img> alone bleeds with cover).
     imgHtml = `<div style="flex-shrink:0;min-width:0;border-radius:${imgBr};overflow:hidden;${isHoriz ? `width:44%;` : `width:100%;margin-bottom:${imgMb}px`}"><img src="${esc(imgSrc)}" alt="${esc(String(p.articleTitle || ""))}" loading="lazy" class="no-global-style" style="${is}"></div>`;
@@ -625,7 +649,7 @@ function Article(p: Props): string {
       ${showAuthor && p.author ? `<span style="font-size:${authorFS};font-weight:${authorFW};font-family:${authorFont};color:${authorColor}">By <strong>${esc(String(p.author))}</strong></span>` : ""}
       ${showDate && dateStr ? `<span style="font-size:${dateFS};font-weight:${dateFW};font-family:${dateFont};color:${dateColor}">${esc(dateStr)}</span>` : ""}
     </div>` : ""}
-    <div style="font-size:${bodyFS};line-height:${bodyLH};color:${bodyColor};font-weight:${bodyFW};font-family:${bodyFont}">${p.body ? bodyToHtml(String(p.body)) : ""}</div>`;
+    <div style="font-size:${bodyFS};line-height:${bodyLH};color:${bodyColor};font-weight:${bodyFW};font-family:${bodyFont}">${p.body ? bodyToHtml(String(p.body), bodyFW, bodyColor) : ""}</div>`;
 
   const innerHtml = isHoriz
     ? `<div style="display:flex;flex-direction:${imgPos === "left" ? "row" : "row-reverse"};gap:48px;align-items:flex-start">${imgHtml}<div style="flex:1;min-width:0">${articleInner}</div></div>`
@@ -706,7 +730,6 @@ function Button(p: Props): string {
   const animDelay     = Number(p.animDelay ?? 0);
   const sizePreset   = (p.sizePreset as string) || "medium";
   const customPad    = (p.customPadding as any) ?? {};
-  const opacity      = p.opacity != null ? (p.opacity as number) / 100 : 1;
   const advMargin    = (p.advMargin as any) ?? {};
   const advBgType    = (p.advBgType as string) || "none";
   const advBgColor   = esc((p.advBgColor as string) || "");
@@ -761,7 +784,6 @@ ${iconType === "svg" && iconHoverColor ? `.pb-btn-${uid}:hover svg{color:${iconH
     borderCss,
     `border-radius:${borderRadius}`,
     "cursor:pointer",
-    `opacity:${opacity}`,
     "text-decoration:none",
   ].filter(Boolean).join(";");
 
@@ -786,7 +808,7 @@ ${iconType === "svg" && iconHoverColor ? `.pb-btn-${uid}:hover svg{color:${iconH
   const wrapped = `<div class="pb-btn-wrap-${uid}" style="${fullWidth ? "display:block" : "display:inline-block"}">${linked}</div>`;
 
   const mt = advMargin.top ?? 0, mr = advMargin.right ?? 0, mb = advMargin.bottom ?? 0, ml = advMargin.left ?? 0;
-  const wrapBg = advBgType === "color" && advBgColor ? `background-color:${advBgColor};` : "";
+  const wrapBg = !fullWidth && advBgType === "color" && advBgColor ? `background-color:${advBgColor};` : "";
   const wrapStyle = [
     !fullWidth ? `text-align:${alignment}` : "",
     `margin:${mt}px ${mr}px ${mb}px ${ml}px`,
@@ -878,7 +900,9 @@ function PhotoCollage(p: Props): string {
   if (layout === "brick") {
     const FULL = 3;     // bricks in a full row
     const brickW = `calc((100% - ${(FULL - 1)} * ${gapPx}) / ${FULL})`;
-    const halfW = `calc((${brickW} - ${gapPx}) / 2)`;
+    // Flattened (non-nested) calc so the flex-basis parses reliably everywhere —
+    // a nested calc here can collapse to 0 and left-align the offset row.
+    const halfW = `calc((100% - ${2 * FULL - 1} * ${gapPx}) / ${2 * FULL})`;
     // Split the images into alternating full (FULL) / offset (FULL-1) rows.
     const rows: { items: typeof valid; offset: boolean }[] = [];
     let idx = 0;
@@ -1290,14 +1314,41 @@ function sectionShell(p: Props, inner: string): string {
   const pt = pad.top ?? 60, pb = pad.bottom ?? 60, pl = pad.left ?? 0, pr = pad.right ?? 0;
   const mt = mar.top ?? 0, mb = mar.bottom ?? 0, ml = mar.left ?? 0, mr = mar.right ?? 0;
   const minH = p.minHeightPx && Number(p.minHeightPx) > 0 ? `min-height:${p.minHeightPx}px;` : "";
+  const bgType = (p.bgType as string) || "none";
+
   let bg = "";
-  if (p.bgType === "color" && p.bgColor) bg = `background-color:${esc(p.bgColor as string)};`;
-  else if (p.bgType === "gradient" && p.bgGrad1 && p.bgGrad2)
-    bg = `background:linear-gradient(${p.bgGradAngle ?? 180}deg,${esc(p.bgGrad1 as string)},${esc(p.bgGrad2 as string)});`;
-  else if (p.bgType === "image" && p.bgImage)
-    bg = `background-image:url(${esc(p.bgImage as string)});background-size:cover;background-position:center center;`;
+  let videoEl = "";
+  if (bgType === "color" && p.bgColor) {
+    bg = `background-color:${esc(p.bgColor as string)};`;
+  } else if (bgType === "gradient") {
+    const dir = (p.bgGradDir as string) || `${p.bgGradAngle ?? 180}deg`;
+    bg = `background:linear-gradient(${esc(dir)},${esc((p.bgGrad1 as string) || "transparent")},${esc((p.bgGrad2 as string) || "transparent")});`;
+  } else if (bgType === "image" && p.bgImage) {
+    bg = `background-image:url(${esc(p.bgImage as string)});`
+      + `background-size:${esc((p.bgSize as string) || "cover")};`
+      + `background-position:${esc((p.bgPos as string) || "center center")};`
+      + `background-repeat:${esc((p.bgRepeat as string) || "no-repeat")};`
+      + (p.bgFixed ? "background-attachment:fixed;" : "");
+  } else if (bgType === "video") {
+    bg = `background-color:${esc((p.bgColor as string) || "#000")};`;
+    if (p.bgVideo) {
+      videoEl = `<video autoplay${p.bgVideoLoop !== false ? " loop" : ""}${p.bgVideoMute !== false ? " muted" : ""} playsinline src="${esc(p.bgVideo as string)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0"></video>`;
+    }
+  }
+
+  // Image overlay (from SectionStyleFields).
+  const overlay = (bgType === "image" && p.overlayType === "color")
+    ? `<div style="position:absolute;inset:0;background:${esc((p.overlayColor as string) || "#000000")};opacity:${(Number(p.overlayOpacity ?? 50)) / 100};z-index:0;pointer-events:none"></div>`
+    : "";
+
+  // Border (from SectionStyleFields).
+  const borderCss = (p.borderStyle && p.borderStyle !== "none")
+    ? `border:${Number(p.borderWidth ?? 1)}px ${esc(p.borderStyle as string)} ${esc((p.borderColor as string) || "#e5e7eb")};`
+    : "";
+  const radiusCss = p.borderRadius ? `border-radius:${Number(p.borderRadius)}px;` : "";
+
   const maxW = p.contentWidth === "boxed" ? `max-width:${p.containerWidth ?? 1140}px;margin-left:auto;margin-right:auto;` : "";
-  return `<section style="position:relative;overflow:hidden;${bg}${minH}padding:${pt}px ${pr}px ${pb}px ${pl}px;margin:${mt}px ${mr}px ${mb}px ${ml}px;box-sizing:border-box"><div class="pb-sec-inner" style="${maxW}width:100%;padding:0 24px;box-sizing:border-box">${inner}</div></section>`;
+  return `<section style="position:relative;overflow:hidden;${bg}${borderCss}${radiusCss}${minH}padding:${pt}px ${pr}px ${pb}px ${pl}px;margin:${mt}px ${mr}px ${mb}px ${ml}px;box-sizing:border-box">${videoEl}${overlay}<div class="pb-sec-inner" style="position:relative;z-index:1;${maxW}width:100%;padding:0 24px;box-sizing:border-box">${inner}</div></section>`;
 }
 
 // Centered section heading (title + subtitle) shared by section templates.
@@ -1316,10 +1367,10 @@ function renderSectionAbout(p: Props): string {
   const imageRight = p.imagePosition === "right";
   const badge = esc((p.badge as string) || "");
   const subtitle = esc((p.subtitle as string) || "");
-  const title = esc((p.title as string) || "Who We Are");
-  const description = esc((p.description as string) || "");
+  const title = esc((p.title as string) || "");
+  const descriptionRaw = (p.description as string) || "";
   const buttonLabel = esc((p.buttonLabel as string) || "");
-  const buttonUrl = esc((p.buttonUrl as string) || "#");
+  const buttonUrl = esc((p.buttonUrl as string) || "");
   const imageUrl = esc((p.imageUrl as string) || "");
   const imageAlt = esc((p.imageAlt as string) || "");
   const titleColor = esc((p.titleColor as string) || "#111827");
@@ -1327,20 +1378,49 @@ function renderSectionAbout(p: Props): string {
   const buttonBg = esc((p.buttonBg as string) || "#005bd3");
   const buttonTextColor = esc((p.buttonTextColor as string) || "#ffffff");
 
-  const textCol = `<div style="display:flex;flex-direction:column;justify-content:center">`
-    + (badge ? `<span style="display:inline-block;align-self:flex-start;background:#005bd3;color:#fff;font-size:12px;font-weight:700;padding:3px 12px;border-radius:4px;margin-bottom:16px;letter-spacing:0.04em">${badge}</span>` : "")
-    + (subtitle ? `<p style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:${buttonBg};margin:0 0 8px">${subtitle}</p>` : "")
-    + `<h2 style="font-size:clamp(1.5rem,3vw,2.25rem);font-weight:800;color:${titleColor};line-height:1.2;margin:0 0 16px">${title}</h2>`
-    + (description ? `<p style="font-size:1rem;color:${textColor};line-height:1.7;margin:0 0 24px">${description}</p>` : "")
-    + (buttonLabel ? `<a href="${buttonUrl}" style="display:inline-block;align-self:flex-start;background:${buttonBg};color:${buttonTextColor};padding:12px 28px;border-radius:6px;font-weight:700;font-size:15px;text-decoration:none">${buttonLabel}</a>` : "")
+  // Typography
+  const ff = (v: any) => (v && v !== "inherit" ? `font-family:${esc(String(v))};` : "");
+  const badgeColor = esc((p.badgeColor as string) || "#ffffff");
+  const badgeBg = esc((p.badgeBg as string) || (p.buttonBg as string) || "#005bd3");
+  const badgeFS = Number(p.badgeFontSize ?? 12);
+  const badgeFW = esc(String(p.badgeFontWeight ?? "700"));
+  const subtitleColor = esc((p.subtitleColor as string) || buttonBg);
+  const subtitleFS = Number(p.subtitleFontSize ?? 13);
+  const subtitleFW = esc(String(p.subtitleFontWeight ?? "700"));
+  const titleFS = Number(p.titleFontSize ?? 0);
+  const titleFW = esc(String(p.titleFontWeight ?? "800"));
+  const descFS = Number(p.descFontSize ?? 16);
+  const descFW = esc(String(p.descFontWeight ?? "400"));
+  const align = String(p.textAlign ?? "text-left").replace("text-", "");
+  const itemsAlign = align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
+  const titleSize = titleFS > 0 ? `${titleFS}px` : "clamp(1.5rem,3vw,2.25rem)";
+
+  // Description: preserve paragraph breaks (blank line) and single line breaks.
+  const descHtml = descriptionRaw
+    ? descriptionRaw.split(/\n\n+/).map((para, i) => {
+        const lines = para.split(/\n/).map(esc).join("<br>");
+        return `<p style="font-size:${descFS}px;font-weight:${descFW};${ff(p.descFontFamily)}color:${textColor};line-height:1.7;margin:${i === 0 ? "0 0 1em" : "1em 0"}">${lines}</p>`;
+      }).join("")
+    : "";
+
+  const textCol = `<div style="display:flex;flex-direction:column;justify-content:center;align-items:${itemsAlign};text-align:${align}">`
+    + (badge ? `<span style="display:inline-block;background:${badgeBg};color:${badgeColor};font-size:${badgeFS}px;font-weight:${badgeFW};${ff(p.badgeFontFamily)}padding:3px 12px;border-radius:4px;margin-bottom:16px;letter-spacing:0.04em">${badge}</span>` : "")
+    + (subtitle ? `<p style="font-size:${subtitleFS}px;font-weight:${subtitleFW};${ff(p.subtitleFontFamily)}text-transform:uppercase;letter-spacing:0.06em;color:${subtitleColor};margin:0 0 8px">${subtitle}</p>` : "")
+    + (title ? `<h2 style="font-size:${titleSize};font-weight:${titleFW};${ff(p.titleFontFamily)}color:${titleColor};line-height:1.2;margin:0 0 16px">${title}</h2>` : "")
+    + (descHtml ? `<div style="margin:0 0 24px">${descHtml}</div>` : "")
+    + (buttonLabel ? `<a href="${buttonUrl || "#"}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:${buttonBg};color:${buttonTextColor};padding:12px 28px;border-radius:6px;font-weight:700;font-size:15px;text-decoration:none">${buttonLabel}</a>` : "")
     + `</div>`;
 
   const imageCol = imageUrl
     ? `<img src="${imageUrl}" alt="${imageAlt}" class="no-global-style" style="width:100%;border-radius:8px;object-fit:cover;max-height:420px;display:block" />`
     : "";
 
-  const cols = imageRight ? `${textCol}${imageCol}` : `${imageCol}${textCol}`;
-  const grid = `<div class="pb-sec-about-grid" style="display:grid;grid-template-columns:${imageUrl ? "1fr 1fr" : "1fr"};gap:clamp(24px,4vw,48px);align-items:center">${cols}</div>`;
+  const textCell = `<div class="pb-about-text">${textCol}</div>`;
+  const imageCell = `<div class="pb-about-img">${imageCol}</div>`;
+  const cols = imageRight ? `${textCell}${imageCell}` : `${imageCell}${textCell}`;
+  const mobileBottom = (p.imagePositionMobile ?? "top") === "bottom";
+  const gridClass = "pb-sec-about-grid" + (mobileBottom ? " pb-about-img-bottom" : "");
+  const grid = `<div class="${gridClass}" style="display:grid;grid-template-columns:${imageUrl ? "1fr 1fr" : "1fr"};gap:clamp(24px,4vw,48px);align-items:center">${cols}</div>`;
   return sectionShell(p, grid);
 }
 
@@ -1495,13 +1575,71 @@ function renderSectionFAQ(p: Props): string {
 // Gallery: heading + responsive image grid.
 function renderSectionGallery(p: Props): string {
   const items: any[] = Array.isArray(p.items) ? (p.items as any[]) : [];
-  const cols = Number(p.galleryColumns ?? 3);
-  const cells = items.filter((it) => it.url).map((it) =>
-    `<img src="${esc(it.url)}" alt="${esc(it.alt || "")}" class="no-global-style" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;display:block" />`
-  ).join("");
-  const heading = p.showHeading !== false ? sectionHeadingHtml(p.sectionTitle as string, p.sectionSubtitle as string) : "";
-  const grid = `<div class="pb-sec-gallery" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${Number(p.gap ?? 12)}px">${cells}</div>`;
-  return sectionShell(p, heading + grid);
+  const cols       = Number(p.galleryColumns ?? 3);
+  const colsTablet = Number(p.galleryColumnsTablet ?? Math.min(cols, 3));
+  const colsMobile = Number(p.galleryColumnsMobile ?? Math.min(cols, 2));
+  const gap        = Number(p.gap ?? 12);
+  const rowGap     = p.rowGap != null ? Number(p.rowGap) : gap;
+  const colGap     = p.colGap != null ? Number(p.colGap) : gap;
+
+  const ar  = (p.aspectRatio as string) || "square";
+  const fit = esc((p.objectFit as string) || "cover");
+  const br  = p.imageBorderRadius != null ? Number(p.imageBorderRadius) : 8;
+  const shadowCss = p.imageShadow ? "box-shadow:0 4px 16px rgba(0,0,0,0.12);" : "";
+  const hoverEffect  = (p.hoverEffect as string) || "none";
+  const layoutType   = (p.layoutType as string) || "grid";
+  const isMasonry    = layoutType === "masonry";
+  const showCaption  = !!p.showCaption;
+  const captionColor = esc((p.captionColor as string) || "#6b7280");
+
+  const aspectMap: Record<string, string> = { square: "1/1", portrait: "3/4", landscape: "4/3", original: "auto" };
+  const arCss    = aspectMap[ar] ?? "1/1";
+  // Masonry keeps natural image height so it ignores the aspect ratio.
+  const arStyle  = (!isMasonry && arCss !== "auto") ? `aspect-ratio:${arCss};` : "";
+
+  // Typography
+  const ff = (v: any) => (v && v !== "inherit" ? `font-family:${esc(String(v))};` : "");
+  const align = String(p.textAlign ?? "text-center").replace("text-", "");
+
+  const uid = `pbg-${((p.cssId || p.id || "x") as string).slice(-6)}`;
+
+  const gridCss = isMasonry
+    ? `#${uid} .pb-gal-grid{column-count:${cols};column-gap:${colGap}px;}
+       #${uid} .pb-gal-cell{break-inside:avoid;margin-bottom:${rowGap}px;}
+       @media(max-width:767px){#${uid} .pb-gal-grid{column-count:${colsMobile};}}
+       @media(min-width:768px) and (max-width:1023px){#${uid} .pb-gal-grid{column-count:${colsTablet};}}`
+    : `#${uid} .pb-gal-grid{display:grid;grid-template-columns:repeat(${cols},1fr);row-gap:${rowGap}px;column-gap:${colGap}px;}
+       @media(max-width:767px){#${uid} .pb-gal-grid{grid-template-columns:repeat(${colsMobile},1fr)!important;}}
+       @media(min-width:768px) and (max-width:1023px){#${uid} .pb-gal-grid{grid-template-columns:repeat(${colsTablet},1fr)!important;}}`;
+
+  const scopedCss = `<style>
+    #${uid} .pb-gal-item{position:relative;overflow:hidden;border-radius:${br}px;${shadowCss}}
+    #${uid} .pb-gal-item img{width:100%;${arStyle}object-fit:${fit};display:block;transition:transform .3s ease,filter .3s ease,opacity .3s ease;}
+    ${hoverEffect === "zoom" ? `#${uid} .pb-gal-item:hover img{transform:scale(1.08);}` : ""}
+    ${hoverEffect === "fade" ? `#${uid} .pb-gal-item:hover img{opacity:0.75;}` : ""}
+    ${gridCss}
+  </style>`;
+
+  const cells = items.map((it) => {
+    if (!it.url) return "";
+    const imgTag = `<img src="${esc(it.url as string)}" alt="${esc((it.alt as string) || "")}" loading="lazy" class="no-global-style" />`;
+    const captionHtml = showCaption && it.caption
+      ? `<div style="font-size:13px;color:${captionColor};margin-top:6px;text-align:${align}">${esc(it.caption as string)}</div>`
+      : "";
+    return `<div class="pb-gal-cell"><div class="pb-gal-item">${imgTag}</div>${captionHtml}</div>`;
+  }).join("");
+
+  const heading = (p.showHeading !== false && p.sectionTitle)
+    ? `<h2 style="text-align:${align};font-size:${Number(p.headingFontSize ?? 36)}px;font-weight:${esc(String(p.headingFontWeight ?? "800"))};${ff(p.headingFontFamily)}color:${esc((p.headingColor as string) || "#111827")};line-height:1.2;margin:0 0 8px">${esc(p.sectionTitle as string)}</h2>`
+    : "";
+
+  const descHtml = (p.showDescription && p.sectionDescription)
+    ? `<p style="text-align:${align};font-size:${Number(p.descFontSize ?? 16)}px;font-weight:${esc(String(p.descFontWeight ?? "400"))};${ff(p.descFontFamily)}line-height:1.6;color:${esc((p.descriptionColor as string) || "#6b7280")};margin:0 0 28px;${align === "center" ? "max-width:720px;margin-left:auto;margin-right:auto;" : ""}">${esc(p.sectionDescription as string)}</p>`
+    : "";
+
+  const grid = `<div id="${uid}"><div class="pb-gal-grid">${cells}</div></div>`;
+
+  return scopedCss + sectionShell(p, heading + descHtml + grid);
 }
 
 // Logo Row: optional label + grayscale logo grid.
@@ -1520,18 +1658,41 @@ function renderSectionLogos(p: Props): string {
 // Carousel: optional marquee bar + heading + product-style cards.
 function renderSectionCarousel(p: Props): string {
   const items: any[] = Array.isArray(p.items) ? (p.items as any[]) : [];
-  const cols = Number(p.cardCount ?? 3);
+  const cols       = Number(p.cardCount ?? 3);
+  const accent     = esc((p.accentColor as string) || "#005bd3");
+  const br         = Number(p.cardRadius ?? 12);
+  const imgRatio   = esc((p.imgRatio as string) || "4/3");
+  const showPrice  = p.showPrice !== false;
+  const showBadge  = p.showBadge !== false;
+
   const marquee = p.showMarquee !== false
     ? `<div style="background:${esc((p.marqueeBg as string) || "#1a1a1a")};padding:10px 0;overflow:hidden"><div style="display:flex;gap:40px;color:${esc((p.marqueeColor as string) || "#fff")};font-size:13px;font-weight:500;white-space:nowrap;padding:0 24px">${[0, 1, 2].map(() => `<span>${esc((p.marqueeText as string) || "Announcement · ")}</span>`).join("")}</div></div>`
     : "";
+
   const cards = items.map((it) => {
-    const img = it.imageUrl
-      ? `<img src="${esc(it.imageUrl)}" alt="${esc(it.title || "")}" style="width:100%;aspect-ratio:4/3;object-fit:cover;display:block" />`
-      : `<div style="width:100%;aspect-ratio:4/3;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:24px">🖼</div>`;
-    return `<div style="background:#fff;border:1px solid #eef2f7;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04)">${img}<div style="padding:16px"><div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:6px">${esc(it.title || "Card title")}</div>${it.text ? `<p style="font-size:14px;color:#6b7280;line-height:1.5;margin:0 0 12px">${esc(it.text)}</p>` : ""}${it.buttonLabel ? `<a href="${esc(it.buttonUrl || "#")}" style="display:inline-block;color:#005bd3;font-weight:700;font-size:14px;text-decoration:none">${esc(it.buttonLabel)} →</a>` : ""}</div></div>`;
+    const imgHtml = it.imageUrl
+      ? `<img src="${esc(it.imageUrl)}" alt="${esc(it.imageAlt || it.title || "")}" style="width:100%;aspect-ratio:${imgRatio};object-fit:cover;display:block" />`
+      : `<div style="width:100%;aspect-ratio:${imgRatio};background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div>`;
+    const badgeHtml = showBadge && it.badge
+      ? `<span style="position:absolute;top:10px;left:10px;z-index:1;background:${accent};color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px">${esc(it.badge)}</span>`
+      : "";
+    const priceHtml = showPrice && it.price
+      ? `<div style="font-size:14px;font-weight:600;color:${accent};margin-bottom:8px">${esc(it.currency || "$")}${esc(it.price)}</div>`
+      : "";
+    const descHtml = it.text
+      ? `<p style="font-size:13px;color:#6b7280;line-height:1.5;margin:0 0 12px">${esc(it.text)}</p>`
+      : "";
+    const btnHtml = it.buttonLabel
+      ? `<a href="${esc(it.buttonUrl || "#")}" style="display:inline-block;color:${accent};font-weight:700;font-size:13px;text-decoration:none">${esc(it.buttonLabel)} →</a>`
+      : "";
+    return `<div style="position:relative;background:#fff;border:1px solid #eef2f7;border-radius:${br}px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04)">${badgeHtml}${imgHtml}<div style="padding:16px"><div style="font-size:15px;font-weight:700;color:#111827;margin-bottom:4px">${esc(it.title || "Card title")}</div>${priceHtml}${descHtml}${btnHtml}</div></div>`;
   }).join("");
+
   const grid = `<div class="pb-sec-cards" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:20px">${cards}</div>`;
-  return marquee + sectionShell(p, (p.sectionTitle ? sectionHeadingHtml(p.sectionTitle as string) : "") + grid);
+  const emptyHint = items.length === 0
+    ? `<p style="text-align:center;color:#9ca3af;font-size:14px;padding:40px 0">No products added yet — select products in the editor.</p>`
+    : "";
+  return marquee + sectionShell(p, (p.sectionTitle ? sectionHeadingHtml(p.sectionTitle as string) : "") + (items.length > 0 ? grid : emptyHint));
 }
 
 // Media Carousel: heading + large main image + thumbnail strip.
@@ -1599,7 +1760,9 @@ function renderDivider(p: Props): string {
   const color = esc((p.lineColor as string) || "#e5e7eb");
   const th = Number(p.thickness ?? 1);
   const lineStyle = (p.lineStyle as string) || "solid";
-  const width = p.lineWidthVal != null ? `${p.lineWidthVal}${(p.lineWidthUnit as string) || "%"}` : esc((p.lineWidth as string) || "100%");
+  // Guard against empty/invalid width values which the browser ignores.
+  const wNum = Number(p.lineWidthVal);
+  const width = Number.isFinite(wNum) && wNum > 0 ? `${wNum}${(p.lineWidthUnit as string) || "px"}` : esc((p.lineWidth as string) || "100%");
   const gap = Number(p.gap ?? 16) || 16;
   const align = (p.alignment as string) || "center";
   const justify = flexJustify(align);
@@ -1652,15 +1815,15 @@ function renderDivider(p: Props): string {
     const imgUrl = ((p.elementImage as string) || "").trim();
     const imgW = Number(p.elementImageWidth ?? 40);
     const imgH = Number(p.elementImageHeight ?? 40);
-    const hasContent = elType === "text" ? true : elType === "image" ? !!imgUrl : !!iconVal;
+    const hasContent = elType === "text" ? !!((p.elementText as string) || "").trim() : elType === "image" ? !!imgUrl : !!iconVal;
     if (hasContent) {
       const elSpacing = `${Number(p.elementSpacing ?? 12)}px`;
       let elContent: string;
       if (elType === "text") {
-        elContent = `<span style="font-size:${p.elementFontSize ?? 14}px;color:${esc((p.elementTextColor as string) || color)};white-space:nowrap;line-height:1;">${esc((p.elementText as string) || "OR")}</span>`;
+        elContent = `<span style="font-size:${p.elementFontSize ?? 14}px;color:${esc((p.elementTextColor as string) || color)};white-space:nowrap;line-height:1;">${esc((p.elementText as string) || "")}</span>`;
       } else if (elType === "image") {
         const imgR = Number(p.elementImageRadius ?? 0);
-        elContent = `<img src="${imgUrl.replace(/"/g, "&quot;")}" alt="" class="no-global-style" style="width:${imgW}px;height:${imgH}px;object-fit:contain;display:inline-block;vertical-align:middle;${imgR > 0 ? `border-radius:${imgR}px;` : ""}" />`;
+        elContent = `<div style="width:${imgW}px;height:${imgH}px;overflow:hidden;display:inline-block;vertical-align:middle;${imgR > 0 ? `border-radius:${imgR}px;` : ""}"><img src="${imgUrl.replace(/"/g, "&quot;")}" alt="" class="no-global-style" style="width:100%;height:100%;object-fit:cover;display:block;" /></div>`;
       } else {
         elContent = `<span style="font-size:${p.iconSize ?? 20}px;color:${esc((p.iconColor as string) || color)};line-height:1;display:inline-block;">${esc(iconVal)}</span>`;
       }
@@ -1673,10 +1836,11 @@ function renderDivider(p: Props): string {
       else if (elPos === "right") inner = `<div style="display:flex;align-items:center;width:${width};">${lineLeft}${elDiv}</div>`;
       else                        inner = `<div style="display:flex;align-items:center;width:${width};">${lineLeft}${elDiv}${lineRight}</div>`;
     } else {
-      inner = buildLine(`width:${width};`);
+      inner = `<div style="display:flex;align-items:center;width:100%;">${buildLine("flex:1;")}</div>`;
     }
   } else {
-    inner = buildLine(`width:${width};`);
+    // No icon/text element → clean full-width divider line.
+    inner = `<div style="display:flex;align-items:center;width:100%;">${buildLine("flex:1;")}</div>`;
   }
 
   return `<div style="${spacing}padding-top:${gap}px;padding-bottom:${gap}px;display:flex;justify-content:${justify};align-items:center;${advBgStyle(p)}">${inner}</div>`;
@@ -1964,6 +2128,16 @@ function renderProgressBar(p: Props): string {
     ? `;background-image:repeating-linear-gradient(45deg,transparent,transparent 8px,rgba(255,255,255,0.2) 8px,rgba(255,255,255,0.2) 16px)`
     : "";
 
+  const animFill = (p.animation as string) === "fill";
+  // Pure-CSS animation: Shopify strips <script> from page.content, so JS-driven
+  // fills never run on the storefront. CSS @keyframes survive sanitization and,
+  // critically, the bar ENDS at the target value even if the animation is
+  // skipped/unsupported (the keyframe's 100% state holds). Each bar gets a
+  // unique animation name so concurrent bars don't collide.
+  const uid = `pbq-${Math.abs(String(p.id ?? "").split("").reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0)).toString(36)}`;
+  const keyframes: string[] = [];
+  let animSeq = 0;
+
   // ── line helper ──────────────────────────────────────────────────────────────
   // Heights are set in explicit px (not height:100%) and reinforced with
   // min-height + a guard class so Shopify themes that reset `height:auto` on
@@ -1974,7 +2148,14 @@ function renderProgressBar(p: Props): string {
     const header = (rowLabel || showPct)
       ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;line-height:1.4">${headerLabel}${headerPct}</div>`
       : "";
-    const fillDiv = `<div class="pb-bar-fill" style="display:block;height:${lineH}px;min-height:${lineH}px;width:${rowPct}%;max-width:100%;background:${fillBg}${stripedOverlay};border-radius:${lineR}px;box-sizing:border-box"></div>`;
+    let fillExtra = `width:${rowPct}%;`;
+    if (animFill) {
+      const an = `${uid}-l${animSeq++}`;
+      keyframes.push(`@keyframes ${an}{from{width:0%}to{width:${rowPct}%}}`);
+      // animation holds the 100% (target) state via forwards + the static width fallback above
+      fillExtra = `width:${rowPct}%;animation:${an} 900ms ease forwards;`;
+    }
+    const fillDiv = `<div class="pb-bar-fill" style="display:block;height:${lineH}px;min-height:${lineH}px;${fillExtra}max-width:100%;background:${fillBg}${stripedOverlay};border-radius:${lineR}px;box-sizing:border-box"></div>`;
     const track   = `<div class="pb-bar-track" style="display:block;position:relative;height:${lineH}px;min-height:${lineH}px;width:100%;background:${tc};border-radius:${lineR}px;overflow:hidden;box-sizing:border-box;line-height:0;font-size:0">${fillDiv}</div>`;
     const mbStyle = mb ? `margin-bottom:${mb}px;` : "";
     return `<div style="${mbStyle}display:block">${header}${track}</div>`;
@@ -1988,7 +2169,13 @@ function renderProgressBar(p: Props): string {
     const circ = 2 * Math.PI * r;
     const dash = (disp / 100) * circ;
     const rest = circ - dash;
-    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" style="transform:rotate(-90deg)"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${tc}" stroke-width="${thick}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${fc}" stroke-width="${thick}" stroke-linecap="round" stroke-dasharray="${dash} ${rest}"/></svg>`;
+    let styleAttr = "";
+    if (animFill) {
+      const an = `${uid}-c${animSeq++}`;
+      keyframes.push(`@keyframes ${an}{from{stroke-dasharray:0 ${circ}}to{stroke-dasharray:${dash} ${rest}}}`);
+      styleAttr = ` style="animation:${an} 900ms ease forwards"`;
+    }
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" style="transform:rotate(-90deg)"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${tc}" stroke-width="${thick}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${fc}" stroke-width="${thick}" stroke-linecap="round" stroke-dasharray="${dash} ${rest}"${styleAttr}/></svg>`;
   };
 
   // ── semi-circle SVG helper (top half arc) ────────────────────────────────────
@@ -1998,16 +2185,24 @@ function renderProgressBar(p: Props): string {
     const dash = (disp / 100) * halfCirc;
     const halfH = sz / 2 + thick;
     const x1 = thick / 2, x2 = sz - thick / 2, cy = sz / 2;
-    return `<svg width="${sz}" height="${halfH}" viewBox="0 0 ${sz} ${halfH}" style="overflow:visible;display:block"><path d="M ${x1} ${cy} A ${r} ${r} 0 0 1 ${x2} ${cy}" fill="none" stroke="${tc}" stroke-width="${thick}" stroke-linecap="round"/><path d="M ${x1} ${cy} A ${r} ${r} 0 0 1 ${x2} ${cy}" fill="none" stroke="${fc}" stroke-width="${thick}" stroke-linecap="round" stroke-dasharray="${dash} ${halfCirc}"/></svg>`;
+    let styleAttr = "";
+    if (animFill) {
+      const an = `${uid}-s${animSeq++}`;
+      keyframes.push(`@keyframes ${an}{from{stroke-dasharray:0 ${halfCirc}}to{stroke-dasharray:${dash} ${halfCirc}}}`);
+      styleAttr = ` style="animation:${an} 900ms ease forwards"`;
+    }
+    return `<svg width="${sz}" height="${halfH}" viewBox="0 0 ${sz} ${halfH}" style="overflow:visible;display:block"><path d="M ${x1} ${cy} A ${r} ${r} 0 0 1 ${x2} ${cy}" fill="none" stroke="${tc}" stroke-width="${thick}" stroke-linecap="round"/><path d="M ${x1} ${cy} A ${r} ${r} 0 0 1 ${x2} ${cy}" fill="none" stroke="${fc}" stroke-width="${thick}" stroke-linecap="round" stroke-dasharray="${dash} ${halfCirc}"${styleAttr}/></svg>`;
   };
 
   // Structural class only — puck-hide-* are injected centrally by the dispatcher.
   const cssClass = p.cssClass ? String(p.cssClass) : "";
   const classAttr = cssClass ? ` class="${cssClass}"` : "";
 
-  // Every type shares this outer wrapper.
+  // Every type shares this outer wrapper. Keyframes are collected while building
+  // `inner`, so emit the <style> here (after inner is built) to drive the CSS
+  // fill-on-load animation without any JS.
   const wrap = (inner: string) =>
-    `<div${classAttr} style="display:block;box-sizing:border-box;width:100%;${spacing}${alignCss}${advBgStyle(p)}">${inner}</div>`;
+    `${keyframes.length ? `<style>${keyframes.join("")}</style>` : ""}<div${classAttr} style="display:block;box-sizing:border-box;width:100%;${spacing}${alignCss}${advBgStyle(p)}">${inner}</div>`;
 
   // ── type: line ───────────────────────────────────────────────────────────────
   if (pbType === "line") {
@@ -2048,7 +2243,13 @@ function renderProgressBar(p: Props): string {
     const steps = Array.from({ length: total }, (_, i) => {
       const on = i < active;
       const numHtml = showNums ? `<span style="font-size:${Math.max(9, lineH - 3)}px;color:${on ? "#fff" : lc}">${i + 1}</span>` : "";
-      return `<div style="flex:1;height:${lineH}px;min-height:${lineH}px;border-radius:${lineR}px;background:${on ? fc : tc};display:flex;align-items:center;justify-content:center;box-sizing:border-box">${numHtml}</div>`;
+      let animExtra = "";
+      if (animFill && on) {
+        const an = `${uid}-st${animSeq++}`;
+        keyframes.push(`@keyframes ${an}{from{background-color:${tc}}to{background-color:${fc}}}`);
+        animExtra = `animation:${an} 400ms ease ${i * 100}ms forwards;`;
+      }
+      return `<div style="flex:1;height:${lineH}px;min-height:${lineH}px;border-radius:${lineR}px;background:${on ? fc : tc};display:flex;align-items:center;justify-content:center;box-sizing:border-box;${animExtra}">${numHtml}</div>`;
     }).join("");
     const pctHtml = showPct ? `<div style="font-size:${pfs}px;color:${pc};margin-top:6px;display:block">${Math.round((active / total) * 100)}%</div>` : "";
     return wrap(`${labelHtml}<div style="display:flex;gap:6px;align-items:stretch">${steps}</div>${pctHtml}`);
@@ -2187,7 +2388,7 @@ function renderBlockQuote(p: Props): string {
 
   const bqStyle = `margin:0;position:relative;background:${bgColor || "transparent"};${bgColor ? "padding:24px;border-radius:8px;" : ""}${borderMap[borderType] || ""}`;
 
-  return `<div style="${spacing}text-align:${alignment};${wrapExtraStyle}">${iconHtml}<blockquote style="${bqStyle}">${quoteEl}${authorEl}</blockquote></div>`;
+  return `<div style="${spacing}text-align:${alignment};${wrapExtraStyle}"><blockquote style="${bqStyle}">${iconHtml}${quoteEl}${authorEl}</blockquote></div>`;
 }
 
 // ─── Main render dispatcher ───────────────────────────────────────────────────
@@ -2323,6 +2524,46 @@ function renderBlock(block: Block, zones: Zones): string {
  */
 // Responsive CSS injected once per page — targets class names added to each section's grid
 // container. Uses !important so it overrides the inline styles written by each render function.
+const PB_ANIM_SCRIPT = `<script data-pb="anim">(function(){
+  function fire(el){
+    var t=el.getAttribute('data-pb-anim');
+    if(t==='line'){
+      el.style.width=el.getAttribute('data-pb-target')+'%';
+    } else if(t==='circle'||t==='semicircle'){
+      var circ=parseFloat(el.getAttribute('data-pb-circ'));
+      var pct=parseFloat(el.getAttribute('data-pb-target'));
+      var dash=(pct/100)*circ;
+      el.setAttribute('stroke-dasharray',dash+' '+circ);
+    } else if(t==='step'){
+      var on=parseInt(el.getAttribute('data-pb-step-on'),10);
+      var i=parseInt(el.getAttribute('data-pb-step-i'),10);
+      el.style.backgroundColor=i<on?el.getAttribute('data-pb-fc'):el.getAttribute('data-pb-tc');
+    }
+  }
+  function getAnchor(el){
+    // walk up to a sizeable ancestor so IntersectionObserver has an area to measure
+    return el.parentElement||el;
+  }
+  var seen=new WeakSet();
+  if('IntersectionObserver' in window){
+    var obs=new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(!e.isIntersecting)return;
+        obs.unobserve(e.target);
+        var fills=e.target.querySelectorAll?e.target.querySelectorAll('[data-pb-anim]'):[e.target];
+        if(!fills.length&&e.target.hasAttribute('data-pb-anim'))fills=[e.target];
+        setTimeout(function(){fills.forEach(fire);},100);
+      });
+    },{threshold:0.1});
+    document.querySelectorAll('[data-pb-anim]').forEach(function(el){
+      var anchor=getAnchor(el);
+      if(!seen.has(anchor)){seen.add(anchor);obs.observe(anchor);}
+    });
+  } else {
+    setTimeout(function(){document.querySelectorAll('[data-pb-anim]').forEach(fire);},100);
+  }
+}());<\/script>`;
+
 const RESPONSIVE_CSS = `<style data-pb="responsive">
 *{box-sizing:border-box}
 img{max-width:100%;height:auto}
@@ -2337,6 +2578,8 @@ img{max-width:100%;height:auto}
 @media(max-width:767px){
 .pb-grid-2col{grid-template-columns:1fr!important;gap:24px!important}
 .pb-sec-about-grid{grid-template-columns:1fr!important;gap:24px!important}
+.pb-about-img-bottom .pb-about-img{order:2!important}
+.pb-about-img-bottom .pb-about-text{order:1!important}
 .pb-sec-cards{grid-template-columns:1fr!important;gap:16px!important}
 .pb-sec-gallery{grid-template-columns:repeat(2,1fr)!important}
 .pb-sec-logos{grid-template-columns:repeat(3,1fr)!important;gap:16px!important}
@@ -2368,12 +2611,14 @@ export function renderPuckToHtml(data: PuckData): string {
   const above = (zones["root:above-header"] ?? zones["above-header"] ?? []) as Block[];
   const below = (zones["root:below-footer"] ?? zones["below-footer"] ?? []) as Block[];
 
-  return [
-    RESPONSIVE_CSS,
+  const blocks = [
     ...above.map((b) => renderBlock(b, zones)),
     ...content.map((b) => renderBlock(b, zones)),
     ...below.map((b) => renderBlock(b, zones)),
-  ].join("\n");
+  ];
+  const html = blocks.join("\n");
+  const needsAnim = html.includes('data-pb-anim=');
+  return [RESPONSIVE_CSS, html, needsAnim ? PB_ANIM_SCRIPT : ""].join("\n");
 }
 
 /**
@@ -2744,12 +2989,14 @@ export function renderPageContentOnly(data: PuckData): string {
   const above = (zones["root:above-header"] ?? zones["above-header"] ?? []) as Block[];
   const below = (zones["root:below-footer"] ?? zones["below-footer"] ?? []) as Block[];
 
-  return [
-    RESPONSIVE_CSS,
+  const blocks = [
     ...above.map((b) => renderBlock(b, zones)),
     ...content.map((b) => renderBlock(b, zones)),
     ...below.map((b) => renderBlock(b, zones)),
-  ].join("\n");
+  ];
+  const html = blocks.join("\n");
+  const needsAnim = html.includes('data-pb-anim=');
+  return [RESPONSIVE_CSS, html, needsAnim ? PB_ANIM_SCRIPT : ""].join("\n");
 }
 
 /**

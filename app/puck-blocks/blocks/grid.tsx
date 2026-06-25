@@ -9,7 +9,6 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
-  ResponsiveSpacingField,
   InlineSelect,
   EditorHideOverlay,
   buildResponsiveSpacingCss,
@@ -33,7 +32,7 @@ const GridBlockComponent = {
             const idx = (items as any[]).findIndex((it: any) => it.props?.id === selectedItem.props?.id);
             if (idx !== -1) { destinationZone = zone; destinationIndex = idx; break; }
           }
-          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } });
+          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } , ui: appState.ui });
         };
         return (
           <BlockTabBar blockKey="GridBlock">
@@ -64,8 +63,6 @@ const GridBlockComponent = {
                     <TabSection title="Spacing" />
                     <FourSideField label="Margin (px)" value={props.advMargin} onChange={(v) => set("advMargin", v)} />
                     <FourSideField label="Padding (px)" value={props.advPadding ?? { top: 0, right: 0, bottom: 0, left: 0 }} onChange={(v) => set("advPadding", v)} />
-                    <TabSection title="Responsive Spacing" />
-                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />

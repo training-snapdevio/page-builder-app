@@ -11,7 +11,6 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
-  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   StackedTextareaField,
@@ -37,7 +36,7 @@ const StarRatingComponent = {
             const idx = (items as any[]).findIndex((it: any) => it.props?.id === selectedItem.props?.id);
             if (idx !== -1) { destinationZone = zone; destinationIndex = idx; break; }
           }
-          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } });
+          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } , ui: appState.ui });
         };
         const bgType = props.advBgType ?? "none";
         return (
@@ -75,8 +74,6 @@ const StarRatingComponent = {
                     <TabSection title="Background" />
                     <InlineSelect label="Type" value={bgType} onChange={(v) => set("advBgType", v)} options={[{ value: "none", label: "None" }, { value: "color", label: "Color" }]} />
                     {bgType === "color" && <ColorPickerField label="Color" value={props.advBgColor ?? ""} onChange={(v) => set("advBgColor", v)} />}
-                    <TabSection title="Responsive Spacing" />
-                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />

@@ -13,7 +13,6 @@ import {
   SliderNumberField,
   EditorHideOverlay,
   buildResponsiveSpacingCss,
-  ResponsiveSpacingField,
 } from "@/puck-blocks/shared";
 
 export const MarqueeBarComponent = {
@@ -34,7 +33,7 @@ export const MarqueeBarComponent = {
             const idx = (items as any[]).findIndex((it: any) => it.props?.id === selectedItem.props?.id);
             if (idx !== -1) { destinationZone = zone; destinationIndex = idx; break; }
           }
-          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } });
+          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } , ui: appState.ui });
         };
         return (
           <BlockTabBar blockKey="MarqueeBar">
@@ -94,8 +93,6 @@ export const MarqueeBarComponent = {
                 )}
                 {tab === "advanced" && (
                   <>
-                    <TabSection title="Responsive Spacing" />
-                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet"  value={!!props.hideTablet}  onChange={(v) => set("hideTablet", v)} />

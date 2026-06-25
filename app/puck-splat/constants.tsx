@@ -1164,6 +1164,13 @@ export const SAVED_BLOCKS_REFRESH_EVENT = "saved-blocks:refresh";
 // canvas must not scroll so no scrollbar appears in the gray gutter.
 export const CANVAS_SCROLL_STYLES = `
   ._PuckCanvas_t6s9b_1 { overflow: hidden !important; }
+  /* Pin the canvas inner + root to exactly the canvas height so the iframe
+     fills the visible area and scrolls internally. Without this, leftover
+     auto-growth rules let the root extend past the canvas bottom, which the
+     overflow:hidden canvas then clips — cutting off the iframe's scrollbar at
+     the bottom while the top stays inset by the canvas padding. */
+  ._PuckCanvas-inner_t6s9b_33 { height: 100% !important; min-height: 0 !important; }
+  ._PuckCanvas-root_t6s9b_42 { height: 100% !important; min-height: 0 !important; }
 `;
 
 // ─── Iframe page scrollbar ────────────────────────────────────────────────────

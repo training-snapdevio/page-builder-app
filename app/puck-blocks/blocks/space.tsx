@@ -30,7 +30,7 @@ const SpaceComponent = {
             const idx = (items as any[]).findIndex((it: any) => it.props?.id === selectedItem.props?.id);
             if (idx !== -1) { destinationZone = zone; destinationIndex = idx; break; }
           }
-          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } });
+          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } , ui: appState.ui });
         };
 
         return (

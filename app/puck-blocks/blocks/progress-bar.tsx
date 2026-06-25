@@ -13,7 +13,6 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
-  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
@@ -157,8 +156,6 @@ const ProgressBarComponent = {
                     <TabSection title="Background" />
                     <InlineSelect label="Type" value={bgType} onChange={(v) => set("advBgType", v)} options={[{ value: "none", label: "None" }, { value: "color", label: "Color" }]} />
                     {bgType === "color" && <ColorPickerField label="Color" value={props.advBgColor ?? ""} onChange={(v) => set("advBgColor", v)} />}
-                    <TabSection title="Responsive Spacing" />
-                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -191,16 +188,45 @@ const ProgressBarComponent = {
     const { label, value, showPercentage, pbType, fillStyle, fillColor, gradientEnd, trackColor, lineHeight, lineRadius, circleSize, ringThickness, showLabelInside, totalSteps, activeStep, showStepNumbers, multiRows, labelFontSize, labelColor, pctFontSize, pctColor, alignment, animation, advBgType, advBgColor, advMargin, advPadding, hideDesktop, hideTablet, hideMobile, cssId, cssClass, zIndex, id, responsiveSpacing } = props;
     const pct = Math.min(100, Math.max(0, value ?? 75));
     const animFill = animation === "fill";
+    const rowData: Array<{ label: string; value: number }> = multiRows ?? [{ label: "Row 1", value: 60 }];
+    const totalStepsClamped = Math.max(1, totalSteps ?? 5);
+    const activeStepClamped = Math.min(totalStepsClamped, Math.max(0, activeStep ?? 3));
+
     const [displayed, setDisplayed] = useState(animFill ? 0 : pct);
+    const [rowDisplayed, setRowDisplayed] = useState<number[]>(() => rowData.map(r => animFill ? 0 : Math.min(100, Math.max(0, r.value))));
+    const [stepDisplayed, setStepDisplayed] = useState(animFill ? 0 : activeStepClamped);
     const ref = useRef<HTMLDivElement>(null);
+    const triggered = useRef(false);
+
     useEffect(() => {
-      if (!animFill) { setDisplayed(pct); return; }
+      triggered.current = false;
+      if (!animFill) {
+        setDisplayed(pct);
+        setRowDisplayed(rowData.map(r => Math.min(100, Math.max(0, r.value))));
+        setStepDisplayed(activeStepClamped);
+        return;
+      }
+      // reset to 0 first so the browser paints the empty state before animating
+      setDisplayed(0);
+      setRowDisplayed(rowData.map(() => 0));
+      setStepDisplayed(0);
       const el = ref.current;
       if (!el) return;
-      const obs = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setDisplayed(pct); obs.disconnect(); } }, { threshold: 0.2 });
+      let timer: ReturnType<typeof setTimeout>;
+      const fire = () => {
+        if (triggered.current) return;
+        triggered.current = true;
+        // defer so the 0-state paint commits before the transition starts
+        timer = setTimeout(() => {
+          setDisplayed(pct);
+          setRowDisplayed(rowData.map(r => Math.min(100, Math.max(0, r.value))));
+          setStepDisplayed(activeStepClamped);
+        }, 50);
+      };
+      const obs = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { fire(); obs.disconnect(); } }, { threshold: 0.1 });
       obs.observe(el);
-      return () => obs.disconnect();
-    }, [pct, animFill]);
+      return () => { obs.disconnect(); clearTimeout(timer); };
+    }, [pct, animFill, JSON.stringify(rowData), totalStepsClamped, activeStepClamped]);
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
     const fc = fillColor || "#0158ad";
     const tc = trackColor || "#e5e7eb";
@@ -320,35 +346,28 @@ const ProgressBarComponent = {
           );
         })()}
 
-        {type === "step" && (() => {
-          const total = Math.max(1, totalSteps ?? 5);
-          const active = Math.min(total, Math.max(0, activeStep ?? 3));
-          return (
-            <div>
-              {label && <div style={{ fontSize: lfs, color: lc, marginBottom: 8 }}>{label}</div>}
-              <div style={{ display: "flex", gap: 6 }}>
-                {Array.from({ length: total }, (_, i) => (
-                  <div key={i} style={{ flex: 1, height: lineHeight || 12, borderRadius: lineRadius ?? 6, backgroundColor: i < active ? fc : tc, display: "flex", alignItems: "center", justifyContent: "center", transition: animFill ? "background-color 400ms ease" : undefined }}>
-                    {showStepNumbers && <span style={{ fontSize: Math.max(9, (lineHeight || 12) - 3), color: i < active ? "#fff" : lc }}>{i + 1}</span>}
-                  </div>
-                ))}
-              </div>
-              {showPercentage && <div style={{ fontSize: pfs, color: pc, marginTop: 6 }}>{Math.round((active / total) * 100)}%</div>}
+        {type === "step" && (
+          <div>
+            {label && <div style={{ fontSize: lfs, color: lc, marginBottom: 8 }}>{label}</div>}
+            <div style={{ display: "flex", gap: 6 }}>
+              {Array.from({ length: totalStepsClamped }, (_, i) => (
+                <div key={i} style={{ flex: 1, height: lineHeight || 12, borderRadius: lineRadius ?? 6, backgroundColor: i < stepDisplayed ? fc : tc, display: "flex", alignItems: "center", justifyContent: "center", transition: animFill ? `background-color 400ms ease ${i * 100}ms` : undefined }}>
+                  {showStepNumbers && <span style={{ fontSize: Math.max(9, (lineHeight || 12) - 3), color: i < activeStepClamped ? "#fff" : lc }}>{i + 1}</span>}
+                </div>
+              ))}
             </div>
-          );
-        })()}
+            {showPercentage && <div style={{ fontSize: pfs, color: pc, marginTop: 6 }}>{Math.round((activeStepClamped / totalStepsClamped) * 100)}%</div>}
+          </div>
+        )}
 
-        {type === "multirow" && (() => {
-          const rowData: Array<{ label: string; value: number }> = multiRows ?? [{ label: "Row 1", value: 60 }];
-          return (
-            <div>
-              {rowData.map((row, i) => {
-                const rowPct = Math.min(100, Math.max(0, row.value));
-                return renderLine(row.label, rowPct, rowPct, i);
-              })}
-            </div>
-          );
-        })()}
+        {type === "multirow" && (
+          <div>
+            {rowData.map((row, i) => {
+              const rowPct = Math.min(100, Math.max(0, row.value));
+              return renderLine(row.label, rowPct, rowDisplayed[i] ?? 0, i);
+            })}
+          </div>
+        )}
       </div>
     );
   },

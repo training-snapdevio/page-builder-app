@@ -905,6 +905,18 @@ function PublishButton({
       return;
     }
 
+    // About section: a Button URL with no Button Label is incomplete. Block the
+    // publish silently — the error is surfaced inline at the Button Label field
+    // in the left sidebar (see Section_About content fields), not here.
+    const aboutMissingLabel = allBlocks.some(
+      (b) => b.type === "Section_About"
+        && !!(b.props?.buttonUrl ?? "").trim()
+        && !(b.props?.buttonLabel ?? "").trim()
+    );
+    if (aboutMissingLabel) {
+      return;
+    }
+
     // Client-side preflight using the same renderer the server uses so the
     // user never sees the raw "pageUpdate body failed: Content is too big"
     // GraphQL error.
@@ -1360,17 +1372,36 @@ export default function PuckSplatEditor({
                 inspectorEnabled={inspectorEnabled}
                 onToggleInspector={() => setInspectorEnabled((prev) => !prev)}
                 onPublish={async (cleanData) => {
-                  const res = await fetch(`/api/pages/${slug}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ data: cleanData }),
-                  });
+                  let res: Response;
+                  try {
+                    res = await fetch(`/api/pages/${slug}`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ data: cleanData }),
+                    });
+                  } catch {
+                    // Network/tunnel error — request never reached the server.
+                    throw new Error("Publish failed: could not reach the server. Check your connection and try again.");
+                  }
                   if (!res.ok) {
-                    let msg = "Publish failed";
-                    try {
-                      const body = await res.json();
-                      if (body?.error) msg = body.error;
-                    } catch { /* ignore parse errors */ }
+                    // Prefer a structured { error } JSON message; otherwise fall
+                    // back to status-specific guidance (a non-JSON body usually
+                    // means an expired session redirect or a server crash).
+                    let msg = "";
+                    const ct = res.headers.get("content-type") || "";
+                    if (ct.includes("application/json")) {
+                      try {
+                        const body = await res.json();
+                        if (body?.error) msg = body.error;
+                      } catch { /* fall through */ }
+                    }
+                    if (!msg) {
+                      if (res.status === 401 || res.status === 403 || res.status === 302) {
+                        msg = "Publish failed: your session expired. Reload the page and try again.";
+                      } else {
+                        msg = `Publish failed (HTTP ${res.status}). Please try again.`;
+                      }
+                    }
                     throw new Error(msg);
                   }
                 }}

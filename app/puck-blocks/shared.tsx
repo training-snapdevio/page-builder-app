@@ -697,6 +697,23 @@ function ColorPickerField({
   };
   const displayValue = extractHex(value);
 
+  // The swatch must show the SAME color the block actually renders. When the
+  // value is a CSS variable (e.g. "var(--primary-color, #0158ad)") the block
+  // resolves it to the store's theme color, while extractHex() only returns the
+  // hex fallback — so the swatch and the button could differ (blue vs green).
+  // Resolve the variable from the preview root so the swatch matches the button.
+  const [swatchColor, setSwatchColor] = useState<string>(displayValue);
+  useEffect(() => {
+    if (!value || !value.includes("var(")) { setSwatchColor(displayValue); return; }
+    const m = value.match(/var\(\s*(--[^,)\s]+)\s*(?:,\s*([^)]+))?\)/);
+    if (!m || typeof document === "undefined") { setSwatchColor(displayValue); return; }
+    const varName = m[1];
+    const fallback = (m[2] || "").trim();
+    const root = (document.querySelector(".page-preview") as HTMLElement) || document.documentElement;
+    const computed = root ? getComputedStyle(root).getPropertyValue(varName).trim() : "";
+    setSwatchColor(computed || fallback || displayValue);
+  }, [value, displayValue]);
+
   // Close picker when clicking outside
 
   useEffect(() => {
@@ -837,7 +854,7 @@ function ColorPickerField({
               margin: 2,
               borderRadius: "var(--p-border-radius-100, 4px)",
               border: "1px solid var(--p-color-border-subdued)",
-              backgroundColor: displayValue || "#ffffff",
+              backgroundColor: swatchColor || "#ffffff",
               cursor: "pointer",
               flexShrink: 0,
               padding: 0,

@@ -10,9 +10,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type * as React from "react";
-import { createContext, useContext } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 import { DropZone, usePuck } from "@my-app/puck-editor";
+import { loadGoogleFont } from "@/puck-splat/utils";
 
 import {
   AlignField,
@@ -20,7 +21,6 @@ import {
   ColorPickerField,
   EditorHideOverlay,
   FourSideField,
-  ResponsiveSpacingField,
   buildResponsiveSpacingCss,
   InlineSelect,
   SliderNumberField,
@@ -166,8 +166,6 @@ const SectionBlockComponent = {
                     <TabSection title="Spacing" />
                     <FourSideField label="Margin (px)" value={props.advMargin} onChange={(v) => set("advMargin", v)} />
                     <FourSideField label="Padding (px)" value={props.advPadding ?? { top: 60, right: 0, bottom: 60, left: 0 }} onChange={(v) => set("advPadding", v)} />
-                    <TabSection title="Responsive Spacing" />
-                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -446,17 +444,6 @@ function SectionAdvancedFields({ props, set }: { props: any; set: (k: string, v:
       <TabSection title="Spacing" />
       <FourSideField label="Padding (px)" value={props.advPadding ?? { top: 60, right: 0, bottom: 60, left: 0 }} onChange={(v) => set("advPadding", v)} />
       <FourSideField label="Margin (px)" value={props.advMargin ?? { top: 0, right: 0, bottom: 0, left: 0 }} onChange={(v) => set("advMargin", v)} />
-      <TabSection title="Columns" />
-      <InlineSelect label="Desktop" value={String(props.columns ?? 1)} onChange={(v) => set("columns", Number(v))}
-        options={[{ value: "1", label: "1" }, { value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }, { value: "6", label: "6" }]} />
-      <InlineSelect label="Tablet" value={String(props.columnsTablet ?? 1)} onChange={(v) => set("columnsTablet", Number(v))}
-        options={[{ value: "1", label: "1" }, { value: "2", label: "2" }, { value: "3", label: "3" }]} />
-      <InlineSelect label="Mobile" value={String(props.columnsMobile ?? 1)} onChange={(v) => set("columnsMobile", Number(v))}
-        options={[{ value: "1", label: "1" }, { value: "2", label: "2" }]} />
-      <SliderNumberField label="Column Gap" value={props.columnGapPx ?? 32} onChange={(v) => set("columnGapPx", v)} min={0} max={120} step={4} unit="PX" />
-      <SliderNumberField label="Row Gap" value={props.rowGapPx ?? 32} onChange={(v) => set("rowGapPx", v)} min={0} max={120} step={4} unit="PX" />
-      <TabSection title="Responsive Spacing" />
-      <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
       <TabSection title="Responsive" />
       <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
       <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -516,28 +503,60 @@ const SectionUidCtx = createContext<string>("x");
 function SectionCanvasWrap({ props, children }: { props: any; children: React.ReactNode }) {
   // Derive a stable uid from the Puck-assigned block id (never Math.random).
   const uid = props.cssId || `st-${(props.id || "x").slice(-8)}`;
-  const bg =
-    props.bgType === "gradient" && props.bgGrad1 && props.bgGrad2
-      ? `linear-gradient(${props.bgGradAngle ?? 180}deg, ${props.bgGrad1}, ${props.bgGrad2})`
-      : undefined;
+  const bgType = props.bgType ?? "none";
+  // Gradient: prefer the named Direction, fall back to the numeric angle.
+  const gradDir = props.bgGradDir || `${props.bgGradAngle ?? 180}deg`;
+  const gradient = bgType === "gradient"
+    ? `linear-gradient(${gradDir}, ${props.bgGrad1 || "transparent"}, ${props.bgGrad2 || "transparent"})`
+    : undefined;
+  // Border (matches SectionStyleFields keys).
+  const border = props.borderStyle && props.borderStyle !== "none"
+    ? `${props.borderWidth ?? 1}px ${props.borderStyle} ${props.borderColor || "#e5e7eb"}`
+    : undefined;
+  // Background is rendered as a dedicated absolutely-positioned layer (like the
+  // video/image layers) rather than via the container's own backgroundColor/
+  // background inline styles. This keeps color/gradient behaving identically to
+  // image/video across re-renders (the previous approach could lose the inline
+  // background on the editor canvas after a publish-triggered re-render).
+  let bgLayerStyle: React.CSSProperties | null = null;
+  if (bgType === "color" && props.bgColor) {
+    bgLayerStyle = { backgroundColor: props.bgColor };
+  } else if (bgType === "gradient") {
+    bgLayerStyle = { background: gradient };
+  } else if (bgType === "image" && props.bgImage) {
+    bgLayerStyle = {
+      backgroundImage: `url("${props.bgImage}")`,
+      backgroundSize: props.bgSize || "cover",
+      backgroundPosition: props.bgPos || "center center",
+      backgroundRepeat: props.bgRepeat || "no-repeat",
+      backgroundAttachment: props.bgFixed ? "fixed" : undefined,
+    };
+  } else if (bgType === "video") {
+    bgLayerStyle = { backgroundColor: props.bgColor || "#000" };
+  }
+
   return (
     <SectionUidCtx.Provider value={uid}>
       <div id={uid} style={{
         position: "relative", overflow: "hidden",
-        backgroundColor: props.bgType === "color" ? props.bgColor || undefined : undefined,
-        background: bg,
-        backgroundImage: props.bgType === "image" && props.bgImage ? `url("${props.bgImage}")` : undefined,
-        backgroundSize: "cover", backgroundPosition: "center center",
+        border,
+        borderRadius: props.borderRadius ? props.borderRadius : undefined,
         minHeight: props.minHeightPx > 0 ? props.minHeightPx : undefined,
         paddingTop: props.advPadding?.top ?? 60, paddingBottom: props.advPadding?.bottom ?? 60,
         paddingLeft: props.advPadding?.left ?? 0, paddingRight: props.advPadding?.right ?? 0,
         marginTop: props.advMargin?.top ?? 0, marginBottom: props.advMargin?.bottom ?? 0,
         boxSizing: "border-box",
       }}>
+        {bgLayerStyle && (
+          <div aria-hidden style={{ position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none", ...bgLayerStyle }} />
+        )}
         <EditorHideOverlay hideDesktop={props.hideDesktop} hideTablet={props.hideTablet} hideMobile={props.hideMobile} />
-        {props.bgType === "video" && props.bgVideo && (
+        {bgType === "video" && props.bgVideo && (
           <video autoPlay loop={props.bgVideoLoop !== false} muted={props.bgVideoMute !== false} playsInline
             src={props.bgVideo} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0 }} />
+        )}
+        {bgType === "image" && props.overlayType === "color" && (
+          <div style={{ position: "absolute", inset: 0, background: props.overlayColor || "#000000", opacity: (props.overlayOpacity ?? 50) / 100, zIndex: 0, pointerEvents: "none" }} />
         )}
         <div style={{ position: "relative", zIndex: 1, maxWidth: props.contentWidth === "boxed" ? `${props.containerWidth || 1140}px` : undefined, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
           {children}
@@ -650,6 +669,107 @@ const miniBtn: React.CSSProperties = {
   display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--p-color-text)",
 };
 
+// Collapsible image-items editor — same accordion UI as the Photo Collage block:
+// each row is a thumbnail + label + chevron, expands to reveal the image upload
+// and per-item fields, with an inline delete confirmation.
+function GalleryItemsField({ items, onChange, max = 36 }: {
+  items: any[];
+  onChange: (next: any[]) => void;
+  max?: number;
+}) {
+  const list = Array.isArray(items) ? items : [];
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [confirmIdx, setConfirmIdx] = useState<number | null>(null);
+
+  const update = (i: number, key: string, val: any) => {
+    onChange(list.map((it, idx) => (idx === i ? { ...it, [key]: val } : it)));
+  };
+  const remove = (i: number) => {
+    onChange(list.filter((_, idx) => idx !== i));
+    setConfirmIdx(null);
+    setOpenIdx(null);
+  };
+  const add = () => { onChange([...list, { url: "", alt: "", caption: "" }]); setOpenIdx(list.length); };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {list.map((img: any, i: number) => {
+        const open = openIdx === i;
+        const confirm = confirmIdx === i;
+        return (
+          <div key={i} style={{ border: "1px solid var(--p-color-border, #e1e3e5)", borderRadius: 8, background: "var(--p-color-bg-surface, #fff)", overflow: "hidden" }}>
+            {/* Header row */}
+            <div
+              onClick={() => { if (!confirm) setOpenIdx(open ? null : i); }}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", cursor: confirm ? "default" : "pointer", userSelect: "none", background: open ? "var(--p-color-bg-surface-secondary, #f6f6f7)" : "transparent", borderBottom: (open || confirm) ? "1px solid var(--p-color-border, #e1e3e5)" : "none" }}
+            >
+              <div style={{ width: 36, height: 36, borderRadius: 5, overflow: "hidden", background: "var(--p-color-bg-surface-secondary, #f3f4f6)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--p-color-border, #e1e3e5)" }}>
+                {img.url
+                  ? <img src={img.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--p-color-icon-subdued, #8c9196)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                }
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--p-color-text, #202223)", lineHeight: 1.3 }}>Image {i + 1}</div>
+                <div style={{ fontSize: 11, color: "var(--p-color-text-subdued, #6d7175)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 1 }}>
+                  {img.alt || img.caption || (img.url ? "No alt text" : "No image selected")}
+                </div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--p-color-icon-subdued, #8c9196)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: "transform 0.2s", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>
+                <path d="m6 9 6 6 6-6"/>
+              </svg>
+              <button
+                onClick={(e: any) => { e.stopPropagation(); setConfirmIdx(i); setOpenIdx(null); }}
+                title="Remove image"
+                style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 5, border: "1px solid var(--p-color-border, #e1e3e5)", background: "var(--p-color-bg-surface, #fff)", color: "var(--p-color-text-critical, #d72c0d)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                </svg>
+              </button>
+            </div>
+            {/* Delete confirmation */}
+            {confirm && (
+              <div style={{ padding: "12px 12px 14px", background: "#fff8f8", display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 6, background: "#fee2e2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "#d72c0d" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#202223", marginBottom: 2 }}>Remove Image {i + 1}?</div>
+                    <div style={{ fontSize: 11, color: "#6d7175", lineHeight: 1.5 }}>This image will be removed from the gallery. This action cannot be undone.</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={(e: any) => { e.stopPropagation(); setConfirmIdx(null); }} style={{ flex: 1, padding: "6px 0", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid var(--p-color-border, #e1e3e5)", background: "var(--p-color-bg-surface, #fff)", color: "var(--p-color-text, #202223)", cursor: "pointer" }}>Cancel</button>
+                  <button onClick={(e: any) => { e.stopPropagation(); remove(i); }} style={{ flex: 1, padding: "6px 0", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "none", background: "#d72c0d", color: "#fff", cursor: "pointer" }}>Remove</button>
+                </div>
+              </div>
+            )}
+            {/* Expanded fields */}
+            {open && !confirm && (
+              <div style={{ padding: "10px 10px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
+                <ImageField label="Image" value={img.url ?? ""} onChange={(v: any) => update(i, "url", v)} />
+                <StackedTextField label="Alt Text" value={img.alt ?? ""} onChange={(v: any) => update(i, "alt", v)} placeholder="Describe the image…" />
+                <StackedTextField label="Caption (optional)" value={img.caption ?? ""} onChange={(v: any) => update(i, "caption", v)} placeholder="Image caption" />
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {list.length < max && (
+        <button
+          onClick={add}
+          style={{ marginTop: 2, width: "100%", padding: "8px 0", border: "1.5px dashed var(--p-color-border-interactive, #0158ad)", borderRadius: 8, color: "var(--p-color-text-interactive, #0158ad)", background: "transparent", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Image
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── About section — pre-filled, directly editable content ───────────────────
 // Renders the section's own fields (heading/text/button/image) as real content,
 // so users customise it from the settings panel instead of dragging blocks in.
@@ -760,18 +880,91 @@ function SectionFAQContent({ p }: { p: any }) {
   );
 }
 
-// Gallery: heading + responsive image grid.
+// Gallery: heading + responsive image grid with lightbox, hover effects, carousel, and full controls.
 function SectionGalleryContent({ p }: { p: any }) {
   const items: any[] = Array.isArray(p.items) ? p.items : [];
   const cols = p.galleryColumns ?? 3;
+  const colsTablet = p.galleryColumnsTablet ?? Math.min(cols, 3);
+  const colsMobile = p.galleryColumnsMobile ?? Math.min(cols, 2);
+  const gap = p.gap ?? 12;
+  const rowGap = p.rowGap != null ? p.rowGap : gap;
+  const colGap = p.colGap != null ? p.colGap : gap;
+  const ar = p.aspectRatio ?? "square";
+  const fit = p.objectFit ?? "cover";
+  const br = p.imageBorderRadius != null ? p.imageBorderRadius : 8;
+  const shadow = p.imageShadow ? "0 4px 16px rgba(0,0,0,0.12)" : undefined;
+  const hoverEffect = p.hoverEffect ?? "none";
+  const layoutType = p.layoutType ?? "grid";
+  const isMasonry = layoutType === "masonry";
+  const showCaption = !!p.showCaption;
+  const captionColor = p.captionColor ?? "#6b7280";
+  const align = (p.textAlign ?? "text-center").replace("text-", "") as "left" | "center" | "right";
+  const showDesc = p.showDescription !== false && !!p.sectionDescription;
+
+  const aspectMap: Record<string, string> = { square: "1/1", portrait: "3/4", landscape: "4/3", original: "auto" };
+  const aspectRatioCss = aspectMap[ar] ?? "1/1";
+  // Masonry keeps natural image height, so it ignores the aspect ratio.
+  const effectiveAR = isMasonry ? "auto" : aspectRatioCss;
+
+  const uid = `gal-${(p.id || "x").slice(-6)}`;
+
+  const imgStyle: React.CSSProperties = {
+    width: "100%",
+    aspectRatio: effectiveAR === "auto" ? undefined : effectiveAR,
+    objectFit: fit as any,
+    display: "block",
+    transition: hoverEffect !== "none" ? "transform 0.3s ease, filter 0.3s ease, opacity 0.3s ease" : undefined,
+  };
+
+  const headingFF = fontFam(p.headingFontFamily);
+  const descFF = fontFam(p.descFontFamily);
+
   return (
     <SectionCanvasWrap props={p}>
-      {p.showHeading !== false && <SectionHeading title={p.sectionTitle} subtitle={p.sectionSubtitle} />}
-      <SecGrid cols={cols} gap={p.gap ?? 12}>
-        {items.map((it, i) => it.url
-          ? <img key={i} src={it.url} alt={it.alt || ""} style={{ width: "100%", aspectRatio: "1/1", objectFit: "cover", borderRadius: 8, display: "block" }} />
-          : <div key={i} style={{ width: "100%", aspectRatio: "1/1", background: "#f1f5f9", border: "2px dashed #cbd5e1", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: 22 }}>🖼</div>)}
-      </SecGrid>
+      <style>{`
+        #${uid} .pb-gal-item { position:relative; overflow:hidden; border-radius:${br}px; box-shadow:${shadow || "none"}; }
+        #${uid} .pb-gal-item img { transition: transform .3s ease, filter .3s ease, opacity .3s ease; }
+        ${hoverEffect === "zoom" ? `#${uid} .pb-gal-item:hover img { transform:scale(1.08); }` : ""}
+        ${hoverEffect === "fade" ? `#${uid} .pb-gal-item:hover img { opacity:0.75; }` : ""}
+        ${isMasonry
+          ? `#${uid} .pb-gal-grid { column-count:${cols}; column-gap:${colGap}px; }
+             #${uid} .pb-gal-cell { break-inside:avoid; margin-bottom:${rowGap}px; }
+             @media(max-width:767px){ #${uid} .pb-gal-grid { column-count:${colsMobile}; } }
+             @media(min-width:768px) and (max-width:1023px){ #${uid} .pb-gal-grid { column-count:${colsTablet}; } }`
+          : `@media(max-width:767px){ #${uid} .pb-gal-grid { grid-template-columns:repeat(${colsMobile},1fr)!important; } }
+             @media(min-width:768px) and (max-width:1023px){ #${uid} .pb-gal-grid { grid-template-columns:repeat(${colsTablet},1fr)!important; } }`}
+      `}</style>
+      <div id={uid}>
+        {p.showHeading !== false && p.sectionTitle && (
+          <h2 style={{ textAlign: align, fontSize: p.headingFontSize ? `${p.headingFontSize}px` : "clamp(1.5rem,3vw,2.25rem)", fontWeight: Number(p.headingFontWeight ?? 800), fontFamily: headingFF, color: p.headingColor || "#111827", lineHeight: 1.2, margin: "0 0 8px" }}>
+            {p.sectionTitle}
+          </h2>
+        )}
+        {showDesc && (
+          <p style={{ textAlign: align, fontSize: p.descFontSize ? `${p.descFontSize}px` : "1rem", fontWeight: Number(p.descFontWeight ?? 400), fontFamily: descFF, lineHeight: 1.6, color: p.descriptionColor || "#6b7280", margin: "0 0 28px", maxWidth: align === "center" ? 720 : undefined, marginLeft: align === "center" ? "auto" : undefined, marginRight: align === "center" ? "auto" : undefined }}>
+            {p.sectionDescription}
+          </p>
+        )}
+        <div className="pb-gal-grid" style={isMasonry ? {} : { display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, rowGap, columnGap: colGap }}>
+          {items.map((it, i) => it.url
+            ? (
+              <div key={i} className="pb-gal-cell">
+                <div className="pb-gal-item">
+                  <img src={it.url} alt={it.alt || ""} style={imgStyle} />
+                </div>
+                {showCaption && it.caption && (
+                  <div style={{ fontSize: 13, color: captionColor, marginTop: 6, textAlign: align }}>{it.caption}</div>
+                )}
+              </div>
+            )
+            : (
+              <div key={i} className="pb-gal-cell pb-gal-item" style={{ width: "100%", aspectRatio: effectiveAR === "auto" ? "1/1" : effectiveAR, background: "#f1f5f9", border: "2px dashed #cbd5e1", borderRadius: br, display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8" }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              </div>
+            )
+          )}
+        </div>
+      </div>
     </SectionCanvasWrap>
   );
 }
@@ -797,10 +990,16 @@ function SectionLogosContent({ p }: { p: any }) {
   );
 }
 
-// Carousel: optional marquee bar + heading + a row of product-style cards.
+// Carousel: optional marquee bar + heading + product/card grid.
+// Supports two data sources: "manual" (hand-crafted items) and "shopify" (live products).
 function SectionCarouselContent({ p }: { p: any }) {
   const items: any[] = Array.isArray(p.items) ? p.items : [];
   const cols = p.cardCount ?? 3;
+  const accentColor = p.accentColor || "#005bd3";
+  const showPrice   = p.showPrice !== false;
+  const showBadge   = p.showBadge !== false;
+  const cardRadius  = p.cardRadius ?? 12;
+  const imgRatio    = p.imgRatio || "4/3";
   return (
     <div>
       {p.showMarquee !== false && (
@@ -814,19 +1013,123 @@ function SectionCarouselContent({ p }: { p: any }) {
         {p.sectionTitle && <SectionHeading title={p.sectionTitle} />}
         <SecGrid cols={cols} gap={20}>
           {items.map((it, i) => (
-            <div key={i} style={{ background: "#fff", border: "1px solid #eef2f7", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+            <div key={i} style={{ background: "#fff", border: "1px solid #eef2f7", borderRadius: cardRadius, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", position: "relative" }}>
+              {showBadge && it.badge && (
+                <span style={{ position: "absolute", top: 10, left: 10, zIndex: 1, background: accentColor, color: "#fff", fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 4 }}>{it.badge}</span>
+              )}
               {it.imageUrl
-                ? <img src={it.imageUrl} alt={it.title || ""} style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }} />
-                : <div style={{ width: "100%", aspectRatio: "4/3", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: 24 }}>🖼</div>}
+                ? <img src={it.imageUrl} alt={it.imageAlt || it.title || ""} style={{ width: "100%", aspectRatio: imgRatio, objectFit: "cover", display: "block" }} />
+                : <div style={{ width: "100%", aspectRatio: imgRatio, background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8" }}>
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                  </div>}
               <div style={{ padding: 16 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#111827", marginBottom: 6 }}>{it.title || "Card title"}</div>
-                {it.text && <p style={{ fontSize: 14, color: "#6b7280", lineHeight: 1.5, margin: "0 0 12px" }}>{it.text}</p>}
-                {it.buttonLabel && <a href={it.buttonUrl || "#"} style={{ display: "inline-block", color: "#005bd3", fontWeight: 700, fontSize: 14, textDecoration: "none" }}>{it.buttonLabel} →</a>}
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{it.title || "Card title"}</div>
+                {showPrice && it.price && (
+                  <div style={{ fontSize: 14, fontWeight: 600, color: accentColor, marginBottom: 8 }}>
+                    {it.currency || "$"}{it.price}
+                  </div>
+                )}
+                {it.text && <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.5, margin: "0 0 12px" }}>{it.text}</p>}
+                {it.buttonLabel && <a href={it.buttonUrl || "#"} style={{ display: "inline-block", color: accentColor, fontWeight: 700, fontSize: 13, textDecoration: "none" }}>{it.buttonLabel} →</a>}
               </div>
             </div>
           ))}
         </SecGrid>
       </SectionCanvasWrap>
+    </div>
+  );
+}
+
+// Product picker sub-component used inside the Carousel section fields.
+function ProductPicker({ items, onChange, cardCount, accentColor }: { items: any[]; onChange: (v: any[]) => void; cardCount: number; accentColor: string }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const selectedIds = new Set(items.map((it: any) => it.id).filter(Boolean));
+
+  const search = useCallback(async (q: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/products?first=20&q=${encodeURIComponent(q)}`);
+      const json = await res.json();
+      setResults(json.products || []);
+    } catch { setResults([]); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { search(""); }, []);
+
+  const toggle = (prod: any) => {
+    if (selectedIds.has(prod.id)) {
+      onChange(items.filter((it: any) => it.id !== prod.id));
+    } else {
+      onChange([...items, {
+        id: prod.id,
+        title: prod.title,
+        imageUrl: prod.imageUrl,
+        imageAlt: prod.imageAlt,
+        price: prod.price,
+        currency: prod.currency,
+        buttonLabel: "Shop Now",
+        buttonUrl: `/products/${prod.handle}`,
+        text: "",
+        badge: "",
+      }]);
+    }
+  };
+
+  const moveUp = (i: number) => { if (i === 0) return; const next = [...items]; [next[i-1], next[i]] = [next[i], next[i-1]]; onChange(next); };
+  const moveDown = (i: number) => { if (i >= items.length-1) return; const next = [...items]; [next[i], next[i+1]] = [next[i+1], next[i]]; onChange(next); };
+  const remove = (i: number) => onChange(items.filter((_: any, idx: number) => idx !== i));
+
+  const inputStyle: React.CSSProperties = { width: "100%", padding: "7px 10px", fontSize: 12, border: "1px solid #d1d5db", borderRadius: 6, outline: "none", boxSizing: "border-box", marginBottom: 8 };
+  const chipStyle = (selected: boolean): React.CSSProperties => ({ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, border: `1px solid ${selected ? accentColor : "#e5e7eb"}`, background: selected ? `${accentColor}10` : "#fff", cursor: "pointer", marginBottom: 6, fontSize: 12 });
+
+  return (
+    <div>
+      {/* Selected products list */}
+      {items.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Selected ({items.length})</div>
+          {items.map((it: any, i: number) => (
+            <div key={it.id || i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, border: "1px solid #e5e7eb", background: "#f9fafb", marginBottom: 4 }}>
+              {it.imageUrl && <img src={it.imageUrl} alt="" style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />}
+              <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.title}</span>
+              {it.price && <span style={{ fontSize: 11, color: "#6b7280", flexShrink: 0 }}>{it.currency}{it.price}</span>}
+              <button onClick={() => moveUp(i)} title="Move up" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#6b7280", padding: "0 2px" }}>↑</button>
+              <button onClick={() => moveDown(i)} title="Move down" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#6b7280", padding: "0 2px" }}>↓</button>
+              <button onClick={() => remove(i)} title="Remove" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#ef4444", padding: "0 2px", lineHeight: 1 }}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Search */}
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Add Products</div>
+      <input
+        style={inputStyle}
+        placeholder="Search products…"
+        value={query}
+        onChange={(e: any) => { setQuery(e.target.value); search(e.target.value); }}
+      />
+      {loading && <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>Searching…</div>}
+      <div style={{ maxHeight: 220, overflowY: "auto", borderRadius: 6, border: "1px solid #e5e7eb", padding: 6 }}>
+        {results.length === 0 && !loading && <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", padding: 12 }}>No products found</div>}
+        {(results as any[]).map((prod: any) => {
+          const selected = selectedIds.has(prod.id);
+          return (
+            <div key={prod.id} style={chipStyle(selected)} onClick={() => toggle(prod)}>
+              {prod.imageUrl
+                ? <img src={prod.imageUrl} alt="" style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
+                : <div style={{ width: 32, height: 32, background: "#f1f5f9", borderRadius: 4, flexShrink: 0 }} />}
+              <span style={{ flex: 1, fontWeight: selected ? 700 : 400, color: selected ? accentColor : "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{prod.title}</span>
+              {prod.price && <span style={{ fontSize: 11, color: "#6b7280", flexShrink: 0 }}>{prod.currency}{prod.price}</span>}
+              <span style={{ fontSize: 14, color: selected ? accentColor : "#9ca3af", flexShrink: 0 }}>{selected ? "✓" : "+"}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -858,29 +1161,40 @@ function SectionMediaCarouselContent({ p }: { p: any }) {
 
 function SectionAboutContent({ p }: { p: any }) {
   const imageRight = p.imagePosition === "right";
+  const align = (p.textAlign ?? "text-left").replace("text-", "") as "left" | "center" | "right";
+  const itemsAlign = align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
 
   const textCol = (
-    <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+    <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: itemsAlign, textAlign: align }}>
       {p.badge && (
-        <span style={{ display: "inline-block", alignSelf: "flex-start", background: "#005bd3", color: "#fff", fontSize: 12, fontWeight: 700, padding: "3px 12px", borderRadius: 4, marginBottom: 16, letterSpacing: "0.04em" }}>
+        <span style={{ display: "inline-block", background: p.badgeBg || p.buttonBg || "#005bd3", color: p.badgeColor || "#fff", fontSize: p.badgeFontSize ?? 12, fontWeight: Number(p.badgeFontWeight ?? 700), fontFamily: fontFam(p.badgeFontFamily), padding: "3px 12px", borderRadius: 4, marginBottom: 16, letterSpacing: "0.04em" }}>
           {p.badge}
         </span>
       )}
       {p.subtitle && (
-        <p style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: p.buttonBg || "#005bd3", margin: "0 0 8px" }}>
+        <p style={{ fontSize: p.subtitleFontSize ?? 13, fontWeight: Number(p.subtitleFontWeight ?? 700), fontFamily: fontFam(p.subtitleFontFamily), textTransform: "uppercase", letterSpacing: "0.06em", color: p.subtitleColor || p.buttonBg || "#005bd3", margin: "0 0 8px" }}>
           {p.subtitle}
         </p>
       )}
-      <h2 style={{ fontSize: "clamp(1.5rem,3vw,2.25rem)", fontWeight: 800, color: p.titleColor || "#111827", lineHeight: 1.2, margin: "0 0 16px" }}>
-        {p.title || "Who We Are"}
-      </h2>
+      {p.title && (
+        <h2 style={{ fontSize: p.titleFontSize ? `${p.titleFontSize}px` : "clamp(1.5rem,3vw,2.25rem)", fontWeight: Number(p.titleFontWeight ?? 800), fontFamily: fontFam(p.titleFontFamily), color: p.titleColor || "#111827", lineHeight: 1.2, margin: "0 0 16px" }}>
+          {p.title}
+        </h2>
+      )}
       {p.description && (
-        <p style={{ fontSize: "1rem", color: p.textColor || "#6b7280", lineHeight: 1.7, margin: "0 0 24px" }}>
-          {p.description}
-        </p>
+        <div style={{ fontSize: p.descFontSize ? `${p.descFontSize}px` : "1rem", fontWeight: Number(p.descFontWeight ?? 400), fontFamily: fontFam(p.descFontFamily), color: p.textColor || "#6b7280", lineHeight: 1.7, margin: "0 0 24px" }}>
+          {String(p.description).split(/\n\n+/).map((para: string, i: number) => (
+            // Weight repeated on the <p> so a theme/global `p` rule can't override it.
+            <p key={i} style={{ margin: i === 0 ? "0 0 1em" : "1em 0", fontWeight: Number(p.descFontWeight ?? 400) }}>
+              {para.split(/\n/).map((line: string, j: number, arr: string[]) => (
+                <span key={j}>{line}{j < arr.length - 1 && <br />}</span>
+              ))}
+            </p>
+          ))}
+        </div>
       )}
       {p.buttonLabel && (
-        <a href={p.buttonUrl || "#"} style={{ display: "inline-block", alignSelf: "flex-start", background: p.buttonBg || "#005bd3", color: p.buttonTextColor || "#fff", padding: "12px 28px", borderRadius: 6, fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
+        <a href={p.buttonUrl || "#"} target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", background: p.buttonBg || "#005bd3", color: p.buttonTextColor || "#fff", padding: "12px 28px", borderRadius: 6, fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
           {p.buttonLabel}
         </a>
       )}
@@ -897,10 +1211,17 @@ function SectionAboutContent({ p }: { p: any }) {
     </div>
   );
 
+  // On mobile the grid stacks to one column; control whether the image sits
+  // above (Top) or below (Bottom) the text via flex order on the mobile layout.
+  const mobileImageBottom = (p.imagePositionMobile ?? "top") === "bottom";
+  const gridClass = "pb-sec-about-grid" + (mobileImageBottom ? " pb-about-img-bottom" : "");
+
   return (
     <SectionCanvasWrap props={p}>
-      <div className="pb-sec-about-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "clamp(24px,4vw,48px)", alignItems: "center" }}>
-        {imageRight ? <>{textCol}{imageCol}</> : <>{imageCol}{textCol}</>}
+      <div className={gridClass} style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "clamp(24px,4vw,48px)", alignItems: "center" }}>
+        {imageRight
+          ? <><div className="pb-about-text">{textCol}</div><div className="pb-about-img">{imageCol}</div></>
+          : <><div className="pb-about-img">{imageCol}</div><div className="pb-about-text">{textCol}</div></>}
       </div>
     </SectionCanvasWrap>
   );
@@ -924,6 +1245,32 @@ function baseSectionProps(overrides: Record<string, unknown> = {}) {
     cssId: "", cssClass: "", zIndex: null,
     ...overrides,
   };
+}
+
+// ─── Typography option lists (shared by About template) ──────────────────────
+const FONT_FAMILY_OPTIONS = [
+  { value: "inherit", label: "Theme Default" },
+  { value: "Arial, Helvetica, sans-serif", label: "Arial" },
+  { value: "Georgia, serif", label: "Georgia" },
+  { value: "'Courier New', monospace", label: "Courier New" },
+  { value: "Impact, sans-serif", label: "Impact" },
+  { value: "Inter, sans-serif", label: "Inter" },
+  { value: "Poppins, sans-serif", label: "Poppins" },
+  { value: "'Roboto Serif', serif", label: "Roboto Serif" },
+  { value: "'New York', 'New York Small', 'Times New Roman', serif", label: "New York" },
+  { value: "'Open Sans', sans-serif", label: "Open Sans" },
+];
+const FONT_WEIGHT_OPTIONS = [
+  { value: "300", label: "Light" },
+  { value: "400", label: "Normal" },
+  { value: "600", label: "Semi Bold" },
+  { value: "700", label: "Bold" },
+  { value: "900", label: "Black" },
+];
+
+// Resolve a font-family prop to a CSS value (inherit → undefined so it cascades).
+function fontFam(v: any): string | undefined {
+  return v && v !== "inherit" ? v : undefined;
 }
 
 // ─── Section Template Components ─────────────────────────────────────────────
@@ -1078,35 +1425,123 @@ export const sectionTemplateConfig: Record<string, any> = {
   // ── About ─────────────────────────────────────────────────────────────────
   Section_About: {
     label: "About",
-    fields: makeSectionFields("Section_About", (p, set) => (
-      <>
-        <TabSection title="Content" />
-        <StackedTextField label="Badge" value={p.badge ?? ""} onChange={(v) => set("badge", v)} placeholder="About Us (leave blank to hide)" />
-        <StackedTextField label="Heading" value={p.title ?? ""} onChange={(v) => set("title", v)} placeholder="Who We Are" />
-        <StackedTextField label="Subheading" value={p.subtitle ?? ""} onChange={(v) => set("subtitle", v)} placeholder="Our story and mission" />
-        <StackedTextareaField label="Description" value={p.description ?? ""} onChange={(v) => set("description", v)} placeholder="A few sentences about your company…" />
-        <TabSection title="Button" />
-        <StackedTextField label="Button Label" value={p.buttonLabel ?? ""} onChange={(v) => set("buttonLabel", v)} placeholder="Learn More (leave blank to hide)" />
-        <LinkUrlField label="Button URL" value={p.buttonUrl ?? ""} onChange={(v) => set("buttonUrl", v)} />
-        <TabSection title="Image" />
-        <ImageField label="Image" value={p.imageUrl ?? ""} onChange={(v) => set("imageUrl", v)} />
-        <StackedTextField label="Alt Text" value={p.imageAlt ?? ""} onChange={(v) => set("imageAlt", v)} placeholder="About image" />
-        <InlineSelect label="Image Position" value={p.imagePosition ?? "left"} onChange={(v) => set("imagePosition", v)}
-          options={[{ value: "left", label: "Image Left" }, { value: "right", label: "Image Right" }]} />
-        <TabSection title="Colors" />
-        <ColorPickerField label="Heading Color" value={p.titleColor ?? ""} onChange={(v) => set("titleColor", v)} />
-        <ColorPickerField label="Text Color" value={p.textColor ?? ""} onChange={(v) => set("textColor", v)} />
-        <ColorPickerField label="Button Background" value={p.buttonBg ?? ""} onChange={(v) => set("buttonBg", v)} />
-        <ColorPickerField label="Button Text" value={p.buttonTextColor ?? ""} onChange={(v) => set("buttonTextColor", v)} />
-      </>
-    )),
+    fields: {
+      _tabs: {
+        type: "custom" as const,
+        label: "",
+        render: (_: any) => {
+          const { selectedItem, appState, dispatch } = usePuck();
+          const p = selectedItem?.props ?? {};
+          const set = makeSectionSet(dispatch, selectedItem, appState);
+          return (
+            <BlockTabBar blockKey="Section_About">
+              {(tab) => (
+                <>
+                  {/* ── CONTENT TAB ── */}
+                  {tab === "content" && (
+                    <>
+                      <TabSection title="Content" />
+                      <StackedTextField label="Badge" value={p.badge ?? ""} onChange={(v) => set("badge", v)} placeholder="About Us (leave blank to hide)" />
+                      <StackedTextField label="Heading" value={p.title ?? ""} onChange={(v) => set("title", v)} placeholder="Who We Are" />
+                      <StackedTextField label="Subheading" value={p.subtitle ?? ""} onChange={(v) => set("subtitle", v)} placeholder="Our story and mission" />
+                      <StackedTextareaField label="Description" value={p.description ?? ""} onChange={(v) => set("description", v)} placeholder="A few sentences about your company…" />
+                      <StackedTextField label="Button Label" value={p.buttonLabel ?? ""} onChange={(v) => set("buttonLabel", v)} placeholder="Learn More (leave blank to hide)" />
+                      {!(p.buttonLabel ?? "").trim() && (p.buttonUrl ?? "").trim() && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "-2px 0 8px", color: "#d72c0d", fontSize: 12, fontWeight: 500 }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                          Button label is empty
+                        </div>
+                      )}
+                      <LinkUrlField label="Button URL" value={p.buttonUrl ?? ""} onChange={(v) => set("buttonUrl", v)} />
+                      <ImageField label="Image" value={p.imageUrl ?? ""} onChange={(v) => set("imageUrl", v)} />
+                      <StackedTextField label="Alt Text" value={p.imageAlt ?? ""} onChange={(v) => set("imageAlt", v)} placeholder="About image" />
+                      <InlineSelect label="Image Position (Desktop)" value={p.imagePosition ?? "left"} onChange={(v) => set("imagePosition", v)}
+                        options={[{ value: "left", label: "Left" }, { value: "right", label: "Right" }]} />
+                      <InlineSelect label="Image Position (Mobile)" value={p.imagePositionMobile ?? "top"} onChange={(v) => set("imagePositionMobile", v)}
+                        options={[{ value: "top", label: "Top" }, { value: "bottom", label: "Bottom" }]} />
+                    </>
+                  )}
+
+                  {/* ── STYLE TAB ── */}
+                  {tab === "style" && (
+                    <>
+                      <TabSection title="Badge" />
+                      <ColorPickerField label="Text Color" value={p.badgeColor ?? ""} onChange={(v) => set("badgeColor", v)} />
+                      <ColorPickerField label="Badge Color" value={p.badgeBg ?? ""} onChange={(v) => set("badgeBg", v)} />
+                      <SliderNumberField label="Font Size" value={p.badgeFontSize ?? 12} onChange={(v) => set("badgeFontSize", v)} min={8} max={48} step={1} unit="px" />
+                      <InlineSelect label="Font Family" value={p.badgeFontFamily ?? "inherit"} onChange={(v) => { set("badgeFontFamily", v); loadGoogleFont(v); }} options={FONT_FAMILY_OPTIONS} />
+                      <InlineSelect label="Font Weight" value={String(p.badgeFontWeight ?? "700")} onChange={(v) => set("badgeFontWeight", v)} options={FONT_WEIGHT_OPTIONS} />
+
+                      <TabSection title="Heading" />
+                      <ColorPickerField label="Color" value={p.titleColor ?? ""} onChange={(v) => set("titleColor", v)} />
+                      <SliderNumberField label="Font Size" value={p.titleFontSize ?? 36} onChange={(v) => set("titleFontSize", v)} min={10} max={120} step={1} unit="px" />
+                      <InlineSelect label="Font Family" value={p.titleFontFamily ?? "inherit"} onChange={(v) => { set("titleFontFamily", v); loadGoogleFont(v); }} options={FONT_FAMILY_OPTIONS} />
+                      <InlineSelect label="Font Weight" value={String(p.titleFontWeight ?? "800")} onChange={(v) => set("titleFontWeight", v)} options={FONT_WEIGHT_OPTIONS} />
+
+                      <TabSection title="Subheading" />
+                      <ColorPickerField label="Color" value={p.subtitleColor ?? ""} onChange={(v) => set("subtitleColor", v)} />
+                      <SliderNumberField label="Font Size" value={p.subtitleFontSize ?? 13} onChange={(v) => set("subtitleFontSize", v)} min={8} max={48} step={1} unit="px" />
+                      <InlineSelect label="Font Family" value={p.subtitleFontFamily ?? "inherit"} onChange={(v) => { set("subtitleFontFamily", v); loadGoogleFont(v); }} options={FONT_FAMILY_OPTIONS} />
+                      <InlineSelect label="Font Weight" value={String(p.subtitleFontWeight ?? "700")} onChange={(v) => set("subtitleFontWeight", v)} options={FONT_WEIGHT_OPTIONS} />
+
+                      <TabSection title="Description" />
+                      <ColorPickerField label="Color" value={p.textColor ?? ""} onChange={(v) => set("textColor", v)} />
+                      <SliderNumberField label="Font Size" value={p.descFontSize ?? 16} onChange={(v) => set("descFontSize", v)} min={10} max={48} step={1} unit="px" />
+                      <InlineSelect label="Font Family" value={p.descFontFamily ?? "inherit"} onChange={(v) => { set("descFontFamily", v); loadGoogleFont(v); }} options={FONT_FAMILY_OPTIONS} />
+                      <InlineSelect label="Font Weight" value={String(p.descFontWeight ?? "400")} onChange={(v) => set("descFontWeight", v)} options={FONT_WEIGHT_OPTIONS} />
+
+                      <TabSection title="Text" />
+                      <AlignField label="Alignment" value={p.textAlign ?? "text-left"} onChange={(v) => set("textAlign", v)} />
+
+                      <SectionStyleFields props={p} set={set} />
+                    </>
+                  )}
+
+                  {/* ── ADVANCED TAB ── */}
+                  {tab === "advanced" && (
+                    <>
+                      <TabSection title="Layout" />
+                      <InlineSelect label="Content Width" value={p.contentWidth ?? "boxed"} onChange={(v) => set("contentWidth", v)}
+                        options={[{ value: "boxed", label: "Boxed" }, { value: "full", label: "Full Width" }]} />
+                      {p.contentWidth === "boxed" && <SliderNumberField label="Max Width" value={p.containerWidth ?? 1140} onChange={(v) => set("containerWidth", v)} min={320} max={1920} step={10} unit="PX" />}
+                      <SliderNumberField label="Min Height" value={p.minHeightPx ?? 0} onChange={(v) => set("minHeightPx", v)} min={0} max={1200} step={10} unit="PX" />
+
+                      <TabSection title="Spacing" />
+                      <FourSideField label="Padding (px)" value={p.advPadding ?? { top: 80, right: 0, bottom: 80, left: 0 }} onChange={(v) => set("advPadding", v)} />
+
+                      <TabSection title="Responsive" />
+                      <ToggleField label="Hide on Desktop" value={!!p.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
+                      <ToggleField label="Hide on Tablet" value={!!p.hideTablet} onChange={(v) => set("hideTablet", v)} />
+                      <ToggleField label="Hide on Mobile" value={!!p.hideMobile} onChange={(v) => set("hideMobile", v)} />
+
+                      <TabSection title="Animation" />
+                      <InlineSelect label="Entrance" value={p.animation ?? "none"} onChange={(v) => set("animation", v)}
+                        options={[{ value: "none", label: "None" }, { value: "fadeIn", label: "Fade In" }, { value: "fadeInUp", label: "Fade In Up" }, { value: "fadeInDown", label: "Fade In Down" }, { value: "slideInLeft", label: "Slide In Left" }, { value: "slideInRight", label: "Slide In Right" }, { value: "zoomIn", label: "Zoom In" }]} />
+                    </>
+                  )}
+                </>
+              )}
+            </BlockTabBar>
+          );
+        },
+      },
+    },
     defaultProps: baseSectionProps({
       columns: 2, columnsTablet: 1, advPadding: { top: 80, right: 0, bottom: 80, left: 0 },
       badge: "About Us", title: "Who We Are", subtitle: "Our story and mission",
       description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut elit tellus, luctus nec ullamcorper mattis, pulvinar dapibus leo.",
-      buttonLabel: "Learn More", buttonUrl: "#",
-      imageUrl: "", imageAlt: "About image", imagePosition: "left",
-      titleColor: "#111827", textColor: "#6b7280", buttonBg: "#005bd3", buttonTextColor: "#ffffff",
+      buttonLabel: "Learn More", buttonUrl: "",
+      imageUrl: "", imageAlt: "About image", imagePosition: "left", imagePositionMobile: "top",
+      // Badge typography
+      badgeColor: "#ffffff", badgeBg: "#005bd3", badgeFontSize: 12, badgeFontFamily: "inherit", badgeFontWeight: "700",
+      // Heading typography
+      titleColor: "#111827", titleFontSize: 36, titleFontFamily: "inherit", titleFontWeight: "800",
+      // Subheading typography
+      subtitleColor: "#005bd3", subtitleFontSize: 13, subtitleFontFamily: "inherit", subtitleFontWeight: "700",
+      // Description typography
+      textColor: "#6b7280", descFontSize: 16, descFontFamily: "inherit", descFontWeight: "400",
+      textAlign: "text-left",
+      buttonBg: "#005bd3", buttonTextColor: "#ffffff",
     }),
     render: (p: any) => <SectionAboutContent p={p} />,
   },
@@ -1114,22 +1549,143 @@ export const sectionTemplateConfig: Record<string, any> = {
   // ── Gallery ───────────────────────────────────────────────────────────────
   Section_Gallery: {
     label: "Gallery",
-    fields: makeSectionFields("Section_Gallery", (p, set) => (
-      <>
-        <TabSection title="Heading" />
-        <ToggleField label="Show Heading" value={p.showHeading !== false} onChange={(v) => set("showHeading", v)} />
-        {p.showHeading !== false && <><StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Our Gallery" /><StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="A short description" /></>}
-        <TabSection title="Images" />
-        <SectionItemsField label="Images" items={p.items} onChange={(v) => set("items", v)} max={24}
-          newItem={() => ({ url: "", alt: "" })}
-          fields={[{ key: "url", label: "Image", type: "image" }, { key: "alt", label: "Alt Text", placeholder: "Describe the image" }]} />
-        <TabSection title="Grid" />
-        <InlineSelect label="Columns" value={String(p.galleryColumns ?? 3)} onChange={(v) => set("galleryColumns", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }, { value: "5", label: "5" }]} />
-        <SliderNumberField label="Gap (px)" value={p.gap ?? 12} onChange={(v) => set("gap", v)} min={0} max={60} step={2} unit="px" />
-      </>
-    )),
-    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 2, advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "Our Gallery", sectionSubtitle: "", galleryColumns: 3, gap: 12, showHeading: true,
-      items: [{ url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }] }),
+    fields: {
+      _tabs: {
+        type: "custom" as const,
+        label: "",
+        render: (_: any) => {
+          const { selectedItem, appState, dispatch } = usePuck();
+          const p = selectedItem?.props ?? {};
+          const set = makeSectionSet(dispatch, selectedItem, appState);
+          return (
+            <BlockTabBar blockKey="Section_Gallery">
+              {(tab) => (
+                <>
+                  {/* ── CONTENT TAB ── */}
+                  {tab === "content" && (
+                    <>
+                      <TabSection title="Title" />
+                      <ToggleField label="Show Title" value={p.showHeading !== false} onChange={(v) => set("showHeading", v)} />
+                      {p.showHeading !== false && (
+                        <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Our Gallery" />
+                      )}
+
+                      <TabSection title="Description" />
+                      <ToggleField label="Show Description" value={!!p.showDescription} onChange={(v) => set("showDescription", v)} />
+                      {!!p.showDescription && (
+                        <StackedTextareaField label="Description" value={p.sectionDescription ?? ""} onChange={(v) => set("sectionDescription", v)} placeholder="A short paragraph about the gallery…" />
+                      )}
+
+                      <TabSection title="Text" />
+                      <AlignField label="Alignment" value={p.textAlign ?? "text-center"} onChange={(v) => set("textAlign", v)} />
+
+                      <TabSection title="Gallery Items" />
+                      <GalleryItemsField
+                        items={p.items}
+                        onChange={(v) => set("items", v)}
+                        max={36}
+                      />
+                    </>
+                  )}
+
+                  {/* ── STYLE TAB ── */}
+                  {tab === "style" && (
+                    <>
+                      <TabSection title="Heading" />
+                      <ColorPickerField label="Color" value={p.headingColor ?? ""} onChange={(v) => set("headingColor", v)} />
+                      <SliderNumberField label="Font Size" value={p.headingFontSize ?? 36} onChange={(v) => set("headingFontSize", v)} min={14} max={80} step={1} unit="px" />
+                      <InlineSelect label="Font Family" value={p.headingFontFamily ?? "inherit"} onChange={(v) => { set("headingFontFamily", v); loadGoogleFont(v); }} options={FONT_FAMILY_OPTIONS} />
+                      <InlineSelect label="Font Weight" value={String(p.headingFontWeight ?? "800")} onChange={(v) => set("headingFontWeight", v)} options={FONT_WEIGHT_OPTIONS} />
+
+                      <TabSection title="Description" />
+                      <ColorPickerField label="Color" value={p.descriptionColor ?? ""} onChange={(v) => set("descriptionColor", v)} />
+                      <SliderNumberField label="Font Size" value={p.descFontSize ?? 16} onChange={(v) => set("descFontSize", v)} min={12} max={40} step={1} unit="px" />
+                      <InlineSelect label="Font Family" value={p.descFontFamily ?? "inherit"} onChange={(v) => { set("descFontFamily", v); loadGoogleFont(v); }} options={FONT_FAMILY_OPTIONS} />
+                      <InlineSelect label="Font Weight" value={String(p.descFontWeight ?? "400")} onChange={(v) => set("descFontWeight", v)} options={FONT_WEIGHT_OPTIONS} />
+
+                      <TabSection title="Gallery" />
+                      <InlineSelect label="Layout" value={p.layoutType ?? "grid"} onChange={(v) => set("layoutType", v)}
+                        options={[{ value: "grid", label: "Grid" }, { value: "masonry", label: "Masonry" }]} />
+                      <InlineSelect label="Aspect Ratio" value={p.aspectRatio ?? "square"} onChange={(v) => set("aspectRatio", v)}
+                        options={[{ value: "square", label: "Square" }, { value: "landscape", label: "Landscape" }, { value: "portrait", label: "Portrait" }, { value: "original", label: "Auto" }]} />
+                      <InlineSelect label="Object Fit" value={p.objectFit ?? "cover"} onChange={(v) => set("objectFit", v)}
+                        options={[{ value: "cover", label: "Cover" }, { value: "contain", label: "Contain" }, { value: "fill", label: "Fill" }]} />
+                      <InlineSelect label="Hover Effect" value={p.hoverEffect ?? "none"} onChange={(v) => set("hoverEffect", v)}
+                        options={[{ value: "none", label: "None" }, { value: "zoom", label: "Zoom" }, { value: "fade", label: "Fade" }]} />
+                      <ToggleField label="Show Caption" value={!!p.showCaption} onChange={(v) => set("showCaption", v)} />
+                      {!!p.showCaption && (
+                        <ColorPickerField label="Caption Color" value={p.captionColor ?? "#6b7280"} onChange={(v) => set("captionColor", v)} />
+                      )}
+                      <SliderNumberField label="Border Radius" value={p.imageBorderRadius ?? 8} onChange={(v) => set("imageBorderRadius", v)} min={0} max={60} step={1} unit="px" />
+                      <ToggleField label="Image Shadow" value={!!p.imageShadow} onChange={(v) => set("imageShadow", v)} />
+
+                      <SectionStyleFields props={p} set={set} />
+                    </>
+                  )}
+
+                  {/* ── ADVANCED TAB ── */}
+                  {tab === "advanced" && (
+                    <>
+                      <TabSection title="Layout" />
+                      <InlineSelect label="Content Width" value={p.contentWidth ?? "boxed"} onChange={(v) => set("contentWidth", v)}
+                        options={[{ value: "boxed", label: "Boxed" }, { value: "full", label: "Full Width" }]} />
+                      {p.contentWidth === "boxed" && <SliderNumberField label="Max Width" value={p.containerWidth ?? 1140} onChange={(v) => set("containerWidth", v)} min={320} max={1920} step={10} unit="PX" />}
+                      <SliderNumberField label="Min Height" value={p.minHeightPx ?? 0} onChange={(v) => set("minHeightPx", v)} min={0} max={1200} step={10} unit="PX" />
+
+                      <TabSection title="Spacing" />
+                      <FourSideField label="Padding (px)" value={p.advPadding ?? { top: 60, right: 0, bottom: 60, left: 0 }} onChange={(v) => set("advPadding", v)} />
+
+                      <TabSection title="Responsive" />
+                      <ToggleField label="Hide on Desktop" value={!!p.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
+                      <ToggleField label="Hide on Tablet" value={!!p.hideTablet} onChange={(v) => set("hideTablet", v)} />
+                      <ToggleField label="Hide on Mobile" value={!!p.hideMobile} onChange={(v) => set("hideMobile", v)} />
+
+                      <TabSection title="Animation" />
+                      <InlineSelect label="Entrance" value={p.animation ?? "none"} onChange={(v) => set("animation", v)}
+                        options={[{ value: "none", label: "None" }, { value: "fadeIn", label: "Fade In" }, { value: "fadeInUp", label: "Fade In Up" }, { value: "fadeInDown", label: "Fade In Down" }, { value: "slideInLeft", label: "Slide In Left" }, { value: "slideInRight", label: "Slide In Right" }, { value: "zoomIn", label: "Zoom In" }]} />
+                    </>
+                  )}
+                </>
+              )}
+            </BlockTabBar>
+          );
+        },
+      },
+    },
+    defaultProps: baseSectionProps({
+      advPadding: { top: 60, right: 0, bottom: 60, left: 0 },
+      sectionTitle: "Our Gallery",
+      showHeading: true,
+      showDescription: false,
+      sectionDescription: "",
+      textAlign: "text-center",
+      galleryColumns: 3,
+      galleryColumnsTablet: 2,
+      galleryColumnsMobile: 1,
+      gap: 12,
+      rowGap: 12,
+      colGap: 12,
+      layoutType: "grid",
+      aspectRatio: "square",
+      objectFit: "cover",
+      hoverEffect: "none",
+      showCaption: false,
+      captionColor: "#6b7280",
+      imageBorderRadius: 8,
+      imageShadow: false,
+      // Heading typography
+      headingColor: "", headingFontSize: 36, headingFontFamily: "inherit", headingFontWeight: "800",
+      // Description typography
+      descriptionColor: "", descFontSize: 16, descFontFamily: "inherit", descFontWeight: "400",
+      items: [
+        { url: "", alt: "", caption: "" },
+        { url: "", alt: "", caption: "" },
+        { url: "", alt: "", caption: "" },
+        { url: "", alt: "", caption: "" },
+        { url: "", alt: "", caption: "" },
+        { url: "", alt: "", caption: "" },
+      ],
+    }),
     render: (p: any) => <SectionGalleryContent p={p} />,
   },
 
@@ -1166,20 +1722,27 @@ export const sectionTemplateConfig: Record<string, any> = {
         <TabSection title="Marquee Bar" />
         <ToggleField label="Show Marquee Bar" value={p.showMarquee !== false} onChange={(v) => set("showMarquee", v)} />
         {p.showMarquee !== false && <><StackedTextField label="Text" value={p.marqueeText ?? ""} onChange={(v) => set("marqueeText", v)} placeholder="Announcement · " /><ColorPickerField label="Background" value={p.marqueeBg ?? "#1a1a1a"} onChange={(v) => set("marqueeBg", v)} /><ColorPickerField label="Text Color" value={p.marqueeColor ?? "#ffffff"} onChange={(v) => set("marqueeColor", v)} /></>}
-        <TabSection title="Carousel" />
+        <TabSection title="Products" />
         <StackedTextField label="Section Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Featured" />
-        <SectionItemsField label="Cards" items={p.items} onChange={(v) => set("items", v)}
-          newItem={() => ({ imageUrl: "", title: "New Card", text: "", buttonLabel: "", buttonUrl: "#" })}
-          fields={[{ key: "imageUrl", label: "Image", type: "image" }, { key: "title", label: "Title", placeholder: "Card title" }, { key: "text", label: "Text", type: "textarea", placeholder: "Short text" }, { key: "buttonLabel", label: "Button Label", placeholder: "Shop (optional)" }, { key: "buttonUrl", label: "Button URL", type: "url" }]} />
+        <InlineSelect label="Data Source" value={p.dataSource ?? "shopify"} onChange={(v) => set("dataSource", v)}
+          options={[{ value: "shopify", label: "Shopify Products" }, { value: "manual", label: "Manual Cards" }]} />
         <InlineSelect label="Cards Per Row" value={String(p.cardCount ?? 3)} onChange={(v) => set("cardCount", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
+        {(p.dataSource ?? "shopify") === "shopify"
+          ? <ProductPicker items={p.items ?? []} onChange={(v) => set("items", v)} cardCount={p.cardCount ?? 3} accentColor={p.accentColor || "#005bd3"} />
+          : <SectionItemsField label="Cards" items={p.items} onChange={(v) => set("items", v)}
+              newItem={() => ({ imageUrl: "", title: "New Card", text: "", buttonLabel: "Shop Now", buttonUrl: "#", badge: "" })}
+              fields={[{ key: "imageUrl", label: "Image", type: "image" }, { key: "title", label: "Title", placeholder: "Card title" }, { key: "text", label: "Text", type: "textarea", placeholder: "Short text" }, { key: "buttonLabel", label: "Button Label", placeholder: "Shop Now" }, { key: "buttonUrl", label: "Button URL", type: "url" }, { key: "badge", label: "Badge", placeholder: "New · Sale" }]} />}
+        <TabSection title="Card Style" />
+        <ColorPickerField label="Accent Color" value={p.accentColor ?? "#005bd3"} onChange={(v) => set("accentColor", v)} />
+        <SliderNumberField label="Card Corner Radius (px)" value={p.cardRadius ?? 12} onChange={(v) => set("cardRadius", v)} min={0} max={32} step={1} unit="px" />
+        <InlineSelect label="Image Ratio" value={p.imgRatio ?? "4/3"} onChange={(v) => set("imgRatio", v)}
+          options={[{ value: "1/1", label: "Square" }, { value: "4/3", label: "4:3" }, { value: "3/4", label: "3:4 (Portrait)" }, { value: "16/9", label: "16:9" }]} />
+        <ToggleField label="Show Price" value={p.showPrice !== false} onChange={(v) => set("showPrice", v)} />
+        <ToggleField label="Show Badge" value={p.showBadge !== false} onChange={(v) => set("showBadge", v)} />
       </>
     )),
-    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 2, advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "Featured", showMarquee: true, marqueeText: "Free shipping · New arrivals · Special offers · ", marqueeBg: "#1a1a1a", marqueeColor: "#ffffff", cardCount: 3,
-      items: [
-        { imageUrl: "", title: "Featured Product", text: "A short description of this item.", buttonLabel: "Shop Now", buttonUrl: "#" },
-        { imageUrl: "", title: "Best Seller", text: "A short description of this item.", buttonLabel: "Shop Now", buttonUrl: "#" },
-        { imageUrl: "", title: "New Arrival", text: "A short description of this item.", buttonLabel: "Shop Now", buttonUrl: "#" },
-      ] }),
+    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 2, advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "Featured", showMarquee: true, marqueeText: "Free shipping · New arrivals · Special offers · ", marqueeBg: "#1a1a1a", marqueeColor: "#ffffff", cardCount: 3, dataSource: "shopify", accentColor: "#005bd3", cardRadius: 12, imgRatio: "4/3", showPrice: true, showBadge: true,
+      items: [] }),
     render: (p: any) => <SectionCarouselContent p={p} />,
   },
 

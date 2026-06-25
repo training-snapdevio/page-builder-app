@@ -15,7 +15,6 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
-  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
@@ -49,7 +48,7 @@ const ButtonComponent = {
         const set = (key: string, val: any) => {
           if (!selectedItem) return;
           const { destinationZone, destinationIndex } = getZoneInfo();
-          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } });
+          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } , ui: appState.ui });
         };
         const setMany = (patch: Record<string, any>) => {
           if (!selectedItem) return;
@@ -292,14 +291,10 @@ const ButtonComponent = {
                       </>
                     )}
 
-                    <TabSection title="Responsive Spacing" />
-                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
-
-                    <SliderNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1} unit="%" />
                   </>
                 )}
               </>
@@ -355,7 +350,6 @@ const ButtonComponent = {
     cssClass: "",
     customCss: "",
     zIndex: null,
-    opacity: 100,
   },
 
   render: ({
@@ -405,7 +399,6 @@ const ButtonComponent = {
     cssClass,
     customCss,
     zIndex,
-    opacity,
   }: any) => {
     const [hovered, setHovered] = useState(false);
 
@@ -463,7 +456,9 @@ const ButtonComponent = {
     } : {};
 
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
-    const wrapBg = advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {};
+    // Wrapper background is meaningless for a full-width button (it fills the
+    // wrapper), and its settings are hidden in that case — so don't apply it.
+    const wrapBg = !fullWidth && advBgType === "color" && advBgColor ? { backgroundColor: advBgColor } : {};
 
     const showIcon = iconType !== "none" && icon;
     const iconEl = showIcon && (
@@ -509,7 +504,6 @@ const ButtonComponent = {
           border: borderStyle !== "none" ? `${borderWidth ?? 2}px ${borderStyle} ${borderColor || "transparent"}` : "none",
           borderRadius: borderRadiusValue,
           cursor: "pointer",
-          opacity: opacity != null ? opacity / 100 : 1,
           textDecoration: "none",
           transition: "color 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.2s ease",
           ...hoverOverrides,

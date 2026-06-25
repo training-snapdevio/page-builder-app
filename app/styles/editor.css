@@ -235,6 +235,8 @@ select._Sidebar--right_o396p_25 ._Input-input_bsxfo_26,
 @media(max-width:767px){
   .pb-grid-2col{grid-template-columns:1fr!important;gap:24px!important}
   .pb-sec-about-grid{grid-template-columns:1fr!important;gap:24px!important}
+  .pb-about-img-bottom .pb-about-img{order:2!important}
+  .pb-about-img-bottom .pb-about-text{order:1!important}
   .pb-sec-cards{grid-template-columns:1fr!important;gap:16px!important}
   .pb-sec-gallery{grid-template-columns:repeat(2,1fr)!important}
   .pb-sec-logos{grid-template-columns:repeat(3,1fr)!important;gap:16px!important}

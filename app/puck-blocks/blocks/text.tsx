@@ -11,7 +11,6 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
-  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
@@ -37,7 +36,7 @@ export const TextComponent = {
             const idx = (items as any[]).findIndex((it: any) => it.props?.id === selectedItem.props?.id);
             if (idx !== -1) { destinationZone = zone; destinationIndex = idx; break; }
           }
-          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } });
+          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } , ui: appState.ui });
         };
 
         const bgType = props.advBgType ?? "none";
@@ -195,14 +194,10 @@ export const TextComponent = {
                     <FourSideField label="Border Radius (px)" value={props.advBorderRadius} onChange={(v) => set("advBorderRadius", v)} />
 
 
-                    <TabSection title="Responsive Spacing" />
-                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
                     <ToggleField label="Hide on Mobile" value={!!props.hideMobile} onChange={(v) => set("hideMobile", v)} />
-
-                    <SliderNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1} unit="%" />
                   </>
                 )}
               </>
@@ -247,7 +242,6 @@ export const TextComponent = {
     cssClass: "",
     customCss: "",
     zIndex: null,
-    opacity: 100,
   },
 
   render: ({
@@ -286,7 +280,6 @@ export const TextComponent = {
     cssClass,
     customCss,
     zIndex,
-    opacity,
   }) => {
     const bgStyle: React.CSSProperties = (() => {
       if (advBgType === "color") return { backgroundColor: backgroundColor || "transparent" };
@@ -306,6 +299,17 @@ export const TextComponent = {
       ? { columnCount: cols, columnGap: columnGap || "1.5rem" }
       : {};
 
+    // With a rounded box + overflow:hidden, text that runs to the edge gets
+    // clipped by the corner curve. Keep the horizontal padding at least as
+    // large as the adjacent corner radii so text stays inside the curve.
+    // Corner map: top→top-left, right→top-right, bottom→bottom-right, left→bottom-left.
+    const rTL = advBorderRadius?.top ?? 0;
+    const rTR = advBorderRadius?.right ?? 0;
+    const rBR = advBorderRadius?.bottom ?? 0;
+    const rBL = advBorderRadius?.left ?? 0;
+    const padLeft = Math.max(advPadding?.left ?? 0, rTL, rBL);
+    const padRight = Math.max(advPadding?.right ?? 0, rTR, rBR);
+
     return (
       <div
         id={cssId || undefined}
@@ -313,12 +317,14 @@ export const TextComponent = {
         className={[hideClasses, cssClass].filter(Boolean).join(" ") || undefined}
         style={{
           position: "relative",
-          paddingTop: advPadding?.top ?? 16, paddingRight: advPadding?.right ?? 0,
-          paddingBottom: advPadding?.bottom ?? 16, paddingLeft: advPadding?.left ?? 0,
+          paddingTop: advPadding?.top ?? 16, paddingRight: padRight,
+          paddingBottom: advPadding?.bottom ?? 16, paddingLeft: padLeft,
           marginTop: advMargin?.top ?? 0, marginRight: advMargin?.right ?? 0,
           marginBottom: advMargin?.bottom ?? 0, marginLeft: advMargin?.left ?? 0,
           zIndex: zIndex ?? undefined,
-          opacity: opacity != null ? opacity / 100 : 1,
+          // Clip content to the rounded box so a large radius can't push text
+          // outside the border / overlap neighbouring blocks.
+          overflow: "hidden",
           borderTopLeftRadius: advBorderRadius?.top ?? 0,
           borderTopRightRadius: advBorderRadius?.right ?? 0,
           borderBottomRightRadius: advBorderRadius?.bottom ?? 0,
@@ -345,6 +351,8 @@ export const TextComponent = {
             textTransform: (textTransform ?? "none") as any,
             color: textColor || "var(--text-color)",
             margin: 0,
+            // Preserve the line breaks the merchant typed in the textarea.
+            whiteSpace: "pre-wrap",
             ...colStyle,
           }}
         >

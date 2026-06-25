@@ -10,7 +10,6 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
-  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   SliderUnitField,
@@ -42,6 +41,18 @@ const VideoComponent = {
           }
           dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), [key]: val } } });
         };
+        const setMany = (patch: Record<string, any>) => {
+          if (!selectedItem) return;
+          const state = appState.data;
+          let destinationZone = "root:default-zone";
+          let destinationIndex = 0;
+          const zones: Record<string, any[]> = { "root:default-zone": state.content, ...(state.zones ?? {}) };
+          for (const [zone, items] of Object.entries(zones)) {
+            const idx = (items as any[]).findIndex((it: any) => it.props?.id === selectedItem.props?.id);
+            if (idx !== -1) { destinationZone = zone; destinationIndex = idx; break; }
+          }
+          dispatch({ type: "replace", destinationZone, destinationIndex, data: { ...selectedItem, props: { ...(selectedItem.props ?? {}), ...patch } } });
+        };
 
         return (
           <BlockTabBar blockKey="Video">
@@ -53,7 +64,7 @@ const VideoComponent = {
                     <InlineSelect
                       label="Source Type"
                       value={props.sourceType ?? "youtube"}
-                      onChange={(v) => set("sourceType", v)}
+                      onChange={(v) => setMany({ sourceType: v, videoUrl: "" })}
                       options={[
                         { value: "youtube", label: "YouTube" },
                         { value: "vimeo", label: "Vimeo" },
@@ -63,7 +74,7 @@ const VideoComponent = {
                     {props.sourceType === "upload" ? (
                       <VideoUploadField value={props.videoUrl ?? ""} onChange={(v) => set("videoUrl", v)} />
                     ) : (
-                      <StackedTextField label="Video URL" value={props.videoUrl ?? ""} onChange={(v) => set("videoUrl", v)} placeholder="https://..." />
+                      <StackedTextField label="Video URL" value={props.videoUrl ?? ""} onChange={(v) => set("videoUrl", v)} placeholder={props.sourceType === "vimeo" ? "https://vimeo.com/..." : "https://www.youtube.com/watch?v=..."} />
                     )}
                     <ToggleField label="Autoplay" value={!!props.autoplay} onChange={(v) => set("autoplay", v)} />
                     <ToggleField label="Loop" value={!!props.loop} onChange={(v) => set("loop", v)} />
@@ -97,9 +108,7 @@ const VideoComponent = {
                       label="Width"
                       value={props.videoWidthVal ?? 100}
                       unit="%"
-                      onValueChange={(v) => set("videoWidthVal", v)}
-                      onUnitChange={() => {}}
-                      units={["%"]}
+                      onChange={(v) => set("videoWidthVal", v)}
                       step={1}
                     />
 
@@ -115,8 +124,6 @@ const VideoComponent = {
                     <FourSideField label="Margin (px)" value={props.advMargin} onChange={(v) => set("advMargin", v)} />
                     <FourSideField label="Padding (px)" value={props.advPadding ?? { top: 0, right: 0, bottom: 0, left: 0 }} onChange={(v) => set("advPadding", v)} />
 
-                    <TabSection title="Responsive Spacing" />
-                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />

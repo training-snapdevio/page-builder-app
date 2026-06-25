@@ -362,8 +362,8 @@ function injectDynamicEffects(
     // Stats row → max 2 cols so numbers stay readable
     `.page-preview .pb-grid-stats{grid-template-columns:repeat(2,1fr) !important;gap:12px !important}`,
     // Photo collage → simple 2-col grid, remove fixed spans
-    `.page-preview .pb-collage{grid-template-columns:repeat(2,1fr) !important;grid-template-rows:auto !important}`,
-    `.page-preview .pb-collage>*{grid-column:auto !important;grid-row:auto !important}`,
+    `.page-preview .pb-collage-wrap{grid-template-columns:repeat(2,1fr) !important;grid-template-rows:auto !important}`,
+    `.page-preview .pb-collage-wrap>*{grid-column:auto !important;grid-row:auto !important}`,
     // Header: hide nav links on narrow screens (prevents overflow / wrapping)
     `.page-preview .pb-header-nav{display:none !important}`,
     `}`,

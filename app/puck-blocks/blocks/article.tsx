@@ -13,7 +13,6 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
-  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
@@ -102,8 +101,6 @@ export const ArticleComponent = {
                     <TabSection title="Spacing" />
                     <FourSideField label="Margin"  value={props.advMargin  ?? { top: 0, right: 0, bottom: 0, left: 0 }}   onChange={(v) => set("advMargin", v)} />
                     <FourSideField label="Padding" value={props.advPadding ?? { top: 48, right: 24, bottom: 48, left: 24 }} onChange={(v) => set("advPadding", v)} />
-                    <TabSection title="Responsive Spacing" />
-                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet"  value={!!props.hideTablet}  onChange={(v) => set("hideTablet", v)} />
@@ -124,7 +121,7 @@ export const ArticleComponent = {
     showAuthor: true,
     publishDate: "",
     showDate: true,
-    body: "<p></p>",
+    body: "",
     featuredImage: "",
     imagePosition: "top",
     imageHeight: 400,
@@ -185,6 +182,7 @@ export const ArticleComponent = {
       height: imgH,
       objectFit: fit as React.CSSProperties["objectFit"],
       display: "block",
+      borderRadius: radius,
     };
 
     const formatDate = (d: string) => {
@@ -260,15 +258,27 @@ export const ArticleComponent = {
           fontWeight: Number(bodyFontWeight ?? 400),
           fontFamily: bodyFontFamily && bodyFontFamily !== "inherit" ? bodyFontFamily : undefined,
         }}>
-          {body
-            ? String(body).split(/\n\n+/).map((para: string, i: number) => (
-                <p key={i} style={{ margin: "0 0 1em" }}>
-                  {para.split(/\n/).map((line: string, j: number, arr: string[]) => (
-                    <span key={j}>{line}{j < arr.length - 1 && <br />}</span>
-                  ))}
-                </p>
-              ))
-            : null}
+          {(() => {
+            // Strip the old default "<p></p>" (and any empty paragraphs typed
+            // before/after the real text) so content isn't mis-detected as HTML
+            // and dropped on the storefront.
+            const cleaned = String(body ?? "")
+              .replace(/^(?:\s*<p>\s*<\/p>\s*)+/i, "")
+              .replace(/(?:\s*<p>\s*<\/p>\s*)+$/i, "")
+              .trim();
+            return cleaned
+              ? (/<[a-z][\s\S]*>/i.test(cleaned)
+                  ? <div dangerouslySetInnerHTML={{ __html: cleaned }} />
+                  : cleaned.split(/\n\n+/).map((para: string, i: number) => (
+                      // Weight + color repeated on the <p> so a theme/global `p` rule can't override them.
+                      <p key={i} style={{ margin: "0 0 1em", fontWeight: Number(bodyFontWeight ?? 400), color: bodyColor || "var(--text-color)" }}>
+                        {para.split(/\n/).map((line: string, j: number, arr: string[]) => (
+                          <span key={j}>{line}{j < arr.length - 1 && <br />}</span>
+                        ))}
+                      </p>
+                    )))
+              : null;
+          })()}
         </div>
       </div>
     );

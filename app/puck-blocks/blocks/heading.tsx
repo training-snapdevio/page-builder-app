@@ -12,7 +12,6 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
-  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   EditorHideOverlay,
@@ -323,8 +322,6 @@ export const HeadingBlockComponent = {
                     />
 
 
-                    <TabSection title="Responsive Spacing" />
-                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField
                       label="Hide on Desktop"
@@ -340,9 +337,6 @@ export const HeadingBlockComponent = {
                       label="Hide on Mobile"
                       value={!!props.hideMobile}
                       onChange={(v) => set("hideMobile", v)}
-                    />
-
-                    <SliderNumberField label="Opacity (%)" value={props.opacity ?? 100} onChange={(v) => set("opacity", v)} min={0} max={100} step={1}
                     />
                   </>
                 )}
@@ -409,7 +403,6 @@ export const HeadingBlockComponent = {
     cssClass: "",
     customCss: "",
     zIndex: null,
-    opacity: 100,
   },
 
   render: ({
@@ -431,7 +424,7 @@ export const HeadingBlockComponent = {
     textDecoration,
     lineHeight,
     letterSpacing,
-    hoverColor: _hoverColor,
+    hoverColor,
     dividerType,
     dividerColor,
     dividerLength,
@@ -458,7 +451,6 @@ export const HeadingBlockComponent = {
     cssClass,
     customCss,
     zIndex,
-    opacity,
   }) => {
     const Tag = (level === "custom" ? "p" : `h${level || 1}`) as keyof JSX.IntrinsicElements;
 
@@ -522,14 +514,15 @@ export const HeadingBlockComponent = {
       marginLeft:   advMargin?.left   ?? 0,
       textAlign: alignment as any,
       zIndex: zIndex ?? undefined,
-      opacity: opacity != null ? opacity / 100 : 1,
       ...bgStyle,
       ...borderStyle,
       ...radiusStyle,
     };
 
+    const hoverClass = hoverColor ? `pb-h-hover-${id}` : undefined;
     const headingEl = (
       <Tag
+        className={hoverClass}
         style={{
           fontSize: level === "custom" ? (fontSize ? `${fontSize}px` : "1rem") : defaultFontSize,
           fontWeight: fontWeight ?? "700",
@@ -541,6 +534,7 @@ export const HeadingBlockComponent = {
           letterSpacing: letterSpacing != null ? `${letterSpacing}px` : undefined,
           color: textColor || "var(--primary-color)",
           margin: 0,
+          transition: "color 0.2s ease",
         }}
       >
         {title}
@@ -557,6 +551,7 @@ export const HeadingBlockComponent = {
         <EditorHideOverlay hideDesktop={hideDesktop} hideTablet={hideTablet} hideMobile={hideMobile} />
         {(() => { const rsCss = buildResponsiveSpacingCss(`[data-pb-rs="${id}"]`, responsiveSpacing); return rsCss ? <style>{rsCss}</style> : null; })()}
         {customCss && <style>{`#${cssId || "heading-block"} { ${customCss} }`}</style>}
+        {hoverColor && <style>{`.pb-h-hover-${id}:hover{color:${hoverColor} !important;}`}</style>}
         {linkUrl
           ? <a href={linkUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit" }}>{headingEl}</a>
           : headingEl

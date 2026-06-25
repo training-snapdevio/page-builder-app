@@ -12,7 +12,6 @@ import {
   BlockTabBar,
   TabSection,
   FourSideField,
-  ResponsiveSpacingField,
   InlineSelect,
   SliderNumberField,
   SliderUnitField,
@@ -83,7 +82,16 @@ const DividerComponent = {
                           ]}
                         />
                         {props.elementType === "text"
-                          ? <StackedTextField label="Text" value={props.elementText ?? ""} onChange={(v) => set("elementText", v)} placeholder="OR" />
+                          ? (
+                            <>
+                              <StackedTextField label="Text" value={props.elementText ?? ""} onChange={(v) => set("elementText", v)} placeholder="OR" />
+                              {!String(props.elementText ?? "").trim() && (
+                                <div style={{ color: "#d72c0d", fontSize: 12, marginTop: 2, lineHeight: 1.3 }}>
+                                  Please enter text to display.
+                                </div>
+                              )}
+                            </>
+                          )
                           : props.elementType === "image"
                             ? <ImageField label="Image" value={props.elementImage ?? ""} onChange={(v) => set("elementImage", v)} />
                             : <StackedTextField label="Icon (emoji or char)" value={props.elementIcon ?? "✦"} onChange={(v) => set("elementIcon", v)} placeholder="e.g. ✦ ★ •" />
@@ -154,6 +162,7 @@ const DividerComponent = {
                           <>
                             <SliderNumberField label="Image Width (px)" value={props.elementImageWidth ?? 40} onChange={(v) => set("elementImageWidth", v)} min={8} max={300} step={1} unit="px" />
                             <SliderNumberField label="Image Height (px)" value={props.elementImageHeight ?? 40} onChange={(v) => set("elementImageHeight", v)} min={8} max={300} step={1} unit="px" />
+                            <SliderNumberField label="Image Radius (px)" value={props.elementImageRadius ?? 0} onChange={(v) => set("elementImageRadius", v)} min={0} max={150} step={1} unit="px" />
                           </>
                         )}
                         <SliderNumberField label="Spacing from Line (px)" value={props.elementSpacing ?? 12} onChange={(v) => set("elementSpacing", v)} min={0} max={60} step={1} unit="px" />
@@ -168,8 +177,6 @@ const DividerComponent = {
                     <TabSection title="Spacing" />
                     <FourSideField label="Margin (px)" value={props.advMargin} onChange={(v) => set("advMargin", v)} />
 
-                    <TabSection title="Responsive Spacing" />
-                    <ResponsiveSpacingField value={props.responsiveSpacing} onChange={(v) => set("responsiveSpacing", v)} />
                     <TabSection title="Responsive" />
                     <ToggleField label="Hide on Desktop" value={!!props.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
                     <ToggleField label="Hide on Tablet" value={!!props.hideTablet} onChange={(v) => set("hideTablet", v)} />
@@ -197,6 +204,7 @@ const DividerComponent = {
     elementImage: "",
     elementImageWidth: 40,
     elementImageHeight: 40,
+    elementImageRadius: 0,
     elementPosition: "center",
     thickness: 1,
     borderRadius: 0,
@@ -230,6 +238,7 @@ const DividerComponent = {
     elementImage,
     elementImageWidth,
     elementImageHeight,
+    elementImageRadius,
     elementPosition,
     thickness,
     borderRadius: dividerBorderRadius,
@@ -318,34 +327,49 @@ const DividerComponent = {
     };
 
     const iconVal = (elementIcon as string) || "";
-    const hasIconContent = elementType === "text" ? true : elementType === "image" ? !!(elementImage as string) : !!iconVal.trim();
+    const hasIconContent = elementType === "text" ? !!String(elementText ?? "").trim() : elementType === "image" ? !!(elementImage as string) : !!iconVal.trim();
     const elementContent = showElement && hasIconContent
       ? (
         <div style={{ display: "flex", alignItems: "center", flexShrink: 0, padding: `0 ${elementSpacing ?? 12}px` }}>
           {elementType === "text"
-            ? <span style={{ fontSize: elementFontSize || 14, color: elementTextColor || color, whiteSpace: "nowrap" }}>{elementText || "OR"}</span>
+            ? <span style={{ fontSize: elementFontSize || 14, color: elementTextColor || color, whiteSpace: "nowrap" }}>{elementText}</span>
             : elementType === "image"
-              ? <img src={elementImage as string} alt="" style={{ width: elementImageWidth || 40, height: elementImageHeight || 40, objectFit: "contain", display: "block" }} />
+              ? (
+                // Wrapper clips the image to rounded corners (overflow:hidden), so the
+                // radius is visible on the photo itself — matching the Image block.
+                <div style={{ width: elementImageWidth || 40, height: elementImageHeight || 40, overflow: "hidden", borderRadius: Number(elementImageRadius) || 0, flexShrink: 0 }}>
+                  <img src={elementImage as string} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                </div>
+              )
               : <span style={{ fontSize: iconSize || 20, color: iconColor || color, lineHeight: 1 }}>{iconVal}</span>
           }
         </div>
       )
       : null;
 
-    const lineWidthCss = `${lineWidthVal ?? 100}px`;
-    const outerJustify = showElement
-      ? (alignment === "right" ? "flex-end" : alignment === "left" ? "flex-start" : "center")
-      : "center";
+    // Guard against empty/invalid width values (e.g. "" → "px") which the
+    // browser ignores, causing the line to stretch full-bleed and break the UI.
+    const wNum = Number(lineWidthVal);
+    const lineWidthCss = Number.isFinite(wNum) && wNum > 0 ? `${wNum}px` : "100%";
+    const outerJustify = alignment === "right" ? "flex-end" : alignment === "left" ? "flex-start" : "center";
 
-    const lineWrap = showElement && elementContent
-      ? (
-        <div style={{ display: "flex", alignItems: "center", width: lineWidthCss }}>
-          {elementPosition === "center" || elementPosition === "right" ? lineEl(true) : null}
-          {elementContent}
-          {elementPosition === "center" || elementPosition === "left" ? lineEl(true) : null}
-        </div>
-      )
-      : lineEl(false, lineWidthCss);
+    // With an icon/text element the divider is constrained to the configured
+    // width so the element stays centered; without it, the divider is a clean
+    // full-width line spanning the container.
+    const hasEl = showElement && elementContent;
+    const lineWrap = (
+      <div style={{ display: "flex", alignItems: "center", width: hasEl ? lineWidthCss : "100%" }}>
+        {hasEl
+          ? (
+            <>
+              {elementPosition === "center" || elementPosition === "right" ? lineEl(true) : null}
+              {elementContent}
+              {elementPosition === "center" || elementPosition === "left" ? lineEl(true) : null}
+            </>
+          )
+          : lineEl(true)}
+      </div>
+    );
 
     return (
       <div
