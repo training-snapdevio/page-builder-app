@@ -328,21 +328,29 @@ const DividerComponent = {
 
     const iconVal = (elementIcon as string) || "";
     const hasIconContent = elementType === "text" ? !!String(elementText ?? "").trim() : elementType === "image" ? !!(elementImage as string) : !!iconVal.trim();
-    const elementContent = showElement && hasIconContent
+    // When "Add Icon / Text" is ON but the text/icon/image is still empty, keep the
+    // element's space reserved (an empty spacer sized like the element would be) so
+    // the divider holds its constrained-width, gapped layout instead of collapsing
+    // to a full-width line — the space "remains there" until content is added.
+    const elementInner = hasIconContent
+      ? (elementType === "text"
+          ? <span style={{ fontSize: elementFontSize || 14, color: elementTextColor || color, whiteSpace: "nowrap" }}>{elementText}</span>
+          : elementType === "image"
+            ? (
+              // Wrapper clips the image to rounded corners (overflow:hidden), so the
+              // radius is visible on the photo itself — matching the Image block.
+              <div style={{ width: elementImageWidth || 40, height: elementImageHeight || 40, overflow: "hidden", borderRadius: Number(elementImageRadius) || 0, flexShrink: 0 }}>
+                <img src={elementImage as string} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              </div>
+            )
+            : <span style={{ fontSize: iconSize || 20, color: iconColor || color, lineHeight: 1 }}>{iconVal}</span>)
+      : (elementType === "image"
+          ? <div style={{ width: elementImageWidth || 40, height: elementImageHeight || 40, flexShrink: 0 }} />
+          : <span style={{ display: "inline-block", minHeight: elementType === "text" ? (elementFontSize || 14) : (iconSize || 20) }} />);
+    const elementContent = showElement
       ? (
         <div style={{ display: "flex", alignItems: "center", flexShrink: 0, padding: `0 ${elementSpacing ?? 12}px` }}>
-          {elementType === "text"
-            ? <span style={{ fontSize: elementFontSize || 14, color: elementTextColor || color, whiteSpace: "nowrap" }}>{elementText}</span>
-            : elementType === "image"
-              ? (
-                // Wrapper clips the image to rounded corners (overflow:hidden), so the
-                // radius is visible on the photo itself — matching the Image block.
-                <div style={{ width: elementImageWidth || 40, height: elementImageHeight || 40, overflow: "hidden", borderRadius: Number(elementImageRadius) || 0, flexShrink: 0 }}>
-                  <img src={elementImage as string} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                </div>
-              )
-              : <span style={{ fontSize: iconSize || 20, color: iconColor || color, lineHeight: 1 }}>{iconVal}</span>
-          }
+          {elementInner}
         </div>
       )
       : null;

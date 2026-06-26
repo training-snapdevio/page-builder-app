@@ -64,7 +64,18 @@ const VideoComponent = {
                     <InlineSelect
                       label="Source Type"
                       value={props.sourceType ?? "youtube"}
-                      onChange={(v) => setMany({ sourceType: v, videoUrl: "" })}
+                      onChange={(v) => {
+                        // Each source type keeps its own URL: stash the current URL
+                        // under the type leaving, and restore the type being selected
+                        // (so e.g. a YouTube link survives a round-trip via Vimeo).
+                        const prevType = props.sourceType ?? "youtube";
+                        if (v === prevType) return;
+                        setMany({
+                          sourceType: v,
+                          [`videoUrl_${prevType}`]: props.videoUrl ?? "",
+                          videoUrl: props[`videoUrl_${v}`] ?? "",
+                        });
+                      }}
                       options={[
                         { value: "youtube", label: "YouTube" },
                         { value: "vimeo", label: "Vimeo" },

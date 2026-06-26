@@ -669,13 +669,22 @@ const miniBtn: React.CSSProperties = {
   display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--p-color-text)",
 };
 
-// Collapsible image-items editor — same accordion UI as the Photo Collage block:
-// each row is a thumbnail + label + chevron, expands to reveal the image upload
-// and per-item fields, with an inline delete confirmation.
-function GalleryItemsField({ items, onChange, max = 36 }: {
+// AccordionItemsField — collapsible repeatable-list editor (the Photo Collage /
+// Gallery accordion UI): each row is a thumbnail + title + chevron that expands to
+// reveal the per-item fields, with an inline delete confirmation. The thumbnail,
+// header title and subtitle are derived per item so the same component drives image
+// galleries (photo thumb) and content cards (e.g. Services — emoji thumb).
+function AccordionItemsField({ items, onChange, fields, newItem, max = 12, singular = "Item", getThumb, getTitle, getSubtitle, removeNote }: {
   items: any[];
   onChange: (next: any[]) => void;
+  fields: { key: string; label: string; type?: "text" | "textarea" | "image" | "url"; placeholder?: string }[];
+  newItem: () => any;
   max?: number;
+  singular?: string;
+  getThumb?: (item: any) => React.ReactNode;
+  getTitle?: (item: any, i: number) => string;
+  getSubtitle?: (item: any) => string;
+  removeNote?: string;
 }) {
   const list = Array.isArray(items) ? items : [];
   const [openIdx, setOpenIdx] = useState<number | null>(null);
@@ -689,13 +698,20 @@ function GalleryItemsField({ items, onChange, max = 36 }: {
     setConfirmIdx(null);
     setOpenIdx(null);
   };
-  const add = () => { onChange([...list, { url: "", alt: "", caption: "" }]); setOpenIdx(list.length); };
+  const add = () => { onChange([...list, newItem()]); setOpenIdx(list.length); };
+
+  const placeholderThumb = (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--p-color-icon-subdued, #8c9196)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      {list.map((img: any, i: number) => {
+      {list.map((item: any, i: number) => {
         const open = openIdx === i;
         const confirm = confirmIdx === i;
+        const headerTitle = getTitle ? getTitle(item, i) : `${singular} ${i + 1}`;
+        const headerSub = getSubtitle ? getSubtitle(item) : "";
+        const thumb = getThumb ? getThumb(item) : null;
         return (
           <div key={i} style={{ border: "1px solid var(--p-color-border, #e1e3e5)", borderRadius: 8, background: "var(--p-color-bg-surface, #fff)", overflow: "hidden" }}>
             {/* Header row */}
@@ -703,16 +719,13 @@ function GalleryItemsField({ items, onChange, max = 36 }: {
               onClick={() => { if (!confirm) setOpenIdx(open ? null : i); }}
               style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", cursor: confirm ? "default" : "pointer", userSelect: "none", background: open ? "var(--p-color-bg-surface-secondary, #f6f6f7)" : "transparent", borderBottom: (open || confirm) ? "1px solid var(--p-color-border, #e1e3e5)" : "none" }}
             >
-              <div style={{ width: 36, height: 36, borderRadius: 5, overflow: "hidden", background: "var(--p-color-bg-surface-secondary, #f3f4f6)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--p-color-border, #e1e3e5)" }}>
-                {img.url
-                  ? <img src={img.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--p-color-icon-subdued, #8c9196)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
-                }
+              <div style={{ width: 36, height: 36, borderRadius: 5, overflow: "hidden", background: "var(--p-color-bg-surface-secondary, #f3f4f6)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--p-color-border, #e1e3e5)", fontSize: 20, lineHeight: 1 }}>
+                {thumb ?? placeholderThumb}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--p-color-text, #202223)", lineHeight: 1.3 }}>Image {i + 1}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--p-color-text, #202223)", lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{headerTitle}</div>
                 <div style={{ fontSize: 11, color: "var(--p-color-text-subdued, #6d7175)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 1 }}>
-                  {img.alt || img.caption || (img.url ? "No alt text" : "No image selected")}
+                  {headerSub}
                 </div>
               </div>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--p-color-icon-subdued, #8c9196)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: "transform 0.2s", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>
@@ -720,7 +733,7 @@ function GalleryItemsField({ items, onChange, max = 36 }: {
               </svg>
               <button
                 onClick={(e: any) => { e.stopPropagation(); setConfirmIdx(i); setOpenIdx(null); }}
-                title="Remove image"
+                title={`Remove ${singular.toLowerCase()}`}
                 style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 5, border: "1px solid var(--p-color-border, #e1e3e5)", background: "var(--p-color-bg-surface, #fff)", color: "var(--p-color-text-critical, #d72c0d)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -736,8 +749,8 @@ function GalleryItemsField({ items, onChange, max = 36 }: {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "#202223", marginBottom: 2 }}>Remove Image {i + 1}?</div>
-                    <div style={{ fontSize: 11, color: "#6d7175", lineHeight: 1.5 }}>This image will be removed from the gallery. This action cannot be undone.</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#202223", marginBottom: 2 }}>Remove {singular} {i + 1}?</div>
+                    <div style={{ fontSize: 11, color: "#6d7175", lineHeight: 1.5 }}>{removeNote ?? `This ${singular.toLowerCase()} will be removed. This action cannot be undone.`}</div>
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -749,9 +762,13 @@ function GalleryItemsField({ items, onChange, max = 36 }: {
             {/* Expanded fields */}
             {open && !confirm && (
               <div style={{ padding: "10px 10px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
-                <ImageField label="Image" value={img.url ?? ""} onChange={(v: any) => update(i, "url", v)} />
-                <StackedTextField label="Alt Text" value={img.alt ?? ""} onChange={(v: any) => update(i, "alt", v)} placeholder="Describe the image…" />
-                <StackedTextField label="Caption (optional)" value={img.caption ?? ""} onChange={(v: any) => update(i, "caption", v)} placeholder="Image caption" />
+                {fields.map((f) => {
+                  const v = item[f.key] ?? "";
+                  if (f.type === "image") return <ImageField key={f.key} label={f.label} value={v} onChange={(val: any) => update(i, f.key, val)} />;
+                  if (f.type === "url") return <LinkUrlField key={f.key} label={f.label} value={v} onChange={(val: any) => update(i, f.key, val)} />;
+                  if (f.type === "textarea") return <StackedTextareaField key={f.key} label={f.label} value={v} onChange={(val: any) => update(i, f.key, val)} placeholder={f.placeholder} />;
+                  return <StackedTextField key={f.key} label={f.label} value={v} onChange={(val: any) => update(i, f.key, val)} placeholder={f.placeholder} />;
+                })}
               </div>
             )}
           </div>
@@ -763,10 +780,37 @@ function GalleryItemsField({ items, onChange, max = 36 }: {
           style={{ marginTop: 2, width: "100%", padding: "8px 0", border: "1.5px dashed var(--p-color-border-interactive, #0158ad)", borderRadius: 8, color: "var(--p-color-text-interactive, #0158ad)", background: "transparent", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add Image
+          Add {singular}
         </button>
       )}
     </div>
+  );
+}
+
+// Collapsible image-items editor for the Gallery — thin wrapper over the shared
+// AccordionItemsField (photo thumbnail + alt/caption fields).
+function GalleryItemsField({ items, onChange, max = 36 }: {
+  items: any[];
+  onChange: (next: any[]) => void;
+  max?: number;
+}) {
+  return (
+    <AccordionItemsField
+      items={items}
+      onChange={onChange}
+      max={max}
+      singular="Image"
+      newItem={() => ({ url: "", alt: "", caption: "" })}
+      fields={[
+        { key: "url", label: "Image", type: "image" },
+        { key: "alt", label: "Alt Text", placeholder: "Describe the image…" },
+        { key: "caption", label: "Caption (optional)", placeholder: "Image caption" },
+      ]}
+      getThumb={(img: any) => (img.url ? <img src={img.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null)}
+      getTitle={(_img: any, i: number) => `Image ${i + 1}`}
+      getSubtitle={(img: any) => img.alt || img.caption || (img.url ? "No alt text" : "No image selected")}
+      removeNote="This image will be removed from the gallery. This action cannot be undone."
+    />
   );
 }
 
@@ -965,27 +1009,6 @@ function SectionGalleryContent({ p }: { p: any }) {
           )}
         </div>
       </div>
-    </SectionCanvasWrap>
-  );
-}
-
-// Logo Row: optional label + grayscale logo grid.
-function SectionLogosContent({ p }: { p: any }) {
-  const items: any[] = Array.isArray(p.items) ? p.items : [];
-  const cols = p.logoColumns ?? 6;
-  const gray = p.grayscale !== false;
-  return (
-    <SectionCanvasWrap props={p}>
-      {p.sectionTitle && <div style={{ textAlign: "center", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#94a3b8", marginBottom: 24 }}>{p.sectionTitle}</div>}
-      <SecGrid cols={cols} gap={24}>
-        {items.map((it, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 50 }}>
-            {it.url
-              ? <img src={it.url} alt={it.alt || ""} style={{ maxWidth: "100%", maxHeight: 44, objectFit: "contain", filter: gray ? "grayscale(1)" : undefined, opacity: gray ? 0.7 : 1 }} />
-              : <div style={{ width: "100%", height: 44, background: "#eef2f7", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", color: "#cbd5e1", fontSize: 18 }}>🏷</div>}
-          </div>
-        ))}
-      </SecGrid>
     </SectionCanvasWrap>
   );
 }
@@ -1445,7 +1468,7 @@ export const sectionTemplateConfig: Record<string, any> = {
                       <StackedTextField label="Heading" value={p.title ?? ""} onChange={(v) => set("title", v)} placeholder="Who We Are" />
                       <StackedTextField label="Subheading" value={p.subtitle ?? ""} onChange={(v) => set("subtitle", v)} placeholder="Our story and mission" />
                       <StackedTextareaField label="Description" value={p.description ?? ""} onChange={(v) => set("description", v)} placeholder="A few sentences about your company…" />
-                      <StackedTextField label="Button Label" value={p.buttonLabel ?? ""} onChange={(v) => set("buttonLabel", v)} placeholder="Learn More (leave blank to hide)" />
+                      <StackedTextField label="Button Label" value={p.buttonLabel ?? ""} onChange={(v) => set("buttonLabel", v)} placeholder="Learn More" />
                       {!(p.buttonLabel ?? "").trim() && (p.buttonUrl ?? "").trim() && (
                         <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "-2px 0 8px", color: "#d72c0d", fontSize: 12, fontWeight: 500 }}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -1698,9 +1721,13 @@ export const sectionTemplateConfig: Record<string, any> = {
         <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="What Our Customers Say" />
         <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="Real reviews from real customers" />
         <TabSection title="Reviews" />
-        <SectionItemsField label="Reviews" items={p.items} onChange={(v) => set("items", v)}
+        <AccordionItemsField items={p.items} onChange={(v) => set("items", v)} max={12} singular="Review"
           newItem={() => ({ quote: "Great experience!", author: "Customer", role: "", rating: "5", avatar: "" })}
-          fields={[{ key: "quote", label: "Quote", type: "textarea", placeholder: "Their feedback…" }, { key: "author", label: "Author", placeholder: "Jane Doe" }, { key: "role", label: "Role / Company", placeholder: "CEO, Acme" }, { key: "rating", label: "Stars (1-5)", placeholder: "5" }, { key: "avatar", label: "Avatar", type: "image" }]} />
+          fields={[{ key: "quote", label: "Quote", type: "textarea", placeholder: "Their feedback…" }, { key: "author", label: "Author", placeholder: "Jane Doe" }, { key: "role", label: "Role / Company", placeholder: "CEO, Acme" }, { key: "rating", label: "Stars (1-5)", placeholder: "5" }, { key: "avatar", label: "Avatar", type: "image" }]}
+          getThumb={(it: any) => (it.avatar ? <img src={it.avatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <span>{"👤"}</span>)}
+          getTitle={(it: any, i: number) => (it.author || "").trim() || `Review ${i + 1}`}
+          getSubtitle={(it: any) => it.role || it.quote || "No quote"}
+          removeNote="This review will be removed. This action cannot be undone." />
         <TabSection title="Layout" />
         <InlineSelect label="Columns" value={String(p.reviewCount ?? 3)} onChange={(v) => set("reviewCount", Number(v))} options={[{ value: "1", label: "1 (Single)" }, { value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
       </>
@@ -1845,9 +1872,13 @@ export const sectionTemplateConfig: Record<string, any> = {
         <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Featured Media" />
         <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="Short description" />
         <TabSection title="Slides" />
-        <SectionItemsField label="Slides" items={p.items} onChange={(v) => set("items", v)} max={10}
+        <AccordionItemsField items={p.items} onChange={(v) => set("items", v)} max={10} singular="Slide"
           newItem={() => ({ url: "", alt: "" })}
-          fields={[{ key: "url", label: "Image", type: "image" }, { key: "alt", label: "Alt Text", placeholder: "Describe the image" }]} />
+          fields={[{ key: "url", label: "Image", type: "image" }, { key: "alt", label: "Alt Text", placeholder: "Describe the image" }]}
+          getThumb={(it: any) => (it.url ? <img src={it.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null)}
+          getTitle={(_it: any, i: number) => `Slide ${i + 1}`}
+          getSubtitle={(it: any) => it.alt || (it.url ? "No alt text" : "No image selected")}
+          removeNote="This slide will be removed. This action cannot be undone." />
         <ToggleField label="Show Thumbnails" value={p.showDots !== false} onChange={(v) => set("showDots", v)} />
       </>
     )),
@@ -1865,9 +1896,13 @@ export const sectionTemplateConfig: Record<string, any> = {
         <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Our Services" />
         <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="What we offer" />
         <TabSection title="Services" />
-        <SectionItemsField label="Services" items={p.items} onChange={(v) => set("items", v)}
+        <AccordionItemsField items={p.items} onChange={(v) => set("items", v)} max={8} singular="Service"
           newItem={() => ({ icon: "⭐", title: "New Service", text: "Describe this service." })}
-          fields={[{ key: "icon", label: "Icon (emoji)", placeholder: "🔧" }, { key: "title", label: "Title", placeholder: "Service name" }, { key: "text", label: "Description", type: "textarea", placeholder: "Short description" }]} />
+          fields={[{ key: "icon", label: "Icon (emoji)", placeholder: "🔧" }, { key: "title", label: "Title", placeholder: "Service name" }, { key: "text", label: "Description", type: "textarea", placeholder: "Short description" }]}
+          getThumb={(it: any) => <span>{it.icon || "⭐"}</span>}
+          getTitle={(it: any, i: number) => (it.title || "").trim() || `Service ${i + 1}`}
+          getSubtitle={(it: any) => it.text || "No description"}
+          removeNote="This service will be removed. This action cannot be undone." />
         <TabSection title="Layout" />
         <InlineSelect label="Per Row" value={String(p.serviceCount ?? 3)} onChange={(v) => set("serviceCount", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
         <ColorPickerField label="Accent Color" value={p.accentColor ?? "#005bd3"} onChange={(v) => set("accentColor", v)} />
@@ -1891,9 +1926,13 @@ export const sectionTemplateConfig: Record<string, any> = {
         <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Simple, Transparent Pricing" />
         <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="No hidden fees" />
         <TabSection title="Tiers" />
-        <SectionItemsField label="Tiers" items={p.items} onChange={(v) => set("items", v)}
+        <AccordionItemsField items={p.items} onChange={(v) => set("items", v)} max={8} singular="Tier"
           newItem={() => ({ name: "New Plan", price: "0", period: "/mo", features: "Feature one\nFeature two", buttonLabel: "Choose Plan", buttonUrl: "#", featured: "" })}
-          fields={[{ key: "name", label: "Plan Name", placeholder: "Pro" }, { key: "price", label: "Price (number)", placeholder: "29" }, { key: "period", label: "Period", placeholder: "/mo" }, { key: "features", label: "Features (one per line)", type: "textarea", placeholder: "Feature one\nFeature two" }, { key: "buttonLabel", label: "Button Label", placeholder: "Choose Plan" }, { key: "buttonUrl", label: "Button URL", type: "url" }, { key: "featured", label: "Featured? (yes/blank)", placeholder: "yes" }]} />
+          fields={[{ key: "name", label: "Plan Name", placeholder: "Pro" }, { key: "price", label: "Price (number)", placeholder: "29" }, { key: "period", label: "Period", placeholder: "/mo" }, { key: "features", label: "Features (one per line)", type: "textarea", placeholder: "Feature one\nFeature two" }, { key: "buttonLabel", label: "Button Label", placeholder: "Choose Plan" }, { key: "buttonUrl", label: "Button URL", type: "url" }, { key: "featured", label: "Featured? (yes/blank)", placeholder: "yes" }]}
+          getThumb={() => <span>{"💳"}</span>}
+          getTitle={(it: any, i: number) => (it.name || "").trim() || `Tier ${i + 1}`}
+          getSubtitle={(it: any) => `${it.price || "0"}${it.period || ""}`}
+          removeNote="This tier will be removed. This action cannot be undone." />
         <TabSection title="Layout" />
         <InlineSelect label="Per Row" value={String(p.tierCount ?? 3)} onChange={(v) => set("tierCount", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
         <StackedTextField label="Currency" value={p.currency ?? "$"} onChange={(v) => set("currency", v)} placeholder="$" />
@@ -1958,9 +1997,13 @@ export const sectionTemplateConfig: Record<string, any> = {
         <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Frequently Asked Questions" />
         <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="Everything you need to know" />
         <TabSection title="Questions" />
-        <SectionItemsField label="Questions" items={p.items} onChange={(v) => set("items", v)}
+        <AccordionItemsField items={p.items} onChange={(v) => set("items", v)} max={20} singular="Question"
           newItem={() => ({ q: "New question?", a: "The answer." })}
-          fields={[{ key: "q", label: "Question", placeholder: "How does it work?" }, { key: "a", label: "Answer", type: "textarea", placeholder: "Explain the answer…" }]} />
+          fields={[{ key: "q", label: "Question", placeholder: "How does it work?" }, { key: "a", label: "Answer", type: "textarea", placeholder: "Explain the answer…" }]}
+          getThumb={() => <span>{"❓"}</span>}
+          getTitle={(it: any, i: number) => (it.q || "").trim() || `Question ${i + 1}`}
+          getSubtitle={(it: any) => it.a || "No answer"}
+          removeNote="This question will be removed. This action cannot be undone." />
         <TabSection title="Style" />
         <ColorPickerField label="Accent Color" value={p.accentColor ?? "#005bd3"} onChange={(v) => set("accentColor", v)} />
       </>
@@ -1984,9 +2027,13 @@ export const sectionTemplateConfig: Record<string, any> = {
         <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Meet Our Team" />
         <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="The people behind the product" />
         <TabSection title="Members" />
-        <SectionItemsField label="Members" items={p.items} onChange={(v) => set("items", v)}
+        <AccordionItemsField items={p.items} onChange={(v) => set("items", v)} max={12} singular="Member"
           newItem={() => ({ imageUrl: "", name: "New Member", role: "Role", bio: "" })}
-          fields={[{ key: "imageUrl", label: "Photo", type: "image" }, { key: "name", label: "Name", placeholder: "Jane Doe" }, { key: "role", label: "Role", placeholder: "Founder" }, { key: "bio", label: "Bio", type: "textarea", placeholder: "Short bio (optional)" }]} />
+          fields={[{ key: "imageUrl", label: "Photo", type: "image" }, { key: "name", label: "Name", placeholder: "Jane Doe" }, { key: "role", label: "Role", placeholder: "Founder" }, { key: "bio", label: "Bio", type: "textarea", placeholder: "Short bio (optional)" }]}
+          getThumb={(it: any) => (it.imageUrl ? <img src={it.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <span>{"👤"}</span>)}
+          getTitle={(it: any, i: number) => (it.name || "").trim() || `Member ${i + 1}`}
+          getSubtitle={(it: any) => it.role || it.bio || "No role"}
+          removeNote="This member will be removed. This action cannot be undone." />
         <TabSection title="Layout" />
         <InlineSelect label="Members Per Row" value={String(p.memberCount ?? 4)} onChange={(v) => set("memberCount", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
       </>
@@ -2001,27 +2048,6 @@ export const sectionTemplateConfig: Record<string, any> = {
     render: (p: any) => <SectionCardsContent p={p} variant="team" />,
   },
 
-  // ── Logo Row ──────────────────────────────────────────────────────────────
-  Section_Logos: {
-    label: "Logo Row",
-    fields: makeSectionFields("Section_Logos", (p, set) => (
-      <>
-        <TabSection title="Label" />
-        <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Trusted By (leave blank to hide)" />
-        <TabSection title="Logos" />
-        <SectionItemsField label="Logos" items={p.items} onChange={(v) => set("items", v)} max={18}
-          newItem={() => ({ url: "", alt: "" })}
-          fields={[{ key: "url", label: "Logo", type: "image" }, { key: "alt", label: "Alt Text", placeholder: "Brand name" }]} />
-        <TabSection title="Style" />
-        <InlineSelect label="Per Row" value={String(p.logoColumns ?? 6)} onChange={(v) => set("logoColumns", Number(v))} options={[{ value: "3", label: "3" }, { value: "4", label: "4" }, { value: "5", label: "5" }, { value: "6", label: "6" }]} />
-        <ToggleField label="Grayscale" value={p.grayscale !== false} onChange={(v) => set("grayscale", v)} />
-      </>
-    )),
-    defaultProps: baseSectionProps({ columns: 6, columnsTablet: 3, bgType: "color", bgColor: "#f8fafc", advPadding: { top: 40, right: 0, bottom: 40, left: 0 }, sectionTitle: "Trusted By", logoColumns: 6, grayscale: true,
-      items: [{ url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }, { url: "", alt: "" }] }),
-    render: (p: any) => <SectionLogosContent p={p} />,
-  },
-
   // ── Features ──────────────────────────────────────────────────────────────
   Section_Features: {
     label: "Features",
@@ -2031,9 +2057,13 @@ export const sectionTemplateConfig: Record<string, any> = {
         <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="Why Choose Us" />
         <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="What makes us different" />
         <TabSection title="Features" />
-        <SectionItemsField label="Features" items={p.items} onChange={(v) => set("items", v)}
+        <AccordionItemsField items={p.items} onChange={(v) => set("items", v)} max={12} singular="Feature"
           newItem={() => ({ icon: "✅", title: "New Feature", text: "Describe this feature." })}
-          fields={[{ key: "icon", label: "Icon (emoji)", placeholder: "✅" }, { key: "title", label: "Title", placeholder: "Feature name" }, { key: "text", label: "Description", type: "textarea", placeholder: "Short description" }]} />
+          fields={[{ key: "icon", label: "Icon (emoji)", placeholder: "✅" }, { key: "title", label: "Title", placeholder: "Feature name" }, { key: "text", label: "Description", type: "textarea", placeholder: "Short description" }]}
+          getThumb={(it: any) => <span>{it.icon || "✅"}</span>}
+          getTitle={(it: any, i: number) => (it.title || "").trim() || `Feature ${i + 1}`}
+          getSubtitle={(it: any) => it.text || "No description"}
+          removeNote="This feature will be removed. This action cannot be undone." />
         <TabSection title="Layout" />
         <InlineSelect label="Per Row" value={String(p.featureCount ?? 3)} onChange={(v) => set("featureCount", Number(v))} options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
         <ColorPickerField label="Accent Color" value={p.accentColor ?? "#005bd3"} onChange={(v) => set("accentColor", v)} />

@@ -714,6 +714,24 @@ function ColorPickerField({
     setSwatchColor(computed || fallback || displayValue);
   }, [value, displayValue]);
 
+  // <input type="color"> only accepts #rrggbb. Normalize the RESOLVED swatch
+  // color (hex shorthand, rgb(), etc.) to 6-digit hex so the custom-color picker
+  // opens on the button's ACTUAL current color — not the CSS-var hex fallback,
+  // which can differ from the resolved theme color (e.g. blue vs green).
+  const toHex6 = (c: string): string => {
+    const s = (c || "").trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(s)) return s.toLowerCase();
+    if (/^#[0-9a-fA-F]{3}$/.test(s)) return "#" + s.slice(1).split("").map((ch) => ch + ch).join("").toLowerCase();
+    const m = s.match(/rgba?\(([^)]+)\)/i);
+    if (m) {
+      const [r, g, b] = m[1].split(",").map((x) => parseFloat(x));
+      const h = (n: number) => Math.max(0, Math.min(255, Math.round(n || 0))).toString(16).padStart(2, "0");
+      return `#${h(r)}${h(g)}${h(b)}`;
+    }
+    return "";
+  };
+  const customColorValue = toHex6(swatchColor) || (/^#[0-9a-fA-F]{6}$/.test(displayValue) ? displayValue : "#000000");
+
   // Close picker when clicking outside
 
   useEffect(() => {
@@ -953,7 +971,7 @@ function ColorPickerField({
               </label>
               <input
                 type="color"
-                value={/^#[0-9a-fA-F]{6}$/.test(displayValue) ? displayValue : "#000000"}
+                value={customColorValue}
                 onChange={(e) => onChange(e.target.value)}
                 style={{
                   width: "100%",
@@ -1198,27 +1216,32 @@ function FourSideField({
 }) {
   const v = value ?? {};
   const t = v.top ?? 0, r = v.right ?? 0, b = v.bottom ?? 0, l = v.left ?? 0;
-  const allEqual = t === r && r === b && b === l;
-  const [linked, setLinked] = useState(allEqual);
+  // Default to the linked (single range slider) view for every field, even when
+  // the stored sides differ — the per-side T/R/B/L inputs are revealed by clicking
+  // the clip/link toggle. (Unlinking never mutates the values, so asymmetric
+  // padding like 60/0/60/0 is preserved and shown intact after one click.)
+  const [linked, setLinked] = useState(true);
 
   const clamp = (n: number) => Math.max(min, Math.min(max, n));
   const setAll = (n: number) => { const c = clamp(n); onChange({ top: c, right: c, bottom: c, left: c }); };
   const setSide = (side: "top" | "right" | "bottom" | "left", n: number) =>
     onChange({ top: t, right: r, bottom: b, left: l, [side]: clamp(n) });
 
-  const numBox = (val: number, onCh: (n: number) => void) => (
-    <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--p-color-border)", borderRadius: 6, background: "var(--p-color-bg-surface)", height: 28, overflow: "hidden", flexShrink: 0 }}>
+  const numBox = (val: number, onCh: (n: number) => void, showUnit = true) => (
+    <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--p-color-border)", borderRadius: 6, background: "var(--p-color-bg-surface)", height: 28, overflow: "hidden", width: "100%", minWidth: 0, boxSizing: "border-box" }}>
       <input
         type="number"
         value={val}
         min={min}
         max={max}
         onChange={(e) => onCh(Number(e.target.value))}
-        style={{ width: 36, padding: "0 6px", fontSize: 12, fontWeight: 500, border: "none", outline: "none", background: "transparent", color: "var(--p-color-text)", textAlign: "right", MozAppearance: "textfield" } as any}
+        style={{ width: "100%", flex: 1, minWidth: 0, padding: showUnit ? "0 6px" : "0 4px", fontSize: 12, fontWeight: 500, border: "none", outline: "none", background: "transparent", color: "var(--p-color-text)", textAlign: showUnit ? "right" : "center", MozAppearance: "textfield" } as any}
       />
-      <span style={{ padding: "0 7px", fontSize: 11, fontWeight: 500, color: "var(--p-color-text-secondary)", background: "var(--p-color-bg-surface-secondary, #f6f6f7)", borderLeft: "1px solid var(--p-color-border)", height: "100%", display: "flex", alignItems: "center", userSelect: "none", flexShrink: 0 }}>
-        px
-      </span>
+      {showUnit && (
+        <span style={{ padding: "0 7px", fontSize: 11, fontWeight: 500, color: "var(--p-color-text-secondary)", background: "var(--p-color-bg-surface-secondary, #f6f6f7)", borderLeft: "1px solid var(--p-color-border)", height: "100%", display: "flex", alignItems: "center", userSelect: "none", flexShrink: 0 }}>
+          px
+        </span>
+      )}
     </div>
   );
 
@@ -1260,7 +1283,7 @@ function FourSideField({
               onChange={(e) => setAll(Number(e.target.value))}
               style={{ flex: 1, minWidth: 0, cursor: "pointer", appearance: "none", WebkitAppearance: "none", height: 11, background: "transparent", outline: "none", border: "none", padding: 0, "--fill": fill } as any}
             />
-            {numBox(t, (n) => setAll(n))}
+            <div style={{ width: 76, flexShrink: 0 }}>{numBox(t, (n) => setAll(n))}</div>
           </div>
           <style>{`
             input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:99px;background:linear-gradient(to right,#1a1a1a var(--fill,0%),#d1d5db var(--fill,0%))}
@@ -1272,13 +1295,13 @@ function FourSideField({
           `}</style>
         </>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 6 }}>
           {(["top", "right", "bottom", "left"] as const).map((side) => (
-            <div key={side} style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
+            <div key={side} style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "center", minWidth: 0 }}>
               <span style={{ fontSize: 10, color: "var(--p-color-text-secondary)" }}>
                 {side === "top" ? "T" : side === "right" ? "R" : side === "bottom" ? "B" : "L"}
               </span>
-              {numBox(v[side] ?? 0, (n) => setSide(side, n))}
+              {numBox(v[side] ?? 0, (n) => setSide(side, n), false)}
             </div>
           ))}
         </div>

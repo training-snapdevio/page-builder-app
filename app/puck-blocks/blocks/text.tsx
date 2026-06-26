@@ -18,7 +18,7 @@ import {
 } from "@/puck-blocks/shared";
 
 export const TextComponent = {
-  label: "Text Editor",
+  label: "Text Block",
   fields: {
     _tabs: {
       type: "custom",

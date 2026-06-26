@@ -749,8 +749,8 @@ function Button(p: Props): string {
   const uid = cssId || `btn-b${String(p.id ?? "").slice(-6)}`;
 
   const hoverCss = (hoverTextColor || hoverBgColor || hoverBorderColor || hoverAnimation !== "none" || (iconType === "svg" && iconHoverColor)) ? `
-.pb-btn-${uid}{transition:color 0.2s ease,background 0.2s ease,border-color 0.2s ease,transform 0.2s ease,opacity 0.2s ease}
-.pb-btn-${uid}:hover{${hoverTextColor ? `color:${hoverTextColor}!important;` : ""}${hoverBgColor ? `background:${hoverBgColor}!important;` : ""}${hoverBorderColor ? `border-color:${hoverBorderColor}!important;` : ""}${hoverAnimation === "grow" ? "transform:scale(1.05);" : hoverAnimation === "shrink" ? "transform:scale(0.96);" : hoverAnimation === "pulse" ? "animation:pb-pulse 0.6s ease;" : ""}}
+.pb-btn-${uid}{transition:color 0.2s ease,background 0.2s ease,border-color 0.2s ease,transform 0.2s ease,opacity 0.2s ease,box-shadow 0.2s ease!important}
+.pb-btn-${uid}:hover{${hoverTextColor ? `color:${hoverTextColor}!important;` : ""}${hoverBgColor ? `background:${hoverBgColor}!important;` : ""}${hoverBorderColor ? `border-color:${hoverBorderColor}!important;` : ""}${hoverAnimation === "grow" ? "transform:scale(1.05)!important;" : hoverAnimation === "shrink" ? "transform:scale(0.96)!important;" : hoverAnimation === "pulse" ? "animation:pb-pulse 0.6s ease!important;transition:color 0.2s ease,background 0.2s ease,border-color 0.2s ease!important;" : ""}}
 ${iconType === "svg" && iconHoverColor ? `.pb-btn-${uid}:hover svg{color:${iconHoverColor}!important;fill:${iconHoverColor}!important}` : ""}
 @keyframes pb-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}` : "";
 
@@ -1642,19 +1642,6 @@ function renderSectionGallery(p: Props): string {
   return scopedCss + sectionShell(p, heading + descHtml + grid);
 }
 
-// Logo Row: optional label + grayscale logo grid.
-function renderSectionLogos(p: Props): string {
-  const items: any[] = Array.isArray(p.items) ? (p.items as any[]) : [];
-  const cols = Number(p.logoColumns ?? 6);
-  const gray = p.grayscale !== false;
-  const cells = items.filter((it) => it.url).map((it) =>
-    `<div style="display:flex;align-items:center;justify-content:center;min-height:50px"><img src="${esc(it.url)}" alt="${esc(it.alt || "")}" style="max-width:100%;max-height:44px;object-fit:contain;${gray ? "filter:grayscale(1);opacity:0.7" : ""}" /></div>`
-  ).join("");
-  const label = p.sectionTitle ? `<div style="text-align:center;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:24px">${esc(p.sectionTitle as string)}</div>` : "";
-  const grid = `<div class="pb-sec-logos" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:24px">${cells}</div>`;
-  return sectionShell(p, label + grid);
-}
-
 // Carousel: optional marquee bar + heading + product-style cards.
 function renderSectionCarousel(p: Props): string {
   const items: any[] = Array.isArray(p.items) ? (p.items as any[]) : [];
@@ -1816,28 +1803,31 @@ function renderDivider(p: Props): string {
     const imgW = Number(p.elementImageWidth ?? 40);
     const imgH = Number(p.elementImageHeight ?? 40);
     const hasContent = elType === "text" ? !!((p.elementText as string) || "").trim() : elType === "image" ? !!imgUrl : !!iconVal;
-    if (hasContent) {
-      const elSpacing = `${Number(p.elementSpacing ?? 12)}px`;
-      let elContent: string;
-      if (elType === "text") {
-        elContent = `<span style="font-size:${p.elementFontSize ?? 14}px;color:${esc((p.elementTextColor as string) || color)};white-space:nowrap;line-height:1;">${esc((p.elementText as string) || "")}</span>`;
-      } else if (elType === "image") {
-        const imgR = Number(p.elementImageRadius ?? 0);
-        elContent = `<div style="width:${imgW}px;height:${imgH}px;overflow:hidden;display:inline-block;vertical-align:middle;${imgR > 0 ? `border-radius:${imgR}px;` : ""}"><img src="${imgUrl.replace(/"/g, "&quot;")}" alt="" class="no-global-style" style="width:100%;height:100%;object-fit:cover;display:block;" /></div>`;
-      } else {
-        elContent = `<span style="font-size:${p.iconSize ?? 20}px;color:${esc((p.iconColor as string) || color)};line-height:1;display:inline-block;">${esc(iconVal)}</span>`;
-      }
-      const elPos = (p.elementPosition as string) || "center";
-      // Build left and right line segments independently so each is a fresh div
-      const lineLeft  = buildLine("flex:1;");
-      const lineRight = buildLine("flex:1;");
-      const elDiv = `<div style="flex-shrink:0;padding:0 ${elSpacing};display:flex;align-items:center;">${elContent}</div>`;
-      if (elPos === "left")       inner = `<div style="display:flex;align-items:center;width:${width};">${elDiv}${lineRight}</div>`;
-      else if (elPos === "right") inner = `<div style="display:flex;align-items:center;width:${width};">${lineLeft}${elDiv}</div>`;
-      else                        inner = `<div style="display:flex;align-items:center;width:${width};">${lineLeft}${elDiv}${lineRight}</div>`;
+    const elSpacing = `${Number(p.elementSpacing ?? 12)}px`;
+    let elContent: string;
+    if (!hasContent) {
+      // Keep the element's space reserved even when empty so the divider holds its
+      // constrained-width, gapped layout instead of collapsing to a full-width line
+      // (mirrors the editor preview — the space "remains there" until content added).
+      elContent = elType === "image"
+        ? `<div style="width:${imgW}px;height:${imgH}px;flex-shrink:0;"></div>`
+        : `<span style="display:inline-block;min-height:${elType === "text" ? Number(p.elementFontSize ?? 14) : Number(p.iconSize ?? 20)}px;"></span>`;
+    } else if (elType === "text") {
+      elContent = `<span style="font-size:${p.elementFontSize ?? 14}px;color:${esc((p.elementTextColor as string) || color)};white-space:nowrap;line-height:1;">${esc((p.elementText as string) || "")}</span>`;
+    } else if (elType === "image") {
+      const imgR = Number(p.elementImageRadius ?? 0);
+      elContent = `<div style="width:${imgW}px;height:${imgH}px;overflow:hidden;display:inline-block;vertical-align:middle;${imgR > 0 ? `border-radius:${imgR}px;` : ""}"><img src="${imgUrl.replace(/"/g, "&quot;")}" alt="" class="no-global-style" style="width:100%;height:100%;object-fit:cover;display:block;" /></div>`;
     } else {
-      inner = `<div style="display:flex;align-items:center;width:100%;">${buildLine("flex:1;")}</div>`;
+      elContent = `<span style="font-size:${p.iconSize ?? 20}px;color:${esc((p.iconColor as string) || color)};line-height:1;display:inline-block;">${esc(iconVal)}</span>`;
     }
+    const elPos = (p.elementPosition as string) || "center";
+    // Build left and right line segments independently so each is a fresh div
+    const lineLeft  = buildLine("flex:1;");
+    const lineRight = buildLine("flex:1;");
+    const elDiv = `<div style="flex-shrink:0;padding:0 ${elSpacing};display:flex;align-items:center;">${elContent}</div>`;
+    if (elPos === "left")       inner = `<div style="display:flex;align-items:center;width:${width};">${elDiv}${lineRight}</div>`;
+    else if (elPos === "right") inner = `<div style="display:flex;align-items:center;width:${width};">${lineLeft}${elDiv}</div>`;
+    else                        inner = `<div style="display:flex;align-items:center;width:${width};">${lineLeft}${elDiv}${lineRight}</div>`;
   } else {
     // No icon/text element → clean full-width divider line.
     inner = `<div style="display:flex;align-items:center;width:100%;">${buildLine("flex:1;")}</div>`;
@@ -2497,7 +2487,6 @@ function renderBlock(block: Block, zones: Zones): string {
       case "Section_Testimonial":   html = renderSectionTestimonial(p); break;
       case "Section_FAQ":           html = renderSectionFAQ(p); break;
       case "Section_Gallery":       html = renderSectionGallery(p); break;
-      case "Section_Logos":         html = renderSectionLogos(p); break;
       case "Section_Carousel":      html = renderSectionCarousel(p); break;
       case "Section_MediaCarousel": html = renderSectionMediaCarousel(p); break;
       // GlobalHeader/Footer are theme concerns; GlobalBlock needs DB lookup (skip)
@@ -2582,7 +2571,6 @@ img{max-width:100%;height:auto}
 .pb-about-img-bottom .pb-about-text{order:1!important}
 .pb-sec-cards{grid-template-columns:1fr!important;gap:16px!important}
 .pb-sec-gallery{grid-template-columns:repeat(2,1fr)!important}
-.pb-sec-logos{grid-template-columns:repeat(3,1fr)!important;gap:16px!important}
 .pb-grid-ncol{grid-template-columns:1fr!important}
 .pb-grid-stats{grid-template-columns:repeat(2,1fr)!important;gap:12px!important}
 .pb-collage-wrap{grid-template-columns:repeat(2,1fr)!important;grid-template-rows:auto!important}
@@ -2595,7 +2583,6 @@ img{max-width:100%;height:auto}
 .pb-grid-ncol{grid-template-columns:repeat(2,1fr)!important}
 .pb-sec-cards{grid-template-columns:repeat(2,1fr)!important}
 .pb-sec-gallery{grid-template-columns:repeat(2,1fr)!important}
-.pb-sec-logos{grid-template-columns:repeat(4,1fr)!important}
 .pb-sec-about-grid{grid-template-columns:1fr!important;gap:32px!important}
 .puck-hide-tablet{display:none!important}
 }
@@ -2707,15 +2694,15 @@ function buildGlobalButtonCss(settings: GlobalSettings): string {
   const bsd = settings.buttonShadow ?? "none";
 
   const rules: string[] = [
-    `.pb-btn{transition:background-color .3s ease-out,color .3s ease-out,border-color .3s ease-out,transform .3s ease-out,box-shadow .3s ease-out,filter .3s ease-out}`,
+    `.pb-btn{transition:background-color .3s ease-out,color .3s ease-out,border-color .3s ease-out,transform .3s ease-out,box-shadow .3s ease-out,filter .3s ease-out!important}`,
     `.pb-btn.pb-btn-outline{border-style:solid!important;border-color:currentColor!important;border-width:var(--button-border-width,2px)!important}`,
   ];
 
   const hoverDecl: Record<string, string> = {
-    lift:  "transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.15)",
-    glow:  `box-shadow:0 0 18px ${esc(pc)}44`,
-    scale: "transform:scale(1.07)",
-    fill:  "filter:brightness(.85) saturate(1.1)",
+    lift:  "transform:translateY(-2px)!important;box-shadow:0 6px 20px rgba(0,0,0,.15)!important",
+    glow:  `box-shadow:0 0 18px ${esc(pc)}44!important`,
+    scale: "transform:scale(1.07)!important",
+    fill:  "filter:brightness(.85) saturate(1.1)!important",
   };
   if (bhe !== "none" && hoverDecl[bhe]) {
     rules.push(`.pb-btn:hover{${hoverDecl[bhe]}}`);

@@ -297,7 +297,10 @@ function DrawerItemOverride({ name }: { name: string }) {
       <div style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--p-color-icon)", flexShrink: 0 }}>
         <span style={{ fontSize: "17px", lineHeight: 1, display: "flex" }}>{icon}</span>
       </div>
-      <span style={{ fontSize: "12px", lineHeight: 1.2, color: "var(--p-color-text)", wordBreak: "break-word", maxWidth: "100%", padding: "0 2px", fontWeight: 500 }}>
+      {/* Reserve a fixed two-line height so labels that wrap (e.g. "Featured
+          Product") never make their card taller than single-line ones — every
+          card stays the same height. Text is centered within the reserved box. */}
+      <span style={{ fontSize: "12px", lineHeight: 1.2, color: "var(--p-color-text)", wordBreak: "break-word", maxWidth: "100%", padding: "0 2px", fontWeight: 500, height: "2.4em", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", overflow: "hidden" }}>
         {formattedName}
       </span>
 
@@ -1216,7 +1219,6 @@ export default function PuckSplatEditor({
       "FeaturedProduct",
       "Image", "Space", "Button", "Divider", "Video", "BlockQuote",
       "StarRating", "ProgressBar", "Alert", "SocialIcons", "ShareButtons",
-      "Section_Logos",
     ];
 
     const SECTION_KEYS = [

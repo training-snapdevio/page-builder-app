@@ -33,7 +33,6 @@ export const SECTION_TEMPLATES: Record<string, SectionTemplateEntry> = {
   Section_CTA:           { label: "CTA",            icon: "⚡" },
   Section_FAQ:           { label: "FAQ",            icon: "❓" },
   Section_Team:          { label: "Team",           icon: "👥" },
-  Section_Logos:         { label: "Logo Row",       icon: "🏷" },
   Section_Features:      { label: "Features",       icon: "✅" },
   Section_Newsletter:    { label: "Newsletter",     icon: "✉"  },
   Section_Video:         { label: "Video Section",  icon: "🎬" },

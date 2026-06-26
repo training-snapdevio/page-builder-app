@@ -66,6 +66,12 @@ const ButtonComponent = {
                 {tab === "content" && (
                   <>
                     <StackedTextField label="Label" value={props.label ?? "Click Me"} onChange={(v) => set("label", v)} placeholder="Button label..." />
+                    {!(props.label ?? "").trim() && (props.linkUrl ?? "").trim() && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "-2px 0 8px", color: "#d72c0d", fontSize: 12, fontWeight: 500 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        Button label is empty
+                      </div>
+                    )}
                     <LinkUrlField value={props.linkUrl ?? ""} onChange={(v) => set("linkUrl", v)} />
                     <InlineSelect
                       label="Icon Type"
@@ -453,6 +459,13 @@ const ButtonComponent = {
       ...(hoverBorderColor ? { borderColor: hoverBorderColor } : {}),
       ...(hoverAnimation === "grow" ? { transform: "scale(1.05)" } : {}),
       ...(hoverAnimation === "shrink" ? { transform: "scale(0.96)" } : {}),
+      // Pulse uses a keyframe; strip the transform transition so it doesn't fight
+      // the animation, then trigger it via inline style (needed in the editor where
+      // :hover CSS may not fire reliably inside the Puck iframe).
+      ...(hoverAnimation === "pulse" ? {
+        animation: "puck-pulse 0.6s ease",
+        transition: "color 0.2s ease, background 0.2s ease, border-color 0.2s ease",
+      } : {}),
     } : {};
 
     const hideClasses = [hideDesktop ? "puck-hide-desktop" : "", hideTablet ? "puck-hide-tablet" : "", hideMobile ? "puck-hide-mobile" : ""].filter(Boolean).join(" ");
