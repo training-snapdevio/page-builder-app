@@ -1228,7 +1228,7 @@ function GlobalFooter(p: Props): string {
 // ── LayoutBlock (Container) ───────────────────────────────────────────────────
 function renderLayoutBlock(p: Props, zones: Zones): string {
   const blockId = String(p.id ?? "");
-  const uid = (p.cssId as string) || `pb-container-${blockId.slice(-8)}`;
+  const uid = (p.cssId as string) || `pb-container-${blockId || "c"}`;
   const zoneName = `container-content-${uid}`;
   const content = zoneContent(blockId, zoneName, zones);
   const pt = (p.advPadding as {top?:number}|undefined)?.top ?? 24;
@@ -1251,7 +1251,7 @@ function renderLayoutBlock(p: Props, zones: Zones): string {
 // ── GridBlock ─────────────────────────────────────────────────────────────────
 function renderGridBlock(p: Props, zones: Zones): string {
   const blockId = String(p.id ?? "");
-  const uid = (p.cssId as string) || `pb-grid-${blockId.slice(-8)}`;
+  const uid = (p.cssId as string) || `pb-grid-${blockId || "g"}`;
   const cols = Math.max(1, Number(p.columns ?? 2));
   const gap  = (p.columnGap as string) || "24px";
   const cells = Array.from({length: cols}, (_, i) => {
@@ -1269,7 +1269,7 @@ function renderGridBlock(p: Props, zones: Zones): string {
 // ── Section (combined Container+Grid) ─────────────────────────────────────────
 function renderSectionBlock(p: Props, zones: Zones): string {
   const blockId = String(p.id ?? "");
-  const uid = (p.cssId as string) || `pb-section-${blockId.slice(-8)}`;
+  const uid = (p.cssId as string) || `pb-section-${blockId || "s"}`;
   // Single free-flow zone — all blocks stack vertically inside the section
   const zoneName = `section-${uid}-content`;
   const content = zoneContent(blockId, zoneName, zones);
@@ -1424,6 +1424,98 @@ function renderSectionAbout(p: Props): string {
   return sectionShell(p, grid);
 }
 
+// Hero: badge + headline + description + two buttons, with Text+Image / Text Only /
+// Image Background layouts. Mirrors the editor render in section.tsx (Section_Hero).
+function renderSectionHero(p: Props): string {
+  const layout = String(p.heroLayout ?? "split");
+  const hAlign = String(p.hAlign ?? "left");
+  const vAlign = String(p.vAlign ?? "center");
+  const justify = hAlign === "center" ? "center" : hAlign === "right" ? "flex-end" : "flex-start";
+  const itemsAlign = hAlign === "center" ? "center" : hAlign === "right" ? "flex-end" : "flex-start";
+  const vJustify = vAlign === "top" ? "flex-start" : vAlign === "bottom" ? "flex-end" : "center";
+  const isBg = layout === "image-bg";
+  const ff = (v: any) => (v && v !== "inherit" ? `font-family:${esc(String(v))};` : "");
+  const uid = "pb-hero-" + esc(String(p.id ?? "x")).replace(/[^a-zA-Z0-9_-]/g, "").slice(-8);
+
+  const pad = (p.advPadding as any) ?? {};
+  const mar = (p.advMargin as any) ?? {};
+  const pt = pad.top ?? 80, pb = pad.bottom ?? 80, pl = pad.left ?? 0, pr = pad.right ?? 0;
+  const mt = mar.top ?? 0, mb = mar.bottom ?? 0, ml = mar.left ?? 0, mr = mar.right ?? 0;
+  const minH = p.minHeightPx && Number(p.minHeightPx) > 0 ? `min-height:${Number(p.minHeightPx)}px;` : "";
+
+  // Background (Style tab) — skipped in image-bg layout.
+  let bg = "";
+  if (isBg) {
+    bg = `background-color:#111827;`;
+    if (p.heroBgImage) bg += `background-image:url(${esc(String(p.heroBgImage))});background-size:${esc(String(p.heroBgSize || "cover"))};background-position:${esc(String(p.heroBgPos || "center"))};background-repeat:no-repeat;`;
+  } else if (p.bgType === "color" && p.bgColor) {
+    bg = `background-color:${esc(String(p.bgColor))};`;
+  } else if (p.bgType === "gradient") {
+    const dir = (p.bgGradDir as string) || `${p.bgGradAngle ?? 180}deg`;
+    bg = `background:linear-gradient(${esc(dir)},${esc(String(p.bgGrad1 || "transparent"))},${esc(String(p.bgGrad2 || "transparent"))});`;
+  } else if (p.bgType === "image" && p.bgImage) {
+    bg = `background-image:url(${esc(String(p.bgImage))});background-size:${esc(String(p.bgSize || "cover"))};background-position:${esc(String(p.bgPos || "center center"))};background-repeat:${esc(String(p.bgRepeat || "no-repeat"))};`;
+  } else if (p.bgType === "video") {
+    bg = `background-color:${esc(String(p.bgColor || "#000"))};`;
+  }
+  const videoEl = (!isBg && p.bgType === "video" && p.bgVideo)
+    ? `<video${p.bgVideoAutoplay !== false ? " autoplay" : ""}${p.bgVideoLoop !== false ? " loop" : ""}${p.bgVideoMute !== false ? " muted" : ""} playsinline src="${esc(String(p.bgVideo))}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0"></video>`
+    : "";
+
+  const border = (p.borderStyle && p.borderStyle !== "none")
+    ? `border:${Number(p.borderWidth ?? 1)}px ${esc(String(p.borderStyle))} ${esc(String(p.borderColor || "#e5e7eb"))};` : "";
+  const radius = p.borderRadius ? `border-radius:${Number(p.borderRadius)}px;` : "";
+
+  const overlay = isBg
+    ? `<div style="position:absolute;inset:0;background:${esc(String(p.heroOverlayColor || "#000000"))};opacity:${(Number(p.heroOverlayOpacity ?? 40)) / 100};z-index:0;pointer-events:none"></div>`
+    : "";
+
+  const onDark = isBg;
+  const titleColor = String(p.titleColor || (onDark ? "#ffffff" : "#111827"));
+  const descColor = String(p.descColor || (onDark ? "rgba(255,255,255,0.85)" : "#6b7280"));
+
+  const badge = esc(String(p.badge || ""));
+  const title = esc(String(p.title || "Your Headline Here"));
+  const descRaw = String(p.description || "");
+
+  const badgeHtml = badge
+    ? `<span style="display:inline-block;background:${esc(String(p.badgeBg || "#005bd3"))};color:${esc(String(p.badgeColor || "#fff"))};font-size:${Number(p.badgeFontSize ?? 12)}px;font-weight:${Number(p.badgeFontWeight ?? 700)};padding:3px 12px;border-radius:4px;margin-bottom:16px;letter-spacing:${Number(p.badgeLetterSpacing ?? 0.5)}px">${badge}</span>` : "";
+  const titleHtml = `<h1 style="font-size:${Number(p.titleFontSize ?? 48)}px;${ff(p.titleFontFamily)}font-weight:${Number(p.titleFontWeight ?? 800)};color:${titleColor};line-height:${Number(p.titleLineHeight ?? 1.2)};letter-spacing:${Number(p.titleLetterSpacing ?? 0)}px;margin:0 0 16px">${title}</h1>`;
+  const descHtml = descRaw
+    ? `<p style="font-size:${Number(p.descFontSize ?? 18)}px;${ff(p.descFontFamily)}font-weight:${Number(p.descFontWeight ?? 400)};color:${descColor};line-height:${Number(p.descLineHeight ?? 1.6)};letter-spacing:${Number(p.descLetterSpacing ?? 0)}px;margin:0 0 32px;max-width:560px">${esc(descRaw)}</p>` : "";
+
+  const pIcon = p.primaryIcon ? `<span>${esc(String(p.primaryIcon))}</span>` : "";
+  const sIcon = p.secondaryIcon ? `<span>${esc(String(p.secondaryIcon))}</span>` : "";
+  const btnBase = "display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:6px;font-size:15px;text-decoration:none;transition:background-color .15s,color .15s,border-color .15s";
+  const primaryBtn = p.primaryLabel
+    ? `<a href="${esc(String(p.primaryUrl || "#"))}" class="pb-hero-btn-primary" style="${btnBase};background:${esc(String(p.primaryBgColor || "#005bd3"))};color:${esc(String(p.primaryTextColor || "#fff"))};font-weight:700;border:2px solid ${esc(String(p.primaryBorderColor || "transparent"))}">${esc(String(p.primaryLabel))}${pIcon}</a>` : "";
+  const secondaryBtn = p.secondaryLabel
+    ? `<a href="${esc(String(p.secondaryUrl || "#"))}" class="pb-hero-btn-secondary" style="${btnBase};background:${esc(String(p.secondaryBgColor || "transparent"))};color:${esc(String(p.secondaryTextColor || (onDark ? "#fff" : "#005bd3")))};font-weight:600;border:2px solid ${esc(String(p.secondaryBorderColor || (onDark ? "rgba(255,255,255,0.6)" : "#005bd3")))}">${esc(String(p.secondaryLabel))}${sIcon}</a>` : "";
+  const buttons = (primaryBtn || secondaryBtn)
+    ? `<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:${justify}">${primaryBtn}${secondaryBtn}</div>` : "";
+
+  const hoverCss = `<style>`
+    + `#${uid} .pb-hero-btn-primary:hover{${p.primaryHoverBg ? `background:${esc(String(p.primaryHoverBg))};` : ""}${p.primaryHoverText ? `color:${esc(String(p.primaryHoverText))};` : ""}}`
+    + `#${uid} .pb-hero-btn-secondary:hover{${p.secondaryHoverBg ? `background:${esc(String(p.secondaryHoverBg))};` : ""}${p.secondaryHoverText ? `color:${esc(String(p.secondaryHoverText))};` : ""}}`
+    + `</style>`;
+
+  const textBlock = `<div class="pb-hero-text" style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:${itemsAlign};text-align:${hAlign}">${badgeHtml}${titleHtml}${descHtml}${buttons}</div>`;
+
+  const imageBlock = (layout === "split" && p.imageUrl)
+    ? `<div style="position:relative;z-index:1"><img src="${esc(String(p.imageUrl))}" alt="${esc(String(p.imageAlt || ""))}" class="no-global-style" style="width:100%;max-width:${Number(p.imageWidth ?? 520)}px;border-radius:${Number(p.imageRadius ?? 12)}px;object-fit:${esc(String(p.imageFit ?? "cover"))};display:block${hAlign === "right" ? ";margin-left:auto" : ""}" /></div>`
+    : "";
+
+  const maxW = p.contentWidth === "boxed" ? `max-width:${Number(p.containerWidth ?? 1140)}px;` : "";
+  const gridAlign = vJustify === "flex-start" ? "start" : vJustify === "flex-end" ? "end" : "center";
+  const inner = layout === "split"
+    ? `<div class="pb-hero-grid" style="position:relative;z-index:1;width:100%;${maxW}margin:0 auto;padding:0 24px;box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:${gridAlign}">`
+      + ((p.imagePosition ?? "right") === "left" ? `${imageBlock}${textBlock}` : `${textBlock}${imageBlock}`)
+      + `</div>`
+    : `<div style="position:relative;z-index:1;width:100%;${maxW}margin:0 auto;padding:0 24px;box-sizing:border-box">${textBlock}</div>`;
+
+  return `<section id="${uid}" style="position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:${vJustify};${bg}${border}${radius}${minH}padding:${pt}px ${pr}px ${pb}px ${pl}px;margin:${mt}px ${mr}px ${mb}px ${ml}px;box-sizing:border-box">${hoverCss}${videoEl}${overlay}${inner}</section>`;
+}
+
 // CTA: headline + subtext + two buttons, alignment-aware, color-aware.
 function renderSectionCTA(p: Props): string {
   const align = String(p.alignment ?? "text-center").replace("text-", "");
@@ -1543,22 +1635,73 @@ function renderSectionCards(p: Props, variant: "services" | "features" | "team" 
   return sectionShell(p, sectionHeadingHtml(p.sectionTitle as string, p.sectionSubtitle as string) + grid);
 }
 
-// Testimonial: heading + grid of quote cards.
+// Testimonial: heading + grid/slider of quote cards. Mirrors SectionTestimonialContent.
+const TESTI_SHADOW: Record<string, string> = {
+  none: "none",
+  small: "0 1px 3px rgba(0,0,0,0.06)",
+  medium: "0 6px 18px rgba(0,0,0,0.08)",
+  large: "0 14px 40px rgba(0,0,0,0.12)",
+};
 function renderSectionTestimonial(p: Props): string {
   const items: any[] = Array.isArray(p.items) ? (p.items as any[]) : [];
-  const cols = Math.min(Number(p.reviewCount ?? 3), 4);
-  const cards = items.map((it) => {
-    const stars = "★".repeat(Math.max(0, Math.min(5, Number(it.rating) || 5)));
-    const avatar = it.avatar
-      ? `<img src="${esc(it.avatar)}" alt="${esc(it.author || "")}" class="no-global-style" style="width:40px;height:40px;border-radius:50%;object-fit:cover" />`
-      : `<div style="width:40px;height:40px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:16px">👤</div>`;
-    return `<div style="background:#fff;border:1px solid #eef2f7;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.04);display:flex;flex-direction:column;gap:12px">`
-      + `<div style="color:#f59e0b;font-size:15px;letter-spacing:1px">${stars}</div>`
-      + `<p style="font-size:15px;color:#374151;line-height:1.6;margin:0;font-style:italic">“${esc(it.quote || "Great experience!")}”</p>`
-      + `<div style="display:flex;align-items:center;gap:10px;margin-top:auto">${avatar}<div><div style="font-size:14px;font-weight:700;color:#111827">${esc(it.author || "Customer")}</div>${it.role ? `<div style="font-size:12px;color:#6b7280">${esc(it.role)}</div>` : ""}</div></div></div>`;
-  }).join("");
-  const grid = `<div class="pb-sec-cards" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:24px;align-items:stretch">${cards}</div>`;
-  return sectionShell(p, sectionHeadingHtml(p.sectionTitle as string, p.sectionSubtitle as string) + grid);
+  const cols = Math.max(1, Math.min(Number(p.reviewCount ?? 3), 4));
+  const isSlider = (p.cardLayout ?? "grid") === "slider";
+  const cardStyle = String(p.cardStyle ?? "filled");
+  const minimal = cardStyle === "minimal";
+  const equal = (p.cardHeight ?? "auto") === "equal";
+  const ff = (v: any) => (v && v !== "inherit" ? `font-family:${esc(String(v))};` : "");
+
+  const contentAlign = String(p.contentAlign ?? "left");
+  const itemsAlign = contentAlign === "center" ? "center" : contentAlign === "right" ? "flex-end" : "flex-start";
+  const vJustify = (p.cardAlign ?? "top") === "center" ? "center" : (p.cardAlign ?? "top") === "bottom" ? "flex-end" : "flex-start";
+
+  const cardBg = String(p.cardBg || (minimal || cardStyle === "outlined" ? "transparent" : "#ffffff"));
+  const effBorderStyle = minimal ? "none" : String(p.cardBorderStyle ?? "solid");
+  const border = effBorderStyle !== "none" ? `${Number(p.cardBorderWidth ?? 1)}px ${effBorderStyle} ${esc(String(p.cardBorderColor || "#eef2f7"))}` : "none";
+  const shadow = minimal ? "none" : (TESTI_SHADOW[String(p.cardShadow ?? "small")] ?? "none");
+  const cardRadius = Number(p.cardRadius ?? 12);
+  const cardPadding = Number(p.cardPadding ?? 24);
+
+  const showRating = p.showRating !== false, showAvatar = p.showAvatar !== false;
+  const showAuthor = p.showAuthor !== false, showRole = p.showRole !== false;
+  const starColor = esc(String(p.starColor || "#f59e0b"));
+  const starSize = Number(p.starSize ?? 15);
+
+  const cardList = items.map((it) => {
+    const rating = Math.max(0, Math.min(5, Math.round(Number(it.rating) || 0)));
+    const stars = showRating ? `<div style="color:${starColor};font-size:${starSize}px;letter-spacing:1px">${"★".repeat(rating)}${"☆".repeat(5 - rating)}</div>` : "";
+    const avatar = showAvatar
+      ? (it.avatar
+        ? `<img src="${esc(it.avatar)}" alt="${esc(it.author || "")}" class="no-global-style" style="width:40px;height:40px;border-radius:50%;object-fit:cover" />`
+        : `<div style="width:40px;height:40px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:16px">👤</div>`)
+      : "";
+    const nameBlock = (showAuthor || showRole)
+      ? `<div>${showAuthor ? `<div style="font-size:${Number(p.authorFontSize ?? 14)}px;font-weight:${Number(p.authorFontWeight ?? 700)};color:${esc(String(p.authorColor || "#111827"))}">${esc(it.author || "Customer")}</div>` : ""}${showRole && it.role ? `<div style="font-size:${Number(p.roleFontSize ?? 12)}px;color:${esc(String(p.roleColor || "#6b7280"))}">${esc(it.role)}</div>` : ""}</div>`
+      : "";
+    const meta = (avatar || nameBlock) ? `<div style="display:flex;align-items:center;gap:10px;justify-content:${itemsAlign}">${avatar}${nameBlock}</div>` : "";
+    return `<div style="background:${cardBg};border:${border};border-radius:${cardRadius}px;padding:${cardPadding}px;box-shadow:${shadow};display:flex;flex-direction:column;gap:12px;${equal ? "height:100%;" : ""}justify-content:${vJustify};text-align:${contentAlign};align-items:${itemsAlign};box-sizing:border-box">`
+      + stars
+      + `<p style="font-size:${Number(p.quoteFontSize ?? 15)}px;color:${esc(String(p.quoteColor || "#374151"))};line-height:${Number(p.quoteLineHeight ?? 1.6)};margin:0;font-style:italic">“${esc(it.quote || "Great experience!")}”</p>`
+      + meta + `</div>`;
+  });
+
+  const body = isSlider
+    ? `<div class="pb-testi-slider" style="display:flex;gap:24px;overflow-x:auto;align-items:${equal ? "stretch" : "flex-start"};scroll-snap-type:x mandatory;padding-bottom:8px">`
+      + cardList.map((c) => `<div style="flex:0 0 calc(${100 / cols}% - ${(24 * (cols - 1)) / cols}px);min-width:240px;scroll-snap-align:start">${c}</div>`).join("")
+      + `</div>`
+    : `<div class="pb-testi-grid pb-sec-cards" style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:24px;align-items:${equal ? "stretch" : "start"}">${cardList.join("")}</div>`;
+
+  // Heading (custom typography).
+  const headAlign = String(p.headingAlign ?? "center");
+  const headWrap = headAlign === "center" ? "max-width:720px;margin:0 auto 40px;" : "margin:0 0 32px;";
+  const heading = (p.sectionTitle || p.sectionSubtitle)
+    ? `<div style="text-align:${headAlign};${headWrap}">`
+      + (p.sectionTitle ? `<h2 style="font-size:${Number(p.headingFontSize ?? 36)}px;${ff(p.headingFontFamily)}font-weight:${Number(p.headingFontWeight ?? 800)};line-height:${Number(p.headingLineHeight ?? 1.2)};color:${esc(String(p.headingColor || "#111827"))};margin:0 0 12px">${esc(String(p.sectionTitle))}</h2>` : "")
+      + (p.sectionSubtitle ? `<p style="font-size:${Number(p.subtitleFontSize ?? 17)}px;${ff(p.subtitleFontFamily)}font-weight:${Number(p.subtitleFontWeight ?? 400)};line-height:${Number(p.subtitleLineHeight ?? 1.6)};color:${esc(String(p.subtitleColor || "#6b7280"))};margin:0">${esc(String(p.sectionSubtitle))}</p>` : "")
+      + `</div>`
+    : "";
+
+  return sectionShell(p, heading + body);
 }
 
 // FAQ: heading + <details> accordion list.
@@ -2474,6 +2617,7 @@ function renderBlock(block: Block, zones: Zones): string {
       case "ShareButtons":     html = renderShareButtons(p); break;
       case "LayoutBlock":      html = renderLayoutBlock(p, zones); break;
       case "Section":          html = renderSectionBlock(p, zones); break;
+      case "Section_Hero":     html = renderSectionHero(p); break;
       case "Section_About":    html = renderSectionAbout(p); break;
       case "Section_CTA":      html = renderSectionCTA(p); break;
       case "Section_Countdown": html = renderSectionCountdown(p); break;
@@ -2576,6 +2720,7 @@ img{max-width:100%;height:auto}
 .pb-collage-wrap{grid-template-columns:repeat(2,1fr)!important;grid-template-rows:auto!important}
 .pb-collage-wrap>*{grid-column:auto!important;grid-row:auto!important}
 .pb-hero{padding:40px 16px!important}
+.pb-hero-grid{grid-template-columns:1fr!important;gap:32px!important}
 .pb-header-nav{display:none!important}
 .puck-hide-mobile{display:none!important}
 }

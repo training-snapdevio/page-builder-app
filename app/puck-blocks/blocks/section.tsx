@@ -374,8 +374,9 @@ function makeSectionSet(dispatch: any, selectedItem: any, appState: any) {
   };
 }
 
-// Shared Style tab (Background / Border / Shadow) — same controls used by Section block
-function SectionStyleFields({ props, set }: { props: any; set: (k: string, v: any) => void }) {
+// Shared Background controls (Type / Color / Gradient / Image / Video) — used by
+// the Section block, the generic Style tab, and the Hero (where Border is separate).
+function SectionStyleBackgroundFields({ props, set }: { props: any; set: (k: string, v: any) => void }) {
   return (
     <>
       <TabSection title="Background" />
@@ -384,8 +385,8 @@ function SectionStyleFields({ props, set }: { props: any; set: (k: string, v: an
       {props.bgType === "color" && <ColorPickerField label="Color" value={props.bgColor ?? ""} onChange={(v) => set("bgColor", v)} />}
       {props.bgType === "gradient" && (
         <>
-          <ColorPickerField label="Start Color" value={props.bgGrad1 ?? ""} onChange={(v) => set("bgGrad1", v)} />
-          <ColorPickerField label="End Color" value={props.bgGrad2 ?? ""} onChange={(v) => set("bgGrad2", v)} />
+          <ColorPickerField label="Color 1" value={props.bgGrad1 ?? ""} onChange={(v) => set("bgGrad1", v)} />
+          <ColorPickerField label="Color 2" value={props.bgGrad2 ?? ""} onChange={(v) => set("bgGrad2", v)} />
           <InlineSelect label="Direction" value={props.bgGradDir ?? "to bottom"} onChange={(v) => set("bgGradDir", v)}
             options={[{ value: "to bottom", label: "Top → Bottom" }, { value: "to right", label: "Left → Right" }, { value: "to bottom right", label: "Diagonal ↘" }, { value: "to top", label: "Bottom → Top" }]} />
           <SliderNumberField label="Angle" value={props.bgGradAngle ?? 180} onChange={(v) => set("bgGradAngle", v)} min={0} max={360} step={1} unit="°" />
@@ -393,7 +394,7 @@ function SectionStyleFields({ props, set }: { props: any; set: (k: string, v: an
       )}
       {props.bgType === "image" && (
         <>
-          <ImageField label="Background Image" value={props.bgImage ?? ""} onChange={(v) => set("bgImage", v)} />
+          <ImageField label="Upload" value={props.bgImage ?? ""} onChange={(v) => set("bgImage", v)} />
           <InlineSelect label="Size" value={props.bgSize ?? "cover"} onChange={(v) => set("bgSize", v)}
             options={[{ value: "cover", label: "Cover" }, { value: "contain", label: "Contain" }, { value: "auto", label: "Auto" }]} />
           <InlineSelect label="Position" value={props.bgPos ?? "center center"} onChange={(v) => set("bgPos", v)}
@@ -405,7 +406,7 @@ function SectionStyleFields({ props, set }: { props: any; set: (k: string, v: an
           {props.overlayType === "color" && (
             <>
               <ColorPickerField label="Overlay Color" value={props.overlayColor ?? "#000000"} onChange={(v) => set("overlayColor", v)} />
-              <SliderNumberField label="Opacity" value={props.overlayOpacity ?? 50} onChange={(v) => set("overlayOpacity", v)} min={0} max={100} step={1} unit="%" />
+              <SliderNumberField label="Overlay Opacity" value={props.overlayOpacity ?? 50} onChange={(v) => set("overlayOpacity", v)} min={0} max={100} step={1} unit="%" />
             </>
           )}
         </>
@@ -413,11 +414,21 @@ function SectionStyleFields({ props, set }: { props: any; set: (k: string, v: an
       {props.bgType === "video" && (
         <>
           <VideoUploadField value={props.bgVideo ?? ""} onChange={(v) => set("bgVideo", v)} />
+          <ToggleField label="Auto-play" value={props.bgVideoAutoplay !== false} onChange={(v) => set("bgVideoAutoplay", v)} />
           <ToggleField label="Loop" value={props.bgVideoLoop !== false} onChange={(v) => set("bgVideoLoop", v)} />
           <ToggleField label="Mute" value={props.bgVideoMute !== false} onChange={(v) => set("bgVideoMute", v)} />
           <ColorPickerField label="Fallback Color" value={props.bgColor ?? "#000"} onChange={(v) => set("bgColor", v)} />
         </>
       )}
+    </>
+  );
+}
+
+// Shared Style tab (Background / Border / Shadow) — same controls used by Section block
+function SectionStyleFields({ props, set }: { props: any; set: (k: string, v: any) => void }) {
+  return (
+    <>
+      <SectionStyleBackgroundFields props={props} set={set} />
       <TabSection title="Border" />
       <InlineSelect label="Style" value={props.borderStyle ?? "none"} onChange={(v) => set("borderStyle", v)}
         options={[{ value: "none", label: "None" }, { value: "solid", label: "Solid" }, { value: "dashed", label: "Dashed" }, { value: "dotted", label: "Dotted" }]} />
@@ -677,7 +688,7 @@ const miniBtn: React.CSSProperties = {
 function AccordionItemsField({ items, onChange, fields, newItem, max = 12, singular = "Item", getThumb, getTitle, getSubtitle, removeNote }: {
   items: any[];
   onChange: (next: any[]) => void;
-  fields: { key: string; label: string; type?: "text" | "textarea" | "image" | "url"; placeholder?: string }[];
+  fields: { key: string; label: string; type?: "text" | "textarea" | "image" | "url" | "range"; placeholder?: string; min?: number; max?: number; step?: number; unit?: string }[];
   newItem: () => any;
   max?: number;
   singular?: string;
@@ -767,6 +778,7 @@ function AccordionItemsField({ items, onChange, fields, newItem, max = 12, singu
                   if (f.type === "image") return <ImageField key={f.key} label={f.label} value={v} onChange={(val: any) => update(i, f.key, val)} />;
                   if (f.type === "url") return <LinkUrlField key={f.key} label={f.label} value={v} onChange={(val: any) => update(i, f.key, val)} />;
                   if (f.type === "textarea") return <StackedTextareaField key={f.key} label={f.label} value={v} onChange={(val: any) => update(i, f.key, val)} placeholder={f.placeholder} />;
+                  if (f.type === "range") return <SliderNumberField key={f.key} label={f.label} value={Number(v) || f.min || 0} onChange={(val: any) => update(i, f.key, val)} min={f.min ?? 0} max={f.max ?? 100} step={f.step ?? 1} unit={f.unit ?? ""} />;
                   return <StackedTextField key={f.key} label={f.label} value={v} onChange={(val: any) => update(i, f.key, val)} placeholder={f.placeholder} />;
                 })}
               </div>
@@ -882,25 +894,81 @@ function SectionCardsContent({ p, variant }: { p: any; variant: "services" | "fe
   );
 }
 
-// Testimonial: heading + grid of quote cards (quote, author, role, rating).
+// Shadow presets shared by the Testimonial card (editor + storefront via TESTI_SHADOW).
+const TESTI_SHADOW: Record<string, string> = {
+  none: "none",
+  small: "0 1px 3px rgba(0,0,0,0.06)",
+  medium: "0 6px 18px rgba(0,0,0,0.08)",
+  large: "0 14px 40px rgba(0,0,0,0.12)",
+};
+
+// Testimonial: heading + grid/slider of quote cards (rating, quote, avatar, author, role).
 function SectionTestimonialContent({ p }: { p: any }) {
   const items: any[] = Array.isArray(p.items) ? p.items : [];
-  const cols = Math.min(p.reviewCount ?? 3, 4);
+  const cols = Math.max(1, Math.min(Number(p.reviewCount ?? 3), 4));
+  const isSlider = (p.cardLayout ?? "grid") === "slider";
+  const cardStyle = p.cardStyle ?? "filled";
+  const minimal = cardStyle === "minimal";
+  const equal = (p.cardHeight ?? "auto") === "equal";
+
+  const contentAlign = (p.contentAlign ?? "left") as "left" | "center" | "right";
+  const itemsAlign = contentAlign === "center" ? "center" : contentAlign === "right" ? "flex-end" : "flex-start";
+  const cardAlign = (p.cardAlign ?? "top") as "top" | "center" | "bottom";
+  const vJustify = cardAlign === "center" ? "center" : cardAlign === "bottom" ? "flex-end" : "flex-start";
+
+  const cardBg = p.cardBg || (minimal || cardStyle === "outlined" ? "transparent" : "#ffffff");
+  const effBorderStyle = minimal ? "none" : (p.cardBorderStyle ?? "solid");
+  const border = effBorderStyle !== "none" ? `${p.cardBorderWidth ?? 1}px ${effBorderStyle} ${p.cardBorderColor || "#eef2f7"}` : "none";
+  const shadow = minimal ? "none" : (TESTI_SHADOW[p.cardShadow ?? "small"] ?? "none");
+
+  const headAlign = (p.headingAlign ?? "center") as "left" | "center" | "right";
+  const headFF = fontFam(p.headingFontFamily);
+  const subFF = fontFam(p.subtitleFontFamily);
+
+  const card = (it: any, i: number) => {
+    const rating = Math.max(0, Math.min(5, Math.round(Number(it.rating) || 0)));
+    return (
+      <div key={i} style={{ background: cardBg, border, borderRadius: p.cardRadius ?? 12, padding: p.cardPadding ?? 24, boxShadow: shadow, display: "flex", flexDirection: "column", gap: 12, height: equal ? "100%" : undefined, justifyContent: vJustify, textAlign: contentAlign, alignItems: itemsAlign, boxSizing: "border-box" }}>
+        {p.showRating !== false && (
+          <div style={{ color: p.starColor || "#f59e0b", fontSize: p.starSize ?? 15, letterSpacing: 1 }}>{"★".repeat(rating)}{"☆".repeat(5 - rating)}</div>
+        )}
+        <p style={{ fontSize: p.quoteFontSize ?? 15, color: p.quoteColor || "#374151", lineHeight: p.quoteLineHeight ?? 1.6, margin: 0, fontStyle: "italic" }}>“{it.quote || "Great experience!"}”</p>
+        {(p.showAvatar !== false || p.showAuthor !== false || p.showRole !== false) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: itemsAlign }}>
+            {p.showAvatar !== false && (it.avatar
+              ? <img src={it.avatar} alt={it.author || ""} style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }} />
+              : <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>👤</div>)}
+            {(p.showAuthor !== false || p.showRole !== false) && (
+              <div>
+                {p.showAuthor !== false && <div style={{ fontSize: p.authorFontSize ?? 14, fontWeight: Number(p.authorFontWeight ?? 700), color: p.authorColor || "#111827" }}>{it.author || "Customer"}</div>}
+                {p.showRole !== false && it.role && <div style={{ fontSize: p.roleFontSize ?? 12, color: p.roleColor || "#6b7280" }}>{it.role}</div>}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <SectionCanvasWrap props={p}>
-      <SectionHeading title={p.sectionTitle} subtitle={p.sectionSubtitle} />
-      <SecGrid cols={cols} gap={24}>
-        {items.map((it, i) => (
-          <div key={i} style={{ background: "#fff", border: "1px solid #eef2f7", borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ color: "#f59e0b", fontSize: 15, letterSpacing: 1 }}>{"★".repeat(Math.max(0, Math.min(5, Number(it.rating) || 5)))}</div>
-            <p style={{ fontSize: 15, color: "#374151", lineHeight: 1.6, margin: 0, fontStyle: "italic" }}>“{it.quote || "Great experience!"}”</p>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: "auto" }}>
-              {it.avatar ? <img src={it.avatar} alt={it.author || ""} style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }} /> : <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>👤</div>}
-              <div><div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{it.author || "Customer"}</div>{it.role && <div style={{ fontSize: 12, color: "#6b7280" }}>{it.role}</div>}</div>
-            </div>
-          </div>
-        ))}
-      </SecGrid>
+      {(p.sectionTitle || p.sectionSubtitle) && (
+        <div style={{ textAlign: headAlign, maxWidth: headAlign === "center" ? 720 : undefined, margin: headAlign === "center" ? "0 auto 40px" : "0 0 32px" }}>
+          {p.sectionTitle && <h2 style={{ fontSize: p.headingFontSize ?? 36, fontFamily: headFF, fontWeight: Number(p.headingFontWeight ?? 800), lineHeight: p.headingLineHeight ?? 1.2, color: p.headingColor || "#111827", margin: "0 0 12px" }}>{p.sectionTitle}</h2>}
+          {p.sectionSubtitle && <p style={{ fontSize: p.subtitleFontSize ?? 17, fontFamily: subFF, fontWeight: Number(p.subtitleFontWeight ?? 400), lineHeight: p.subtitleLineHeight ?? 1.6, color: p.subtitleColor || "#6b7280", margin: 0 }}>{p.sectionSubtitle}</p>}
+        </div>
+      )}
+      {isSlider ? (
+        <div style={{ display: "flex", gap: 24, overflowX: "auto", alignItems: equal ? "stretch" : "flex-start", scrollSnapType: "x mandatory", paddingBottom: 8 }}>
+          {items.map((it, i) => (
+            <div key={i} style={{ flex: `0 0 calc(${100 / cols}% - ${(24 * (cols - 1)) / cols}px)`, minWidth: 240, scrollSnapAlign: "start" }}>{card(it, i)}</div>
+          ))}
+        </div>
+      ) : (
+        <div className="pb-testi-grid" style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 24, alignItems: equal ? "stretch" : "start" }}>
+          {items.map(card)}
+        </div>
+      )}
     </SectionCanvasWrap>
   );
 }
@@ -1303,143 +1371,320 @@ export const sectionTemplateConfig: Record<string, any> = {
   // ── Hero ──────────────────────────────────────────────────────────────────
   Section_Hero: {
     label: "Hero",
-    fields: makeSectionFields("Section_Hero", (p, set) => (
-      <>
-        <TabSection title="Content" />
-        <StackedTextField label="Badge" value={p.badge ?? ""} onChange={(v) => set("badge", v)} placeholder="e.g. New · Sale · Featured" />
-        <StackedTextField label="Headline" value={p.title ?? ""} onChange={(v) => set("title", v)} placeholder="Your Page Headline" />
-        <StackedTextField label="Subtext" value={p.subtitle ?? ""} onChange={(v) => set("subtitle", v)} placeholder="Short supporting tagline" />
-        <TabSection title="Primary Button" />
-        <StackedTextField label="Label" value={p.primaryLabel ?? ""} onChange={(v) => set("primaryLabel", v)} placeholder="Get Started" />
-        <LinkUrlField label="URL" value={p.primaryUrl ?? ""} onChange={(v) => set("primaryUrl", v)} />
-        <TabSection title="Secondary Button" />
-        <StackedTextField label="Label" value={p.secondaryLabel ?? ""} onChange={(v) => set("secondaryLabel", v)} placeholder="Learn More (leave blank to hide)" />
-        <LinkUrlField label="URL" value={p.secondaryUrl ?? ""} onChange={(v) => set("secondaryUrl", v)} />
-        <TabSection title="Image" />
-        <ImageField label="Hero Image" value={p.imageUrl ?? ""} onChange={(v) => set("imageUrl", v)} />
-        <StackedTextField label="Alt Text" value={p.imageAlt ?? ""} onChange={(v) => set("imageAlt", v)} placeholder="Describe the image" />
-        <TabSection title="Layout" />
-        <InlineSelect label="Layout" value={p.heroLayout ?? "split"} onChange={(v) => set("heroLayout", v)}
-          options={[{ value: "split", label: "Text + Image" }, { value: "centered", label: "Centered" }, { value: "image-bg", label: "Image Background" }]} />
-        <AlignField label="Text Align" value={p.alignment ?? "text-left"} onChange={(v) => set("alignment", v)} />
-        {p.heroLayout === "image-bg" && (
-          <SliderNumberField label="Overlay Opacity" value={p.overlayOpacity ?? 40} onChange={(v) => set("overlayOpacity", v)} min={0} max={90} step={5} unit="%" />
-        )}
-      </>
-    )),
+    fields: {
+      _tabs: {
+        type: "custom" as const,
+        label: "",
+        render: (_: any) => {
+          const { selectedItem, appState, dispatch } = usePuck();
+          const p = selectedItem?.props ?? {};
+          const set = makeSectionSet(dispatch, selectedItem, appState);
+          const layout = p.heroLayout ?? "split";
+          return (
+            <BlockTabBar blockKey="Section_Hero">
+              {(tab) => (
+                <>
+                  {/* ── CONTENT TAB ── */}
+                  {tab === "content" && (
+                    <>
+                      <TabSection title="General" />
+                      <StackedTextField label="Badge" value={p.badge ?? ""} onChange={(v) => set("badge", v)} placeholder="e.g. New · Sale · Featured" />
+                      <StackedTextField label="Headline" value={p.title ?? ""} onChange={(v) => set("title", v)} placeholder="Your Page Headline" />
+                      <StackedTextareaField label="Description / Subtext" value={p.description ?? ""} onChange={(v) => set("description", v)} placeholder="Short supporting tagline" />
+
+                      <TabSection title="Primary Button" />
+                      <StackedTextField label="Label" value={p.primaryLabel ?? ""} onChange={(v) => set("primaryLabel", v)} placeholder="Get Started (leave blank to hide)" />
+                      <LinkUrlField label="Link" value={p.primaryUrl ?? ""} onChange={(v) => set("primaryUrl", v)} />
+                      <StackedTextField label="Icon (Optional)" value={p.primaryIcon ?? ""} onChange={(v) => set("primaryIcon", v)} placeholder="e.g. → or 🛒" />
+
+                      <TabSection title="Secondary Button" />
+                      <StackedTextField label="Label" value={p.secondaryLabel ?? ""} onChange={(v) => set("secondaryLabel", v)} placeholder="Learn More (leave blank to hide)" />
+                      <LinkUrlField label="Link" value={p.secondaryUrl ?? ""} onChange={(v) => set("secondaryUrl", v)} />
+                      <StackedTextField label="Icon (Optional)" value={p.secondaryIcon ?? ""} onChange={(v) => set("secondaryIcon", v)} placeholder="e.g. ▶ or ℹ" />
+
+                      <TabSection title="Layout" />
+                      <InlineSelect label="Layout" value={layout} onChange={(v) => set("heroLayout", v)}
+                        options={[{ value: "split", label: "Text + Image" }, { value: "text", label: "Text Only" }, { value: "image-bg", label: "Image Background" }]} />
+
+                      <TabSection title="Content Alignment" />
+                      <InlineSelect label="Vertical Alignment" value={p.vAlign ?? "center"} onChange={(v) => set("vAlign", v)}
+                        options={[{ value: "top", label: "Top" }, { value: "center", label: "Center" }, { value: "bottom", label: "Bottom" }]} />
+                      <InlineSelect label="Horizontal Alignment" value={p.hAlign ?? "left"} onChange={(v) => set("hAlign", v)}
+                        options={[{ value: "left", label: "Left" }, { value: "center", label: "Center" }, { value: "right", label: "Right" }]} />
+
+                      {/* Media — conditional on layout */}
+                      {layout === "split" && (
+                        <>
+                          <TabSection title="Media" />
+                          <ImageField label="Hero Image" value={p.imageUrl ?? ""} onChange={(v) => set("imageUrl", v)} />
+                          <StackedTextField label="Alt Text" value={p.imageAlt ?? ""} onChange={(v) => set("imageAlt", v)} placeholder="Describe the image" />
+                          <InlineSelect label="Image Position" value={p.imagePosition ?? "right"} onChange={(v) => set("imagePosition", v)}
+                            options={[{ value: "left", label: "Left" }, { value: "right", label: "Right" }]} />
+                          <InlineSelect label="Image Fit" value={p.imageFit ?? "cover"} onChange={(v) => set("imageFit", v)}
+                            options={[{ value: "cover", label: "Cover" }, { value: "contain", label: "Contain" }, { value: "fill", label: "Fill" }]} />
+                          <SliderNumberField label="Image Width" value={p.imageWidth ?? 520} onChange={(v) => set("imageWidth", v)} min={120} max={900} step={10} unit="PX" />
+                          <SliderNumberField label="Image Border Radius" value={p.imageRadius ?? 12} onChange={(v) => set("imageRadius", v)} min={0} max={100} step={1} unit="PX" />
+                        </>
+                      )}
+                      {layout === "image-bg" && (
+                        <>
+                          <TabSection title="Background Image" />
+                          <ImageField label="Upload Background Image" value={p.heroBgImage ?? ""} onChange={(v) => set("heroBgImage", v)} />
+                          <StackedTextField label="Alt Text" value={p.heroBgImageAlt ?? ""} onChange={(v) => set("heroBgImageAlt", v)} placeholder="Describe the image" />
+                          <TabSection title="Background Settings" />
+                          <InlineSelect label="Background Size" value={p.heroBgSize ?? "cover"} onChange={(v) => set("heroBgSize", v)}
+                            options={[{ value: "cover", label: "Cover" }, { value: "contain", label: "Contain" }, { value: "auto", label: "Auto" }]} />
+                          <InlineSelect label="Background Position" value={p.heroBgPos ?? "center"} onChange={(v) => set("heroBgPos", v)}
+                            options={[{ value: "center", label: "Center" }, { value: "top", label: "Top" }, { value: "bottom", label: "Bottom" }, { value: "left", label: "Left" }, { value: "right", label: "Right" }]} />
+                          <TabSection title="Overlay" />
+                          <ColorPickerField label="Overlay Color" value={p.heroOverlayColor ?? "#000000"} onChange={(v) => set("heroOverlayColor", v)} />
+                          <SliderNumberField label="Overlay Opacity" value={p.heroOverlayOpacity ?? 40} onChange={(v) => set("heroOverlayOpacity", v)} min={0} max={100} step={1} unit="%" />
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {/* ── STYLE TAB ── */}
+                  {tab === "style" && (
+                    <>
+                      {/* Background — hidden when the layout already uses an image background */}
+                      {layout !== "image-bg" && <SectionStyleBackgroundFields props={p} set={set} />}
+
+                      <TabSection title="Badge" />
+                      <ColorPickerField label="Color" value={p.badgeColor ?? "#ffffff"} onChange={(v) => set("badgeColor", v)} />
+                      <ColorPickerField label="Background" value={p.badgeBg ?? "#005bd3"} onChange={(v) => set("badgeBg", v)} />
+                      <SliderNumberField label="Font Size" value={p.badgeFontSize ?? 12} onChange={(v) => set("badgeFontSize", v)} min={8} max={48} step={1} unit="px" />
+                      <InlineSelect label="Font Weight" value={String(p.badgeFontWeight ?? "700")} onChange={(v) => set("badgeFontWeight", v)} options={FONT_WEIGHT_OPTIONS} />
+                      <SliderNumberField label="Letter Spacing" value={p.badgeLetterSpacing ?? 0.5} onChange={(v) => set("badgeLetterSpacing", v)} min={-5} max={20} step={0.5} unit="px" />
+
+                      <TabSection title="Heading" />
+                      <InlineSelect label="Font Family" value={p.titleFontFamily ?? "inherit"} onChange={(v) => { set("titleFontFamily", v); loadGoogleFont(v); }} options={FONT_FAMILY_OPTIONS} />
+                      <SliderNumberField label="Font Size" value={p.titleFontSize ?? 48} onChange={(v) => set("titleFontSize", v)} min={12} max={120} step={1} unit="px" />
+                      <InlineSelect label="Font Weight" value={String(p.titleFontWeight ?? "800")} onChange={(v) => set("titleFontWeight", v)} options={FONT_WEIGHT_OPTIONS} />
+                      <SliderNumberField label="Line Height" value={p.titleLineHeight ?? 1.2} onChange={(v) => set("titleLineHeight", v)} min={0.8} max={3} step={0.05} unit="" />
+                      <SliderNumberField label="Letter Spacing" value={p.titleLetterSpacing ?? 0} onChange={(v) => set("titleLetterSpacing", v)} min={-5} max={20} step={0.5} unit="px" />
+                      <ColorPickerField label="Color" value={p.titleColor ?? ""} onChange={(v) => set("titleColor", v)} />
+
+                      <TabSection title="Description" />
+                      <InlineSelect label="Font Family" value={p.descFontFamily ?? "inherit"} onChange={(v) => { set("descFontFamily", v); loadGoogleFont(v); }} options={FONT_FAMILY_OPTIONS} />
+                      <SliderNumberField label="Font Size" value={p.descFontSize ?? 18} onChange={(v) => set("descFontSize", v)} min={10} max={48} step={1} unit="px" />
+                      <InlineSelect label="Font Weight" value={String(p.descFontWeight ?? "400")} onChange={(v) => set("descFontWeight", v)} options={FONT_WEIGHT_OPTIONS} />
+                      <SliderNumberField label="Line Height" value={p.descLineHeight ?? 1.6} onChange={(v) => set("descLineHeight", v)} min={0.8} max={3} step={0.05} unit="" />
+                      <SliderNumberField label="Letter Spacing" value={p.descLetterSpacing ?? 0} onChange={(v) => set("descLetterSpacing", v)} min={-5} max={20} step={0.5} unit="px" />
+                      <ColorPickerField label="Color" value={p.descColor ?? ""} onChange={(v) => set("descColor", v)} />
+
+                      <TabSection title="Primary Button" />
+                      <ColorPickerField label="Text Color" value={p.primaryTextColor ?? "#ffffff"} onChange={(v) => set("primaryTextColor", v)} />
+                      <ColorPickerField label="Background Color" value={p.primaryBgColor ?? "#005bd3"} onChange={(v) => set("primaryBgColor", v)} />
+                      <ColorPickerField label="Border Color" value={p.primaryBorderColor ?? ""} onChange={(v) => set("primaryBorderColor", v)} />
+                      <ColorPickerField label="Hover Text" value={p.primaryHoverText ?? ""} onChange={(v) => set("primaryHoverText", v)} />
+                      <ColorPickerField label="Hover Background" value={p.primaryHoverBg ?? ""} onChange={(v) => set("primaryHoverBg", v)} />
+
+                      <TabSection title="Secondary Button" />
+                      <ColorPickerField label="Text Color" value={p.secondaryTextColor ?? "#005bd3"} onChange={(v) => set("secondaryTextColor", v)} />
+                      <ColorPickerField label="Background Color" value={p.secondaryBgColor ?? "transparent"} onChange={(v) => set("secondaryBgColor", v)} />
+                      <ColorPickerField label="Border Color" value={p.secondaryBorderColor ?? "#005bd3"} onChange={(v) => set("secondaryBorderColor", v)} />
+                      <ColorPickerField label="Hover Text" value={p.secondaryHoverText ?? ""} onChange={(v) => set("secondaryHoverText", v)} />
+                      <ColorPickerField label="Hover Background" value={p.secondaryHoverBg ?? ""} onChange={(v) => set("secondaryHoverBg", v)} />
+
+                      <TabSection title="Border" />
+                      <InlineSelect label="Style" value={p.borderStyle ?? "none"} onChange={(v) => set("borderStyle", v)}
+                        options={[{ value: "none", label: "None" }, { value: "solid", label: "Solid" }, { value: "dashed", label: "Dashed" }, { value: "dotted", label: "Dotted" }]} />
+                      {p.borderStyle && p.borderStyle !== "none" && (
+                        <>
+                          <SliderNumberField label="Border Width" value={p.borderWidth ?? 1} onChange={(v) => set("borderWidth", v)} min={1} max={20} step={1} unit="px" />
+                          <ColorPickerField label="Border Color" value={p.borderColor ?? ""} onChange={(v) => set("borderColor", v)} />
+                          <SliderNumberField label="Border Radius" value={p.borderRadius ?? 0} onChange={(v) => set("borderRadius", v)} min={0} max={100} step={1} unit="px" />
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {/* ── ADVANCED TAB ── */}
+                  {tab === "advanced" && (
+                    <>
+                      <TabSection title="Layout" />
+                      <InlineSelect label="Content Width" value={p.contentWidth ?? "boxed"} onChange={(v) => set("contentWidth", v)}
+                        options={[{ value: "boxed", label: "Boxed" }, { value: "full", label: "Full Width" }]} />
+                      {p.contentWidth === "boxed" && <SliderNumberField label="Max Width" value={p.containerWidth ?? 1140} onChange={(v) => set("containerWidth", v)} min={320} max={1920} step={10} unit="PX" />}
+                      <SliderNumberField label="Min Height" value={p.minHeightPx ?? 0} onChange={(v) => set("minHeightPx", v)} min={0} max={1200} step={10} unit="PX" />
+
+                      <TabSection title="Spacing" />
+                      <FourSideField label="Padding (px)" value={p.advPadding ?? { top: 80, right: 0, bottom: 80, left: 0 }} onChange={(v) => set("advPadding", v)} />
+                      <FourSideField label="Margin (px)" value={p.advMargin ?? { top: 0, right: 0, bottom: 0, left: 0 }} onChange={(v) => set("advMargin", v)} />
+
+                      <TabSection title="Responsive" />
+                      <ToggleField label="Hide on Desktop" value={!!p.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
+                      <ToggleField label="Hide on Tablet" value={!!p.hideTablet} onChange={(v) => set("hideTablet", v)} />
+                      <ToggleField label="Hide on Mobile" value={!!p.hideMobile} onChange={(v) => set("hideMobile", v)} />
+
+                      <TabSection title="Animation" />
+                      <InlineSelect label="Entrance Animation" value={p.animation ?? "none"} onChange={(v) => set("animation", v)}
+                        options={[{ value: "none", label: "None" }, { value: "fadeIn", label: "Fade In" }, { value: "fadeInUp", label: "Fade In Up" }, { value: "fadeInDown", label: "Fade In Down" }, { value: "slideInLeft", label: "Slide In Left" }, { value: "slideInRight", label: "Slide In Right" }, { value: "zoomIn", label: "Zoom In" }]} />
+                    </>
+                  )}
+                </>
+              )}
+            </BlockTabBar>
+          );
+        },
+      },
+    },
     defaultProps: baseSectionProps({
       columns: 1, columnsTablet: 1,
       advPadding: { top: 80, right: 0, bottom: 80, left: 0 },
+      // Content — general
       badge: "",
       title: "Your Headline Here",
-      subtitle: "A short tagline that explains your value proposition",
-      primaryLabel: "Get Started",  primaryUrl: "#",
-      secondaryLabel: "Learn More", secondaryUrl: "#",
-      imageUrl: "", imageAlt: "Hero image",
-      alignment: "text-left",
-      heroLayout: "split",
-      overlayOpacity: 40,
+      description: "A short tagline that explains your value proposition",
+      primaryLabel: "Get Started",  primaryUrl: "#", primaryIcon: "",
+      secondaryLabel: "Learn More", secondaryUrl: "#", secondaryIcon: "",
+      // Layout + alignment
+      heroLayout: "split", vAlign: "center", hAlign: "left",
+      // Media — Text + Image
+      imageUrl: "", imageAlt: "Hero image", imagePosition: "right",
+      imageFit: "cover", imageWidth: 520, imageRadius: 12,
+      // Media — Image Background
+      heroBgImage: "", heroBgImageAlt: "", heroBgSize: "cover", heroBgPos: "center",
+      heroOverlayColor: "#000000", heroOverlayOpacity: 40,
+      // Typography — badge
+      badgeColor: "#ffffff", badgeBg: "#005bd3", badgeFontSize: 12, badgeFontWeight: "700", badgeLetterSpacing: 0.5,
+      // Typography — heading
+      titleColor: "", titleFontFamily: "inherit", titleFontSize: 48, titleFontWeight: "800", titleLineHeight: 1.2, titleLetterSpacing: 0,
+      // Typography — description
+      descColor: "", descFontFamily: "inherit", descFontSize: 18, descFontWeight: "400", descLineHeight: 1.6, descLetterSpacing: 0,
+      // Buttons — primary
+      primaryTextColor: "#ffffff", primaryBgColor: "#005bd3", primaryBorderColor: "", primaryHoverText: "", primaryHoverBg: "",
+      // Buttons — secondary
+      secondaryTextColor: "#005bd3", secondaryBgColor: "transparent", secondaryBorderColor: "#005bd3", secondaryHoverText: "", secondaryHoverBg: "",
+      bgVideoAutoplay: true,
     }),
     render: (p: any) => {
       const layout = p.heroLayout ?? "split";
-      const align = (p.alignment ?? "text-left").replace("text-", "") as "left" | "center" | "right";
-      const justifyContent = align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
-      const isCentered = layout === "centered";
-      const isBg = layout === "image-bg" && !!p.imageUrl;
+      const hAlign = (p.hAlign ?? "left") as "left" | "center" | "right";
+      const vAlign = (p.vAlign ?? "center") as "top" | "center" | "bottom";
+      const justifyContent = hAlign === "center" ? "center" : hAlign === "right" ? "flex-end" : "flex-start";
+      const itemsAlign = hAlign === "center" ? "center" : hAlign === "right" ? "flex-end" : "flex-start";
+      const vJustify = vAlign === "top" ? "flex-start" : vAlign === "bottom" ? "flex-end" : "center";
+      const isBg = layout === "image-bg";
+      const uid = `pb-hero-${(p.id || "x").toString().slice(-8)}`;
+
+      // Background (Style tab) — skipped in image-bg layout, which uses its own image.
+      let bgCss: React.CSSProperties = {};
+      if (!isBg) {
+        if (p.bgType === "color" && p.bgColor) bgCss = { backgroundColor: p.bgColor };
+        else if (p.bgType === "gradient") bgCss = { background: `linear-gradient(${p.bgGradDir || `${p.bgGradAngle ?? 180}deg`}, ${p.bgGrad1 || "transparent"}, ${p.bgGrad2 || "transparent"})` };
+        else if (p.bgType === "image" && p.bgImage) bgCss = { backgroundImage: `url("${p.bgImage}")`, backgroundSize: p.bgSize || "cover", backgroundPosition: p.bgPos || "center center", backgroundRepeat: p.bgRepeat || "no-repeat" };
+        else if (p.bgType === "video") bgCss = { backgroundColor: p.bgColor || "#000" };
+      }
+      const showBgVideo = !isBg && p.bgType === "video" && p.bgVideo;
+
+      const border = p.borderStyle && p.borderStyle !== "none"
+        ? { borderStyle: p.borderStyle, borderWidth: p.borderWidth ?? 1, borderColor: p.borderColor || "#e5e7eb" } : {};
 
       const outerStyle: React.CSSProperties = {
         position: "relative",
         overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: vJustify,
         padding: `${p.advPadding?.top ?? 80}px ${p.advPadding?.right ?? 0}px ${p.advPadding?.bottom ?? 80}px ${p.advPadding?.left ?? 0}px`,
-        backgroundColor: isBg ? "#111827" : (p.bgType === "color" ? p.bgColor || "#ffffff" : "#ffffff"),
-        backgroundImage: isBg ? `url("${p.imageUrl}")` : undefined,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
+        margin: `${p.advMargin?.top ?? 0}px ${p.advMargin?.right ?? 0}px ${p.advMargin?.bottom ?? 0}px ${p.advMargin?.left ?? 0}px`,
+        backgroundColor: isBg ? "#111827" : undefined,
+        backgroundImage: isBg && p.heroBgImage ? `url("${p.heroBgImage}")` : undefined,
+        backgroundSize: isBg ? (p.heroBgSize || "cover") : undefined,
+        backgroundPosition: isBg ? (p.heroBgPos || "center") : undefined,
+        backgroundRepeat: "no-repeat",
         boxSizing: "border-box" as const,
         minHeight: p.minHeightPx > 0 ? p.minHeightPx : undefined,
+        ...bgCss,
+        ...border,
+        borderRadius: p.borderRadius ? p.borderRadius : undefined,
       };
 
       const overlayStyle: React.CSSProperties = isBg ? {
         position: "absolute", inset: 0,
-        backgroundColor: `rgba(0,0,0,${(p.overlayOpacity ?? 40) / 100})`,
+        backgroundColor: p.heroOverlayColor || "#000000",
+        opacity: (p.heroOverlayOpacity ?? 40) / 100,
         zIndex: 0,
       } : {};
 
-      const textColor = isBg ? "#ffffff" : "#111827";
-      const subtitleColor = isBg ? "rgba(255,255,255,0.85)" : "#6b7280";
+      const onDark = isBg;
+      const titleColor = p.titleColor || (onDark ? "#ffffff" : "#111827");
+      const descColor = p.descColor || (onDark ? "rgba(255,255,255,0.85)" : "#6b7280");
+      const ff = (v: any) => (v && v !== "inherit" ? v : undefined);
+
+      const btnBase: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 28px", borderRadius: 6, fontSize: 15, textDecoration: "none", transition: "background-color .15s,color .15s,border-color .15s" };
+
+      const hoverCss = `
+        #${uid} .pb-hero-btn-primary:hover{${p.primaryHoverBg ? `background:${p.primaryHoverBg};` : ""}${p.primaryHoverText ? `color:${p.primaryHoverText};` : ""}}
+        #${uid} .pb-hero-btn-secondary:hover{${p.secondaryHoverBg ? `background:${p.secondaryHoverBg};` : ""}${p.secondaryHoverText ? `color:${p.secondaryHoverText};` : ""}}
+      `;
 
       const textBlock = (
-        <div style={{ position: "relative", zIndex: 1, textAlign: align, maxWidth: isCentered ? 720 : "100%", margin: isCentered ? "0 auto" : undefined }}>
+        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: itemsAlign, textAlign: hAlign, maxWidth: layout === "text" ? 760 : "100%", marginLeft: layout === "text" && hAlign !== "left" ? "auto" : undefined, marginRight: layout === "text" && hAlign !== "right" ? "auto" : undefined }}>
           {p.badge && (
-            <span style={{ display: "inline-block", background: "#005bd3", color: "#fff", fontSize: 12, fontWeight: 700, padding: "3px 12px", borderRadius: 4, marginBottom: 16, letterSpacing: "0.04em" }}>
+            <span style={{ display: "inline-block", background: p.badgeBg || "#005bd3", color: p.badgeColor || "#fff", fontSize: p.badgeFontSize ?? 12, fontWeight: Number(p.badgeFontWeight ?? 700), padding: "3px 12px", borderRadius: 4, marginBottom: 16, letterSpacing: `${p.badgeLetterSpacing ?? 0.5}px` }}>
               {p.badge}
             </span>
           )}
-          <h1 style={{ fontSize: "clamp(1.75rem,4vw,3rem)", fontWeight: 800, color: textColor, lineHeight: 1.2, margin: "0 0 16px" }}>
+          <h1 style={{ fontSize: p.titleFontSize ?? 48, fontFamily: ff(p.titleFontFamily), fontWeight: Number(p.titleFontWeight ?? 800), color: titleColor, lineHeight: p.titleLineHeight ?? 1.2, letterSpacing: `${p.titleLetterSpacing ?? 0}px`, margin: "0 0 16px" }}>
             {p.title || "Your Headline Here"}
           </h1>
-          {p.subtitle && (
-            <p style={{ fontSize: "1.1rem", color: subtitleColor, lineHeight: 1.6, margin: "0 0 32px", maxWidth: 560, marginLeft: align === "center" ? "auto" : undefined, marginRight: align === "right" || align === "center" ? "auto" : undefined }}>
-              {p.subtitle}
+          {p.description && (
+            <p style={{ fontSize: p.descFontSize ?? 18, fontFamily: ff(p.descFontFamily), fontWeight: Number(p.descFontWeight ?? 400), color: descColor, lineHeight: p.descLineHeight ?? 1.6, letterSpacing: `${p.descLetterSpacing ?? 0}px`, margin: "0 0 32px", maxWidth: 560 }}>
+              {p.description}
             </p>
           )}
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent }}>
             {p.primaryLabel && (
-              <a href={p.primaryUrl || "#"} style={{ display: "inline-block", background: "#005bd3", color: "#fff", padding: "12px 28px", borderRadius: 6, fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
-                {p.primaryLabel}
+              <a href={p.primaryUrl || "#"} className="pb-hero-btn-primary" style={{ ...btnBase, background: p.primaryBgColor || "#005bd3", color: p.primaryTextColor || "#fff", fontWeight: 700, border: p.primaryBorderColor ? `2px solid ${p.primaryBorderColor}` : "2px solid transparent" }}>
+                {p.primaryLabel}{p.primaryIcon && <span>{p.primaryIcon}</span>}
               </a>
             )}
             {p.secondaryLabel && (
-              <a href={p.secondaryUrl || "#"} style={{ display: "inline-block", background: "transparent", color: isBg ? "#fff" : "#005bd3", padding: "12px 28px", borderRadius: 6, fontWeight: 600, fontSize: 15, textDecoration: "none", border: `2px solid ${isBg ? "rgba(255,255,255,0.6)" : "#005bd3"}` }}>
-                {p.secondaryLabel}
+              <a href={p.secondaryUrl || "#"} className="pb-hero-btn-secondary" style={{ ...btnBase, background: p.secondaryBgColor || "transparent", color: p.secondaryTextColor || (onDark ? "#fff" : "#005bd3"), fontWeight: 600, border: `2px solid ${p.secondaryBorderColor || (onDark ? "rgba(255,255,255,0.6)" : "#005bd3")}` }}>
+                {p.secondaryLabel}{p.secondaryIcon && <span>{p.secondaryIcon}</span>}
               </a>
             )}
           </div>
         </div>
       );
 
-      const imageBlock = p.imageUrl && !isBg ? (
-        <div style={{ position: "relative", zIndex: 1, flex: "0 0 auto" }}>
-          <img src={p.imageUrl} alt={p.imageAlt || ""} style={{ width: "100%", maxWidth: 520, borderRadius: 12, objectFit: "cover", display: "block" }} />
+      const imageBlock = layout === "split" && p.imageUrl ? (
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <img src={p.imageUrl} alt={p.imageAlt || ""} style={{ width: "100%", maxWidth: p.imageWidth ?? 520, borderRadius: p.imageRadius ?? 12, objectFit: (p.imageFit ?? "cover") as any, display: "block", marginLeft: hAlign === "right" ? "auto" : undefined }} />
         </div>
-      ) : null;
-
-      const imagePlaceholder = !p.imageUrl && layout === "split" ? (
-        <div style={{ flex: "0 0 auto", width: "100%", maxWidth: 520, minHeight: 300, background: "#f1f5f9", borderRadius: 12, border: "2px dashed #cbd5e1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, color: "#94a3b8" }}>
+      ) : layout === "split" ? (
+        <div style={{ width: "100%", maxWidth: p.imageWidth ?? 520, minHeight: 300, background: "#f1f5f9", borderRadius: p.imageRadius ?? 12, border: "2px dashed #cbd5e1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, color: "#94a3b8" }}>
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           <span style={{ fontSize: 13, fontWeight: 600 }}>Upload hero image</span>
           <span style={{ fontSize: 11 }}>Set in Content → Hero Image</span>
         </div>
       ) : null;
 
-      if (isBg) {
-        return (
-          <div style={outerStyle}>
-            <div style={overlayStyle} />
-            <div style={{ position: "relative", zIndex: 1, maxWidth: 1140, margin: "0 auto", padding: "0 24px", boxSizing: "border-box" }}>
-              {textBlock}
-            </div>
-          </div>
-        );
-      }
+      const innerMax: React.CSSProperties = {
+        position: "relative", zIndex: 1, width: "100%",
+        maxWidth: p.contentWidth === "boxed" ? (p.containerWidth || 1140) : undefined,
+        margin: "0 auto", padding: "0 24px", boxSizing: "border-box",
+      };
 
-      if (isCentered) {
-        return (
-          <div style={outerStyle}>
-            <div style={{ maxWidth: 1140, margin: "0 auto", padding: "0 24px", boxSizing: "border-box" }}>
-              {textBlock}
-            </div>
-          </div>
-        );
-      }
-
-      // Split layout
       return (
-        <div style={outerStyle}>
-          <div style={{ maxWidth: 1140, margin: "0 auto", padding: "0 24px", boxSizing: "border-box", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center" }}>
-            {textBlock}
-            {imageBlock || imagePlaceholder}
-          </div>
+        <div id={uid} style={outerStyle}>
+          <style>{hoverCss}</style>
+          <EditorHideOverlay hideDesktop={p.hideDesktop} hideTablet={p.hideTablet} hideMobile={p.hideMobile} />
+          {showBgVideo && (
+            <video autoPlay={p.bgVideoAutoplay !== false} loop={p.bgVideoLoop !== false} muted={p.bgVideoMute !== false} playsInline
+              src={p.bgVideo} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0 }} />
+          )}
+          {isBg && <div style={overlayStyle} />}
+          {layout === "split" ? (
+            <div style={{ ...innerMax, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: vJustify === "flex-start" ? "start" : vJustify === "flex-end" ? "end" : "center" }}>
+              {(p.imagePosition ?? "right") === "left" ? <>{imageBlock}{textBlock}</> : <>{textBlock}{imageBlock}</>}
+            </div>
+          ) : (
+            <div style={innerMax}>{textBlock}</div>
+          )}
         </div>
       );
     },
@@ -1715,28 +1960,169 @@ export const sectionTemplateConfig: Record<string, any> = {
   // ── Testimonial ───────────────────────────────────────────────────────────
   Section_Testimonial: {
     label: "Testimonial",
-    fields: makeSectionFields("Section_Testimonial", (p, set) => (
-      <>
-        <TabSection title="Heading" />
-        <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="What Our Customers Say" />
-        <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="Real reviews from real customers" />
-        <TabSection title="Reviews" />
-        <AccordionItemsField items={p.items} onChange={(v) => set("items", v)} max={12} singular="Review"
-          newItem={() => ({ quote: "Great experience!", author: "Customer", role: "", rating: "5", avatar: "" })}
-          fields={[{ key: "quote", label: "Quote", type: "textarea", placeholder: "Their feedback…" }, { key: "author", label: "Author", placeholder: "Jane Doe" }, { key: "role", label: "Role / Company", placeholder: "CEO, Acme" }, { key: "rating", label: "Stars (1-5)", placeholder: "5" }, { key: "avatar", label: "Avatar", type: "image" }]}
-          getThumb={(it: any) => (it.avatar ? <img src={it.avatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <span>{"👤"}</span>)}
-          getTitle={(it: any, i: number) => (it.author || "").trim() || `Review ${i + 1}`}
-          getSubtitle={(it: any) => it.role || it.quote || "No quote"}
-          removeNote="This review will be removed. This action cannot be undone." />
-        <TabSection title="Layout" />
-        <InlineSelect label="Columns" value={String(p.reviewCount ?? 3)} onChange={(v) => set("reviewCount", Number(v))} options={[{ value: "1", label: "1 (Single)" }, { value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
-      </>
-    )),
-    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 1, bgType: "color", bgColor: "#f8fafc", advPadding: { top: 60, right: 0, bottom: 60, left: 0 }, sectionTitle: "What Our Customers Say", sectionSubtitle: "Real reviews from real customers", reviewCount: 3,
+    fields: {
+      _tabs: {
+        type: "custom" as const,
+        label: "",
+        render: (_: any) => {
+          const { selectedItem, appState, dispatch } = usePuck();
+          const p = selectedItem?.props ?? {};
+          const set = makeSectionSet(dispatch, selectedItem, appState);
+          return (
+            <BlockTabBar blockKey="Section_Testimonial">
+              {(tab) => (
+                <>
+                  {/* ── CONTENT TAB ── */}
+                  {tab === "content" && (
+                    <>
+                      <TabSection title="Heading" />
+                      <StackedTextField label="Title" value={p.sectionTitle ?? ""} onChange={(v) => set("sectionTitle", v)} placeholder="What Our Customers Say" />
+                      <StackedTextField label="Subtitle" value={p.sectionSubtitle ?? ""} onChange={(v) => set("sectionSubtitle", v)} placeholder="Real reviews from real customers" />
+                      <InlineSelect label="Heading Alignment" value={p.headingAlign ?? "center"} onChange={(v) => set("headingAlign", v)}
+                        options={[{ value: "left", label: "Left" }, { value: "center", label: "Center" }, { value: "right", label: "Right" }]} />
+
+                      <TabSection title="Reviews" />
+                      <AccordionItemsField items={p.items} onChange={(v) => set("items", v)} max={12} singular="Review"
+                        newItem={() => ({ author: "Customer", quote: "Great experience!", role: "", rating: 5, avatar: "" })}
+                        fields={[
+                          { key: "author", label: "Author Name", placeholder: "Jane Doe" },
+                          { key: "quote", label: "Quote", type: "textarea", placeholder: "Their feedback…" },
+                          { key: "role", label: "Role / Company", placeholder: "CEO, Acme" },
+                          { key: "rating", label: "Rating (1–5)", type: "range", min: 1, max: 5, step: 1 },
+                          { key: "avatar", label: "Avatar", type: "image" },
+                        ]}
+                        getThumb={(it: any) => (it.avatar ? <img src={it.avatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <span>{"👤"}</span>)}
+                        getTitle={(it: any, i: number) => (it.author || "").trim() || `Review ${i + 1}`}
+                        getSubtitle={(it: any) => it.role || it.quote || "No quote"}
+                        removeNote="This review will be removed. This action cannot be undone." />
+
+                      <TabSection title="Layout" />
+                      <InlineSelect label="Columns" value={String(p.reviewCount ?? 3)} onChange={(v) => set("reviewCount", Number(v))}
+                        options={[{ value: "1", label: "1" }, { value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]} />
+                      <InlineSelect label="Card Layout" value={p.cardLayout ?? "grid"} onChange={(v) => set("cardLayout", v)}
+                        options={[{ value: "grid", label: "Grid" }, { value: "slider", label: "Slider" }]} />
+                      <InlineSelect label="Content Alignment" value={p.contentAlign ?? "left"} onChange={(v) => set("contentAlign", v)}
+                        options={[{ value: "left", label: "Left" }, { value: "center", label: "Center" }, { value: "right", label: "Right" }]} />
+                      <InlineSelect label="Card Alignment" value={p.cardAlign ?? "top"} onChange={(v) => set("cardAlign", v)}
+                        options={[{ value: "top", label: "Top" }, { value: "center", label: "Center" }, { value: "bottom", label: "Bottom" }]} />
+
+                      <TabSection title="Display Settings" />
+                      <ToggleField label="Show Rating ⭐" value={p.showRating !== false} onChange={(v) => set("showRating", v)} />
+                      <ToggleField label="Show Avatar 👤" value={p.showAvatar !== false} onChange={(v) => set("showAvatar", v)} />
+                      <ToggleField label="Show Author Name" value={p.showAuthor !== false} onChange={(v) => set("showAuthor", v)} />
+                      <ToggleField label="Show Role / Company" value={p.showRole !== false} onChange={(v) => set("showRole", v)} />
+
+                      <TabSection title="Card Settings" />
+                      <InlineSelect label="Card Style" value={p.cardStyle ?? "filled"} onChange={(v) => set("cardStyle", v)}
+                        options={[{ value: "filled", label: "Filled" }, { value: "outlined", label: "Outlined" }, { value: "minimal", label: "Minimal" }]} />
+                      <InlineSelect label="Card Height" value={p.cardHeight ?? "auto"} onChange={(v) => set("cardHeight", v)}
+                        options={[{ value: "auto", label: "Auto" }, { value: "equal", label: "Equal Height" }]} />
+                    </>
+                  )}
+
+                  {/* ── STYLE TAB ── */}
+                  {tab === "style" && (
+                    <>
+                      <SectionStyleBackgroundFields props={p} set={set} />
+
+                      <TabSection title="Heading" />
+                      <InlineSelect label="Font Family" value={p.headingFontFamily ?? "inherit"} onChange={(v) => { set("headingFontFamily", v); loadGoogleFont(v); }} options={FONT_FAMILY_OPTIONS} />
+                      <SliderNumberField label="Size" value={p.headingFontSize ?? 36} onChange={(v) => set("headingFontSize", v)} min={12} max={120} step={1} unit="px" />
+                      <InlineSelect label="Weight" value={String(p.headingFontWeight ?? "800")} onChange={(v) => set("headingFontWeight", v)} options={FONT_WEIGHT_OPTIONS} />
+                      <SliderNumberField label="Line Height" value={p.headingLineHeight ?? 1.2} onChange={(v) => set("headingLineHeight", v)} min={0.8} max={3} step={0.05} unit="" />
+                      <ColorPickerField label="Color" value={p.headingColor ?? ""} onChange={(v) => set("headingColor", v)} />
+
+                      <TabSection title="Subtitle" />
+                      <InlineSelect label="Font Family" value={p.subtitleFontFamily ?? "inherit"} onChange={(v) => { set("subtitleFontFamily", v); loadGoogleFont(v); }} options={FONT_FAMILY_OPTIONS} />
+                      <SliderNumberField label="Size" value={p.subtitleFontSize ?? 17} onChange={(v) => set("subtitleFontSize", v)} min={10} max={48} step={1} unit="px" />
+                      <InlineSelect label="Weight" value={String(p.subtitleFontWeight ?? "400")} onChange={(v) => set("subtitleFontWeight", v)} options={FONT_WEIGHT_OPTIONS} />
+                      <SliderNumberField label="Line Height" value={p.subtitleLineHeight ?? 1.6} onChange={(v) => set("subtitleLineHeight", v)} min={0.8} max={3} step={0.05} unit="" />
+                      <ColorPickerField label="Color" value={p.subtitleColor ?? ""} onChange={(v) => set("subtitleColor", v)} />
+
+                      <TabSection title="Quote" />
+                      <SliderNumberField label="Font Size" value={p.quoteFontSize ?? 15} onChange={(v) => set("quoteFontSize", v)} min={10} max={40} step={1} unit="px" />
+                      <ColorPickerField label="Color" value={p.quoteColor ?? ""} onChange={(v) => set("quoteColor", v)} />
+                      <SliderNumberField label="Line Height" value={p.quoteLineHeight ?? 1.6} onChange={(v) => set("quoteLineHeight", v)} min={0.8} max={3} step={0.05} unit="" />
+
+                      <TabSection title="Author" />
+                      <SliderNumberField label="Font Size" value={p.authorFontSize ?? 14} onChange={(v) => set("authorFontSize", v)} min={10} max={40} step={1} unit="px" />
+                      <InlineSelect label="Weight" value={String(p.authorFontWeight ?? "700")} onChange={(v) => set("authorFontWeight", v)} options={FONT_WEIGHT_OPTIONS} />
+                      <ColorPickerField label="Color" value={p.authorColor ?? ""} onChange={(v) => set("authorColor", v)} />
+
+                      <TabSection title="Role" />
+                      <SliderNumberField label="Font Size" value={p.roleFontSize ?? 12} onChange={(v) => set("roleFontSize", v)} min={8} max={32} step={1} unit="px" />
+                      <ColorPickerField label="Color" value={p.roleColor ?? ""} onChange={(v) => set("roleColor", v)} />
+
+                      <TabSection title="Card" />
+                      <ColorPickerField label="Background Color" value={p.cardBg ?? ""} onChange={(v) => set("cardBg", v)} />
+                      <InlineSelect label="Border" value={p.cardBorderStyle ?? "solid"} onChange={(v) => set("cardBorderStyle", v)}
+                        options={[{ value: "none", label: "None" }, { value: "solid", label: "Solid" }, { value: "dashed", label: "Dashed" }, { value: "dotted", label: "Dotted" }]} />
+                      {p.cardBorderStyle !== "none" && (
+                        <>
+                          <SliderNumberField label="Border Width" value={p.cardBorderWidth ?? 1} onChange={(v) => set("cardBorderWidth", v)} min={1} max={12} step={1} unit="px" />
+                          <ColorPickerField label="Border Color" value={p.cardBorderColor ?? ""} onChange={(v) => set("cardBorderColor", v)} />
+                        </>
+                      )}
+                      <SliderNumberField label="Border Radius" value={p.cardRadius ?? 12} onChange={(v) => set("cardRadius", v)} min={0} max={60} step={1} unit="px" />
+                      <InlineSelect label="Shadow" value={p.cardShadow ?? "small"} onChange={(v) => set("cardShadow", v)}
+                        options={[{ value: "none", label: "None" }, { value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }]} />
+                      <SliderNumberField label="Padding" value={p.cardPadding ?? 24} onChange={(v) => set("cardPadding", v)} min={0} max={80} step={2} unit="px" />
+
+                      <TabSection title="Rating" />
+                      <ColorPickerField label="Star Color" value={p.starColor ?? "#f59e0b"} onChange={(v) => set("starColor", v)} />
+                      <SliderNumberField label="Star Size" value={p.starSize ?? 15} onChange={(v) => set("starSize", v)} min={8} max={40} step={1} unit="px" />
+                    </>
+                  )}
+
+                  {/* ── ADVANCED TAB ── */}
+                  {tab === "advanced" && (
+                    <>
+                      <TabSection title="Layout" />
+                      <InlineSelect label="Content Width" value={p.contentWidth ?? "boxed"} onChange={(v) => set("contentWidth", v)}
+                        options={[{ value: "boxed", label: "Boxed" }, { value: "full", label: "Full Width" }]} />
+                      {p.contentWidth === "boxed" && <SliderNumberField label="Max Width" value={p.containerWidth ?? 1140} onChange={(v) => set("containerWidth", v)} min={320} max={1920} step={10} unit="PX" />}
+                      <SliderNumberField label="Min Height" value={p.minHeightPx ?? 0} onChange={(v) => set("minHeightPx", v)} min={0} max={1200} step={10} unit="PX" />
+
+                      <TabSection title="Spacing" />
+                      <FourSideField label="Padding (px)" value={p.advPadding ?? { top: 60, right: 0, bottom: 60, left: 0 }} onChange={(v) => set("advPadding", v)} />
+                      <FourSideField label="Margin (px)" value={p.advMargin ?? { top: 0, right: 0, bottom: 0, left: 0 }} onChange={(v) => set("advMargin", v)} />
+
+                      <TabSection title="Responsive" />
+                      <ToggleField label="Hide on Desktop" value={!!p.hideDesktop} onChange={(v) => set("hideDesktop", v)} />
+                      <ToggleField label="Hide on Tablet" value={!!p.hideTablet} onChange={(v) => set("hideTablet", v)} />
+                      <ToggleField label="Hide on Mobile" value={!!p.hideMobile} onChange={(v) => set("hideMobile", v)} />
+
+                      <TabSection title="Animation" />
+                      <InlineSelect label="Entrance Animation" value={p.animation ?? "none"} onChange={(v) => set("animation", v)}
+                        options={[{ value: "none", label: "None" }, { value: "fadeIn", label: "Fade In" }, { value: "fadeInUp", label: "Fade In Up" }, { value: "fadeInDown", label: "Fade In Down" }, { value: "slideInLeft", label: "Slide In Left" }, { value: "slideInRight", label: "Slide In Right" }, { value: "zoomIn", label: "Zoom In" }]} />
+                    </>
+                  )}
+                </>
+              )}
+            </BlockTabBar>
+          );
+        },
+      },
+    },
+    defaultProps: baseSectionProps({ columns: 3, columnsTablet: 1, bgType: "color", bgColor: "#f8fafc", advPadding: { top: 60, right: 0, bottom: 60, left: 0 },
+      sectionTitle: "What Our Customers Say", sectionSubtitle: "Real reviews from real customers", headingAlign: "center",
+      reviewCount: 3, cardLayout: "grid", contentAlign: "left", cardAlign: "top",
+      showRating: true, showAvatar: true, showAuthor: true, showRole: true,
+      cardStyle: "filled", cardHeight: "auto",
+      // Typography
+      headingFontFamily: "inherit", headingFontSize: 36, headingFontWeight: "800", headingLineHeight: 1.2, headingColor: "",
+      subtitleFontFamily: "inherit", subtitleFontSize: 17, subtitleFontWeight: "400", subtitleLineHeight: 1.6, subtitleColor: "",
+      quoteFontSize: 15, quoteColor: "", quoteLineHeight: 1.6,
+      authorFontSize: 14, authorFontWeight: "700", authorColor: "",
+      roleFontSize: 12, roleColor: "",
+      // Card
+      cardBg: "", cardBorderStyle: "solid", cardBorderWidth: 1, cardBorderColor: "", cardRadius: 12, cardShadow: "small", cardPadding: 24,
+      // Rating
+      starColor: "#f59e0b", starSize: 15,
       items: [
-        { quote: "Absolutely love it. Setup was effortless and the results speak for themselves.", author: "Jamie Carter", role: "Marketing Lead", rating: "5", avatar: "" },
-        { quote: "The best decision we made this year. Support is incredibly responsive.", author: "Priya Nair", role: "Founder, Bloom", rating: "5", avatar: "" },
-        { quote: "Simple, powerful, and reliable. Highly recommended to any team.", author: "Marcus Hill", role: "CTO", rating: "5", avatar: "" },
+        { author: "Jamie Carter", quote: "Absolutely love it. Setup was effortless and the results speak for themselves.", role: "Marketing Lead", rating: 5, avatar: "" },
+        { author: "Priya Nair", quote: "The best decision we made this year. Support is incredibly responsive.", role: "Founder, Bloom", rating: 5, avatar: "" },
+        { author: "Marcus Hill", quote: "Simple, powerful, and reliable. Highly recommended to any team.", role: "CTO", rating: 5, avatar: "" },
       ] }),
     render: (p: any) => <SectionTestimonialContent p={p} />,
   },
